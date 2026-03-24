@@ -40,7 +40,7 @@ function Phi = sidWindowedDFT(R, W, freqs, useFFT)
 %   https://github.com/pdlourenco/sid-matlab
 %  -----------------------------------------------------------------------
 
-    M = length(W) - 1;
+    M = length(W) - 1; %#ok<NASGU>
     nf = length(freqs);
 
     % Determine signal dimensions
