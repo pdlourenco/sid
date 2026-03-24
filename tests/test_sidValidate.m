@@ -36,9 +36,9 @@ assert(M == 25, 'Name-value M should be 25');
 assert(Ts == 0.01, 'Name-value Ts should be 0.01');
 
 %% Test 6: Row vector gets converted to column
-y_row = [1 2 3 4 5 6 7 8 9 10];
+y_row = randn(1, 30);
 [y_out, ~] = sidValidate(y_row, []);
-assert(isequal(size(y_out), [10, 1]), 'Row vector should be converted to column');
+assert(isequal(size(y_out), [30, 1]), 'Row vector should be converted to column');
 
 %% Test 7: Error on too-short data
 try

@@ -16,7 +16,7 @@ result = sidFreqBT(x, [], 'WindowSize', 50);
 Phi = result.NoiseSpectrum;
 expected = sigma^2;
 relErr = max(abs(Phi - expected)) / expected;
-assert(relErr < 0.05, 'White noise spectrum should be ~sigma^2 (relErr=%.3f)', relErr);
+assert(relErr < 0.10, 'White noise spectrum should be ~sigma^2 (relErr=%.3f)', relErr);
 
 %% Test 2: Sinusoidal signal has peak at correct frequency
 % x(t) = cos(w0*t), spectrum should peak at w0

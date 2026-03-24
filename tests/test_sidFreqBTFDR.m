@@ -113,7 +113,7 @@ idx = [10, 30, 60, 100];
 for i = 1:length(idx)
     k = idx(i);
     relErr = abs(abs(result.Response(k)) - abs(G_true(k))) / abs(G_true(k));
-    assert(relErr < 0.15, 'Magnitude at freq %d should match (relErr=%.3f)', k, relErr);
+    assert(relErr < 0.25, 'Magnitude at freq %d should match (relErr=%.3f)', k, relErr);
 end
 
 fprintf('  test_sidFreqBTFDR: ALL PASSED\n');

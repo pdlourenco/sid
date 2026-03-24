@@ -89,7 +89,7 @@ function X = sidDFT(x, freqs, useFFT)
 
         for k = 1:nf
             e = exp(-1j * freqs(k) * t);  % (N x 1)
-            X(k, :) = e' * x;             % (1 x p)
+            X(k, :) = e.' * x;            % (1 x p)
         end
     end
 end

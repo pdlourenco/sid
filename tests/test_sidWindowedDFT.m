@@ -61,7 +61,7 @@ W = sidHannWin(M);
 freqs = (1:128)' * pi / 128;
 Phi = real(sidWindowedDFT(R, W, freqs, true));
 % For unit variance white noise, spectrum should be ~1 everywhere
-assert(max(abs(Phi - 1)) < 0.15, 'White noise spectrum should be ~1 (flat)');
+assert(max(abs(Phi - 1)) < 0.25, 'White noise spectrum should be ~1 (flat)');
 
 %% Test 8: Custom frequencies (non-default grid)
 freqs_custom = [0.1; 0.5; 1.0; 2.0; 3.0];

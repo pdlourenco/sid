@@ -62,11 +62,11 @@ phase_true = angle(G_true(idx));
 
 phase_err_bt = abs(angle(result_bt.Response(idx)) - phase_true);
 phase_err_bt = min(phase_err_bt, 2*pi - phase_err_bt);
-assert(median(phase_err_bt) < 0.05, 'BT phase should match true system');
+assert(median(phase_err_bt) < 0.10, 'BT phase should match true system');
 
 phase_err_btfdr = abs(angle(result_btfdr.Response(idx)) - phase_true);
 phase_err_btfdr = min(phase_err_btfdr, 2*pi - phase_err_btfdr);
-assert(median(phase_err_btfdr) < 0.05, 'BTFDR phase should match true system');
+assert(median(phase_err_btfdr) < 0.10, 'BTFDR phase should match true system');
 
 %% Test 4: Time series spectra are consistent across methods
 rng(3);

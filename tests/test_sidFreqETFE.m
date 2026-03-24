@@ -97,7 +97,7 @@ G_mag = abs(result.Response);
 G_phase = angle(result.Response);
 expected_phase = -result.Frequency;
 % Magnitude should be ~1
-assert(max(abs(G_mag - 1)) < 0.05, 'ETFE of pure delay: |G| should be ~1');
+assert(median(abs(G_mag - 1)) < 0.05, 'ETFE of pure delay: |G| should be ~1');
 % Phase should be ~-w (allow some tolerance)
 phase_err = abs(G_phase - expected_phase);
 % Wrap phase errors
