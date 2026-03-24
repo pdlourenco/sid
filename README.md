@@ -26,8 +26,8 @@ sidSpectrumPlot(result);
 | Function | Description | Status |
 |----------|-------------|--------|
 | `sidFreqBT` | Frequency response via Blackman-Tukey (replaces `spa`) | Implemented |
-| `sidFreqBTFDR` | Blackman-Tukey with frequency-dependent resolution (replaces `spafdr`) | Stub |
-| `sidFreqETFE` | Empirical transfer function estimate (replaces `etfe`) | Stub |
+| `sidFreqBTFDR` | Blackman-Tukey with frequency-dependent resolution (replaces `spafdr`) | Implemented |
+| `sidFreqETFE` | Empirical transfer function estimate (replaces `etfe`) | Implemented |
 | `sidBodePlot` | Bode diagram with confidence bands | Implemented |
 | `sidSpectrumPlot` | Power spectrum plot with confidence bands | Implemented |
 
