@@ -18,6 +18,23 @@ function R = sidCov(x, z, maxLag)
 %     R      - (maxLag+1 x p x q) array of covariance estimates.
 %              R(tau+1, :, :) is the covariance at lag tau.
 %              For scalar signals, R is (maxLag+1 x 1).
+%
+%   Example:
+%   TODO add example code here
+%
+%   Changelog:
+%   2026-03-24: First version by Pedro Lourenço.
+%
+%  -----------------------------------------------------------------------
+%   Copyright (c) 2026 Pedro Lourenço, All rights reserved.
+%   This code is released under the MIT License. See LICENSE file in the
+%   project root for full license information.
+%
+%   This function is part of the Open Source System Identification 
+%   Toolbox (SID).
+%   For full documentation and examples, visit
+%   https://github.com/pdlourenco/sid-matlab
+%  -----------------------------------------------------------------------
 
     N = size(x, 1);
     p = size(x, 2);

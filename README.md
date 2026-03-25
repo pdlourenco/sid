@@ -41,5 +41,5 @@ sidSpectrumPlot(result);
 See [SPEC.md](SPEC.md) for the full algorithm specification.
 
 ## License
-
-MIT. See [LICENSE](LICENSE).
+Copyright (c) 2026 Pedro Lourenço, All rights reserved.
+This code is released under the MIT License. See [LICENSE](LICENSE) file in the project root for full license information.

@@ -16,6 +16,23 @@ function [GStd, PhiVStd] = sidUncertainty(G, PhiV, Coh, N, W)
 %   OUTPUTS:
 %     GStd    - Standard deviation of G (n_f x 1), or [].
 %     PhiVStd - Standard deviation of PhiV (n_f x 1).
+%
+%   Example:
+%   TODO add example code here
+%
+%   Changelog:
+%   2026-03-24: First version by Pedro Lourenço.
+%
+%  -----------------------------------------------------------------------
+%   Copyright (c) 2026 Pedro Lourenço, All rights reserved.
+%   This code is released under the MIT License. See LICENSE file in the
+%   project root for full license information.
+%
+%   This function is part of the Open Source System Identification 
+%   Toolbox (SID).
+%   For full documentation and examples, visit
+%   https://github.com/pdlourenco/sid-matlab
+%  -----------------------------------------------------------------------
 
     % ---- Window norm: C_W = sum_{tau=-M}^{M} W(tau)^2 ----
     % W contains values for tau = 0..M. The full sum is W(0)^2 + 2*sum(W(1..M)^2).
