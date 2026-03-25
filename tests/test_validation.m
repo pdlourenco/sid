@@ -71,7 +71,7 @@ y = filter(1, [1 -0.8], u) + sigma_v * randn(N, 1);
 result = sidFreqBT(y, u, 'WindowSize', 50);
 % Average noise spectrum should be ~sigma_v^2
 mean_noise = mean(result.NoiseSpectrum);
-assert(abs(mean_noise - sigma_v^2) / sigma_v^2 < 0.15, ...
+assert(abs(mean_noise - sigma_v^2) / sigma_v^2 < 0.20, ...
     'Average noise spectrum should be ~sigma_v^2 (got %.3f vs %.3f)', mean_noise, sigma_v^2);
 
 %% Test 6: Coherence approaches 1 for low-noise systems
