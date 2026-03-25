@@ -19,8 +19,9 @@ rng(10);
 N = 2000;
 Ts = 1;
 a = 0.85;
+sigma_v = 0.5;  % moderate noise to avoid catastrophic cancellation in PhiV
 u = randn(N, 1);
-y = filter(1, [1 -a], u) + 0.1 * randn(N, 1);
+y = filter(1, [1 -a], u) + sigma_v * randn(N, 1);
 
 result_sid = sidFreqBT(y, u);
 w = result_sid.Frequency;

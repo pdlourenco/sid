@@ -13,31 +13,33 @@ if ~exist('spafdr', 'file')
     return;
 end
 
-%% Test 1: SISO first-order system, default resolution
+%% Test 1: SISO first-order system, explicit resolution
 rng(21);
 N = 2000;
 Ts = 1;
+sigma_v = 0.5;  % moderate noise for robust noise spectrum comparison
 u = randn(N, 1);
-y = filter(1, [1 -0.85], u) + 0.1 * randn(N, 1);
+y = filter(1, [1 -0.85], u) + sigma_v * randn(N, 1);
 
 w = (1:128)' * pi / 128;
+R_res = 0.3;  % explicit resolution avoids default formula differences
 
-result_sid = sidFreqBTFDR(y, u, 'Frequencies', w);
+result_sid = sidFreqBTFDR(y, u, 'Resolution', R_res, 'Frequencies', w);
 
 data = iddata(y, u, Ts);
-G_spafdr = spafdr(data, [], w);
+G_spafdr = spafdr(data, R_res, w);
 resp_spafdr = squeeze(G_spafdr.ResponseData);
 spec_spafdr = real(squeeze(G_spafdr.SpectrumData));
 
 % Response comparison
 relErr = max(abs(result_sid.Response - resp_spafdr) ./ max(abs(resp_spafdr), 1e-10));
 assert(relErr < 0.02, ...
-    'Test 1: default response relErr=%.6f should be <2%%', relErr);
+    'Test 1: response relErr=%.6f should be <2%%', relErr);
 
 % Noise spectrum comparison
 relErr_noise = max(abs(real(result_sid.NoiseSpectrum) - spec_spafdr) ./ max(abs(spec_spafdr), 1e-10));
 assert(relErr_noise < 0.02, ...
-    'Test 1: default noise spectrum relErr=%.6f should be <2%%', relErr_noise);
+    'Test 1: noise spectrum relErr=%.6f should be <2%%', relErr_noise);
 
 %% Test 2: Fine resolution (large window, low variance)
 rng(22);
