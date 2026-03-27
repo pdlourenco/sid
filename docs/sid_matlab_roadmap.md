@@ -19,6 +19,8 @@ sid  [Domain]  [Method/Variant]
 | **`sidFreqBT`** | `spa` | Frequency response via Blackman-Tukey |
 | **`sidFreqBTFDR`** | `spafdr` | Blackman-Tukey, frequency-dependent resolution |
 | **`sidFreqETFE`** | `etfe` | Empirical transfer function estimate |
+| **`sidFreqBTMap`** | — | Time-varying frequency response map (LTV analysis) |
+| **`sidSpectrogram`** | `spectrogram` | Short-time FFT spectrogram |
 | `sidTfARX` | `arx` | Transfer function, ARX model |
 | `sidTfARMAX` | `armax` | Transfer function, ARMAX model |
 | `sidSsN4SID` | `n4sid` | State-space, N4SID subspace method |
@@ -32,6 +34,8 @@ sid  [Domain]  [Method/Variant]
 |----------|-------------|
 | **`sidBodePlot`** | Bode diagram with confidence bands |
 | **`sidSpectrumPlot`** | Power spectrum with confidence bands |
+| **`sidMapPlot`** | Time-frequency color map (for sidFreqBTMap results) |
+| **`sidSpectrogramPlot`** | Spectrogram color map (for sidSpectrogram results) |
 | `sidNyquistPlot` | Nyquist plot |
 | `sidPolePlot` | Pole-zero map |
 
@@ -50,22 +54,26 @@ sid  [Domain]  [Method/Variant]
 
 ```
 sid/
-├── +sid/
-│   ├── sidFreqBT.m           % Blackman-Tukey spectral analysis
-│   ├── sidFreqBTFDR.m        % BT with frequency-dependent resolution
-│   ├── sidFreqETFE.m         % Empirical transfer function estimate
-│   ├── sidBodePlot.m         % Bode diagram with confidence bands
-│   ├── sidSpectrumPlot.m     % Power spectrum plot
-│   └── +internal/
-│       ├── sidCov.m          % Biased covariance estimation
-│       ├── sidHannWin.m      % Hann window generation
-│       ├── sidWindowedDFT.m  % Windowed DFT (FFT + direct)
-│       ├── sidUncertainty.m  % Asymptotic variance formulas
-│       └── sidValidate.m     % Input parsing and validation
+├── sidFreqBT.m              % Blackman-Tukey spectral analysis
+├── sidFreqBTFDR.m           % BT with frequency-dependent resolution
+├── sidFreqETFE.m            % Empirical transfer function estimate
+├── sidFreqBTMap.m           % Time-varying frequency response map
+├── sidSpectrogram.m         % Short-time FFT spectrogram
+├── sidBodePlot.m            % Bode diagram with confidence bands
+├── sidSpectrumPlot.m        % Power spectrum plot
+├── sidMapPlot.m             % Time-frequency color map
+├── sidSpectrogramPlot.m     % Spectrogram color map
+├── internal/
+│   ├── sidCov.m             % Biased covariance estimation
+│   ├── sidHannWin.m         % Hann window generation
+│   ├── sidWindowedDFT.m     % Windowed DFT (FFT + direct)
+│   ├── sidUncertainty.m     % Asymptotic variance formulas
+│   └── sidValidate.m        % Input parsing and validation
 ├── test/
-│   ├── testSidFreqBT.m       % SISO + time series + MIMO
+│   ├── testSidFreqBT.m      % SISO + time series + MIMO
 │   ├── testSidFreqBTFDR.m
 │   ├── testSidFreqETFE.m
+│   ├── testSidFreqBTMap.m
 │   ├── testSidUncertainty.m
 │   ├── testSidEdgeCases.m
 │   ├── testSidOctave.m
@@ -169,13 +177,40 @@ result.DataLength          % N (number of samples used)
 - `sidBodePlot.m` extended: subplot grid per channel pair
 - Tests: 2x2 known system, verify channel-by-channel
 
-### Phase 7 — `sidFreqETFE` and `sidFreqBTFDR` (~4 days)
+### Phase 7 — `sidFreqBTMap` + `sidSpectrogram` — Time-Varying Analysis (~5 days)
+
+- `sidSpectrogram.m`:
+  - Short-time FFT spectrogram (replaces Signal Processing Toolbox `spectrogram`)
+  - Windowed segments → FFT → one-sided PSD
+  - Supports Hann, Hamming, rectangular, or custom window vector
+  - Returns struct with Time, Frequency, Power, PowerDB, Complex coefficients
+- `sidFreqBTMap.m`:
+  - Segment the data into overlapping windows
+  - Run `sidFreqBT` on each segment
+  - Collect G(w,t), Phi_v(w,t), coherence(w,t) into 2D arrays
+  - Compute time vector from segment centers
+  - Share segmentation conventions with `sidSpectrogram` for aligned time axes
+- `sidMapPlot.m`:
+  - Color map visualization (pcolor/imagesc)
+  - Plot types: magnitude, phase, noise, coherence, spectrum
+  - Log frequency axis, time on x-axis, colorbar
+  - Octave-compatible
+- `sidSpectrogramPlot.m`:
+  - Standard spectrogram color map (time × frequency × power dB)
+  - Shared visual style with `sidMapPlot`
+- Tests:
+  - `sidSpectrogram`: chirp signal (verify moving peak), white noise (flat), known sinusoid
+  - `sidFreqBTMap`: LTI system (constant map), step change in system, chirp
+  - Alignment test: verify time axes match between `sidSpectrogram` and `sidFreqBTMap`
+  - Compare `sidSpectrogram` output to MathWorks `spectrogram` (if available)
+
+### Phase 8 — `sidFreqETFE` and `sidFreqBTFDR` (~4 days)
 
 - `sidFreqETFE.m` — FFT ratio with optional smoothing
 - `sidFreqBTFDR.m` — frequency-dependent window size
 - Tests for both
 
-### Phase 8 — Validation + Release (~4 days)
+### Phase 9 — Validation + Release (~4 days)
 
 - `exampleCompare.m` — head-to-head vs. MathWorks `spa`
 - Octave CI on GitHub Actions
@@ -194,8 +229,9 @@ result.DataLength          % N (number of samples used)
 | 4. Uncertainty | 3 days | 11 days |
 | 5. Plotting | 2 days | 13 days |
 | 6. MIMO | 4 days | 17 days |
-| 7. ETFE + BTFDR | 4 days | 21 days |
-| 8. Validation + release | 4 days | 25 days |
+| 7. sidFreqBTMap + sidSpectrogram | 5 days | 22 days |
+| 8. ETFE + BTFDR | 4 days | 26 days |
+| 9. Validation + release | 4 days | 30 days |
 
 ---
 
