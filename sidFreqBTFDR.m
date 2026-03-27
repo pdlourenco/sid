@@ -146,7 +146,7 @@ function result = sidFreqBTFDR(y, u, varargin)
     end
 
     % ---- Resolution to window size ----
-    Mk = ceil(2 * pi ./ R);
+    Mk = round(2 * pi ./ R);
     Mk = max(Mk, 2);                   % M >= 2
     Mk = min(Mk, floor(N / 2));        % M <= N/2
 
