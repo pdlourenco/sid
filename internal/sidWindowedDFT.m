@@ -1,7 +1,8 @@
-function Phi = sidWindowedDFT(R, W, freqs, useFFT)
+function Phi = sidWindowedDFT(R, W, freqs, useFFT, Rneg)
 %SIDWINDOWEDDFT Windowed Fourier transform of covariance estimates.
 %
 %   Phi = sidWindowedDFT(R, W, freqs, useFFT)
+%   Phi = sidWindowedDFT(R, W, freqs, useFFT, Rneg)
 %
 %   Computes the spectral estimate:
 %
@@ -10,6 +11,10 @@ function Phi = sidWindowedDFT(R, W, freqs, useFFT)
 %   Using either the FFT (when useFFT is true and the frequency grid is
 %   the default linear grid) or direct summation.
 %
+%   For auto-covariance, R(-tau) = conj(R(tau)) is used automatically.
+%   For cross-covariance, pass Rneg = R_zy (the reverse covariance) so
+%   that R(-tau) = Rneg(tau) is used for negative lags.
+%
 %   INPUTS:
 %     R      - Covariance estimates for lags 0..M.
 %              Scalar signals: (M+1 x 1) vector.
@@ -17,6 +22,9 @@ function Phi = sidWindowedDFT(R, W, freqs, useFFT)
 %     W      - Hann window values for lags 0..M. (M+1 x 1) vector.
 %     freqs  - (n_f x 1) frequency vector in rad/sample.
 %     useFFT - Logical. If true, use FFT fast path.
+%     Rneg   - (optional) Covariance for negative lags. Same size as R.
+%              When provided, Rneg(tau) is used for R(-tau) instead of
+%              conj(R(tau)). Required for cross-covariance estimation.
 %
 %   OUTPUT:
 %     Phi    - Spectral estimate at each frequency.
@@ -40,7 +48,11 @@ function Phi = sidWindowedDFT(R, W, freqs, useFFT)
 %   https://github.com/pdlourenco/sid-matlab
 %  -----------------------------------------------------------------------
 
-    M = length(W) - 1; %#ok<NASGU>
+    if nargin < 5
+        Rneg = [];
+    end
+
+    M = length(W) - 1;
     nf = length(freqs);
 
     % Determine signal dimensions
@@ -48,34 +60,45 @@ function Phi = sidWindowedDFT(R, W, freqs, useFFT)
         p = 1; q = 1;
         isScalar = true;
     else
-        sz = size(R);
-        p = sz(2); q = sz(3);
+        p = size(R, 2); q = size(R, 3);
         isScalar = false;
     end
 
     if useFFT && isScalar
-        Phi = windowedDFT_FFT(R, W, nf);
+        Rneg_s = Rneg;
+        Phi = windowedDFT_FFT(R, W, nf, Rneg_s);
     elseif useFFT && ~isScalar
         Phi = zeros(nf, p, q);
         for ii = 1:p
             for jj = 1:q
-                Phi(:, ii, jj) = windowedDFT_FFT(R(:, ii, jj), W, nf);
+                if isempty(Rneg)
+                    Rneg_ij = [];
+                else
+                    Rneg_ij = Rneg(:, jj, ii);
+                end
+                Phi(:, ii, jj) = windowedDFT_FFT(R(:, ii, jj), W, nf, Rneg_ij);
             end
         end
     elseif ~useFFT && isScalar
-        Phi = windowedDFT_direct(R, W, freqs);
+        Rneg_s = Rneg;
+        Phi = windowedDFT_direct(R, W, freqs, Rneg_s);
     else
         Phi = zeros(nf, p, q);
         for ii = 1:p
             for jj = 1:q
-                Phi(:, ii, jj) = windowedDFT_direct(R(:, ii, jj), W, freqs);
+                if isempty(Rneg)
+                    Rneg_ij = [];
+                else
+                    Rneg_ij = Rneg(:, jj, ii);
+                end
+                Phi(:, ii, jj) = windowedDFT_direct(R(:, ii, jj), W, freqs, Rneg_ij);
             end
         end
     end
 end
 
 
-function Phi = windowedDFT_FFT(R, W, nf)
+function Phi = windowedDFT_FFT(R, W, nf, Rneg)
 %WINDOWEDDFT_FFT FFT fast path for default linear frequency grid.
 %
 %   Assumes frequencies are (1:nf) * pi / nf, i.e. the bins produced by
@@ -97,10 +120,15 @@ function Phi = windowedDFT_FFT(R, W, nf)
         s(tau + 1) = W(tau + 1) * R(tau + 1);
     end
 
-    % Negative lags -1..-M (using R(-tau) = conj(R(tau)) for cross-cov)
-    % For real signals this is just R(tau).
+    % Negative lags -1..-M
+    % For auto-covariance: R(-tau) = conj(R(tau))
+    % For cross-covariance: R_xy(-tau) = R_yx(tau), passed as Rneg
     for tau = 1:M
-        s(L - tau + 1) = W(tau + 1) * conj(R(tau + 1));
+        if isempty(Rneg)
+            s(L - tau + 1) = W(tau + 1) * conj(R(tau + 1));
+        else
+            s(L - tau + 1) = W(tau + 1) * Rneg(tau + 1);
+        end
     end
 
     % FFT
@@ -112,7 +140,7 @@ function Phi = windowedDFT_FFT(R, W, nf)
 end
 
 
-function Phi = windowedDFT_direct(R, W, freqs)
+function Phi = windowedDFT_direct(R, W, freqs, Rneg)
 %WINDOWEDDFT_DIRECT Direct DFT at arbitrary frequencies.
 
     M = length(W) - 1;
@@ -126,9 +154,15 @@ function Phi = windowedDFT_direct(R, W, freqs)
         val = W(1) * R(1);
 
         % Lags 1..M: positive and negative combined
+        % For auto-covariance: R(-tau) = conj(R(tau))
+        % For cross-covariance: R_xy(-tau) = Rneg(tau) = R_yx(tau)
         for tau = 1:M
             e = exp(-1j * w * tau);
-            val = val + W(tau + 1) * (R(tau + 1) * e + conj(R(tau + 1)) * conj(e));
+            if isempty(Rneg)
+                val = val + W(tau + 1) * (R(tau + 1) * e + conj(R(tau + 1)) * conj(e));
+            else
+                val = val + W(tau + 1) * (R(tau + 1) * e + Rneg(tau + 1) * conj(e));
+            end
         end
 
         Phi(k) = val;

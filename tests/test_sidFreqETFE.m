@@ -111,7 +111,8 @@ u = randn(N, 1);
 y = [filter([1], [1 -0.5], u), filter([0.3], [1 -0.7], u)];
 result_mimo = sidFreqETFE(y, u);
 nf = length(result_mimo.Frequency);
-assert(isequal(size(result_mimo.Response), [nf, 2, 1]), 'MIMO Response should be (nf x 2 x 1)');
+assert(size(result_mimo.Response, 1) == nf && size(result_mimo.Response, 2) == 2, ...
+    'MIMO Response should be (nf x 2 x 1)');
 
 %% Test 14: Custom sample time
 result = sidFreqETFE(y, u, 'SampleTime', 0.001);

@@ -30,6 +30,9 @@ testFiles = {
     'test_sidPlotting'
     'test_validation'
     'test_crossMethod'
+    'test_compareSpa'
+    'test_compareEtfe'
+    'test_compareSpafdr'
 };
 
 nTests = length(testFiles);

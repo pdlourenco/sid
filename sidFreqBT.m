@@ -103,6 +103,7 @@ function result = sidFreqBT(y, u, varargin)
         nu = size(u, 2);
         Ruu = sidCov(u, u, M);                   % (M+1) x nu x nu
         Ryu = sidCov(y, u, M);                   % (M+1) x ny x nu
+        Ruy = sidCov(u, y, M);                   % (M+1) x nu x ny — for negative lags
     end
 
     % ---- Window ----
@@ -113,7 +114,7 @@ function result = sidFreqBT(y, u, varargin)
 
     if ~isTimeSeries
         PhiU  = sidWindowedDFT(Ruu, W, freqs, useFFT); % (nf x nu x nu)
-        PhiYU = sidWindowedDFT(Ryu, W, freqs, useFFT); % (nf x ny x nu)
+        PhiYU = sidWindowedDFT(Ryu, W, freqs, useFFT, Ruy); % (nf x ny x nu)
     end
 
     % ---- Form transfer function and noise spectrum ----

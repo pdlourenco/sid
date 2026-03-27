@@ -157,6 +157,7 @@ function result = sidFreqBTFDR(y, u, varargin)
     if ~isTimeSeries
         Ruu = sidCov(u, u, Mmax);
         Ryu = sidCov(y, u, Mmax);
+        Ruy = sidCov(u, y, Mmax);              % for negative lags of cross-cov
     end
 
     % ---- Per-frequency computation ----
@@ -212,7 +213,7 @@ function result = sidFreqBTFDR(y, u, varargin)
 
             PhiYall(kk) = scalarSingleFreqDFT(Ryy(1:Mk_k+1), W, freqs(kk));
             PhiUall(kk) = scalarSingleFreqDFT(Ruu(1:Mk_k+1), W, freqs(kk));
-            PhiYUall(kk) = scalarSingleFreqDFT(Ryu(1:Mk_k+1), W, freqs(kk));
+            PhiYUall(kk) = scalarSingleFreqDFT(Ryu(1:Mk_k+1), W, freqs(kk), Ruy(1:Mk_k+1));
         end
 
         PhiUmax = max(abs(PhiUall));
@@ -261,10 +262,11 @@ function result = sidFreqBTFDR(y, u, varargin)
             Ryy_k = truncateCov(Ryy, Mk_k, ny, ny);
             Ruu_k = truncateCov(Ruu, Mk_k, nu, nu);
             Ryu_k = truncateCov(Ryu, Mk_k, ny, nu);
+            Ruy_k = truncateCov(Ruy, Mk_k, nu, ny);
 
             PhiY_k = singleFreqDFT(Ryy_k, W, freqs(kk), ny, ny);
             PhiU_k = singleFreqDFT(Ruu_k, W, freqs(kk), nu, nu);
-            PhiYU_k = singleFreqDFT(Ryu_k, W, freqs(kk), ny, nu);
+            PhiYU_k = singleFreqDFT(Ryu_k, W, freqs(kk), ny, nu, Ruy_k);
 
             G(kk, :, :) = PhiYU_k / PhiU_k;
             PhiV_k = PhiY_k - PhiYU_k / PhiU_k * PhiYU_k';
@@ -301,12 +303,16 @@ function Rk = truncateCov(R, Mk, p, q)
 end
 
 
-function Phi = singleFreqDFT(R, W, w, p, q)
+function Phi = singleFreqDFT(R, W, w, p, q, Rneg)
 %SINGLEFREQDFT Windowed DFT at a single frequency for matrix signals.
-%   R:  (Mk+1 x p x q) covariance array
-%   W:  (Mk+1 x 1) window values
-%   w:  scalar frequency (rad/sample)
+%   R:     (Mk+1 x p x q) covariance array
+%   W:     (Mk+1 x 1) window values
+%   w:     scalar frequency (rad/sample)
+%   Rneg:  (optional) (Mk+1 x q x p) reverse covariance for negative lags
 %   Returns: (p x q) complex spectral matrix
+    if nargin < 6
+        Rneg = [];
+    end
     Mk = length(W) - 1;
     Phi = zeros(p, q);
 
@@ -314,29 +320,49 @@ function Phi = singleFreqDFT(R, W, w, p, q)
         for jj = 1:q
             if p == 1 && q == 1
                 Rvec = R(:);
+                if isempty(Rneg)
+                    Rneg_vec = [];
+                else
+                    Rneg_vec = Rneg(:);
+                end
             else
                 Rvec = R(:, ii, jj);
+                if isempty(Rneg)
+                    Rneg_vec = [];
+                else
+                    Rneg_vec = Rneg(:, jj, ii);
+                end
             end
-            Phi(ii, jj) = scalarSingleFreqDFT(Rvec, W, w);
+            Phi(ii, jj) = scalarSingleFreqDFT(Rvec, W, w, Rneg_vec);
         end
     end
 end
 
 
-function val = scalarSingleFreqDFT(R, W, w)
+function val = scalarSingleFreqDFT(R, W, w, Rneg)
 %SCALARSINGLEFREQDFT Windowed DFT at one frequency for scalar covariance.
-%   R: (M+1 x 1) covariance for lags 0..M
-%   W: (M+1 x 1) window values
-%   w: scalar frequency
+%   R:    (M+1 x 1) covariance for lags 0..M
+%   W:    (M+1 x 1) window values
+%   w:    scalar frequency
+%   Rneg: (optional) (M+1 x 1) reverse covariance for negative lags
 %   Returns: scalar complex spectral estimate
+    if nargin < 4
+        Rneg = [];
+    end
     M = length(W) - 1;
 
     % Lag 0 contribution
     val = W(1) * R(1);
 
     % Lags 1..M: combine positive and negative lag contributions
+    % For auto-covariance: R(-tau) = conj(R(tau))
+    % For cross-covariance: R_xy(-tau) = Rneg(tau) = R_yx(tau)
     for tau = 1:M
         e = exp(-1j * w * tau);
-        val = val + W(tau + 1) * (R(tau + 1) * e + conj(R(tau + 1)) * conj(e));
+        if isempty(Rneg)
+            val = val + W(tau + 1) * (R(tau + 1) * e + conj(R(tau + 1)) * conj(e));
+        else
+            val = val + W(tau + 1) * (R(tau + 1) * e + Rneg(tau + 1) * conj(e));
+        end
     end
 end
