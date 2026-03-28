@@ -49,6 +49,8 @@ for i = 1:nTests
         failedNames{end+1} = testFiles{i}; %#ok<SAGROW>
         fprintf('  *** %s: FAILED ***\n', testFiles{i});
         fprintf('      Error: %s\n', e.message);
+        % Emit GitHub Actions annotation so the error appears in CI check-run output
+        fprintf('::error title=%s::%s\n', testFiles{i}, strrep(e.message, newline, ' '));
     end
 end
 
