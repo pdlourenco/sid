@@ -20,7 +20,8 @@ function R = sidCov(x, z, maxLag)
 %              For scalar signals, R is (maxLag+1 x 1).
 %
 %   Example:
-%   TODO add example code here
+%     x = randn(200, 1);
+%     R = sidCov(x, x, 30);  % auto-covariance for lags 0..30
 %
 %   Changelog:
 %   2026-03-24: First version by Pedro Lourenço.

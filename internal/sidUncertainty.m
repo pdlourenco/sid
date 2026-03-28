@@ -18,7 +18,8 @@ function [GStd, PhiVStd] = sidUncertainty(G, PhiV, Coh, N, W)
 %     PhiVStd - Standard deviation of PhiV (n_f x 1).
 %
 %   Example:
-%   TODO add example code here
+%     W = sidHannWin(30);
+%     [GStd, PhiVStd] = sidUncertainty(G, PhiV, Coh, N, W);
 %
 %   Changelog:
 %   2026-03-24: First version by Pedro Lourenço.

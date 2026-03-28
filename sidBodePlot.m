@@ -26,8 +26,10 @@ function varargout = sidBodePlot(result, varargin)
 %   See also: sidFreqBT, sidSpectrumPlot
 %
 %   Example:
-%   % Estimate frequency response and plot Bode diagram with confidence bands
-%   TODO add example code here
+%     N = 1000; u = randn(N, 1);
+%     y = filter([1], [1 -0.9], u) + 0.1*randn(N, 1);
+%     result = sidFreqBT(y, u);
+%     sidBodePlot(result, 'Confidence', 3);
 %
 %   Changelog:
 %   2026-03-24: First version by Pedro Lourenço.

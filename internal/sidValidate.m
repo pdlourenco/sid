@@ -9,7 +9,8 @@ function [y, u, M, freqs, Ts, isTimeSeries] = sidValidate(y, u, varargin)
 %     sidValidate(y, u, 'WindowSize', M, 'Frequencies', freqs)
 %
 %   Example:
-%   TODO add example code here
+%     y = randn(500, 1); u = randn(500, 1);
+%     [y, u, M, freqs, Ts, isTS] = sidValidate(y, u, 'WindowSize', 20);
 %
 %   Changelog:
 %   2026-03-24: First version by Pedro Lourenço.

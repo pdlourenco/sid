@@ -58,7 +58,10 @@ function result = sidFreqBTFDR(y, u, varargin)
 %   See also: sidFreqBT, sidFreqETFE
 %
 %   Example:
-%   TODO add example code here
+%     N = 1000; u = randn(N, 1);
+%     y = filter([1 0.5], [1 -0.8], u) + 0.1*randn(N, 1);
+%     result = sidFreqBTFDR(y, u, 'Resolution', 0.3);
+%     sidBodePlot(result);
 %
 %   Changelog:
 %   2026-03-24: First version by Pedro Lourenço.

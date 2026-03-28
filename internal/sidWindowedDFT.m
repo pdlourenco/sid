@@ -32,7 +32,9 @@ function Phi = sidWindowedDFT(R, W, freqs, useFFT, Rneg)
 %              Matrix signals: (n_f x p x q) complex array.
 %
 %   Example:
-%   TODO add example code here
+%     R = sidCov(x, x, 30); W = sidHannWin(30);
+%     freqs = (1:128)' * pi / 128;
+%     Phi = sidWindowedDFT(R, W, freqs, true, R);
 %
 %   Changelog:
 %   2026-03-24: First version by Pedro Lourenço.

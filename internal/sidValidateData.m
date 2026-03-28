@@ -20,7 +20,8 @@ function [y, u, N, ny, nu, isTimeSeries] = sidValidateData(y, u)
 %     isTimeSeries - Logical, true when u is empty
 %
 %   Example:
-%   TODO add example code here
+%     y = randn(500, 1); u = randn(500, 1);
+%     [y, u, N, ny, nu, isTS] = sidValidateData(y, u);
 %
 %   Changelog:
 %   2026-03-24: First version by Pedro Lourenço.

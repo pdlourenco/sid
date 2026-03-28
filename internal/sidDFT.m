@@ -17,7 +17,9 @@ function X = sidDFT(x, freqs, useFFT)
 %     X      - (nf x p) complex DFT values
 %
 %   Example:
-%   TODO add example code here
+%     x = randn(500, 1);
+%     freqs = (1:128)' * pi / 128;
+%     X = sidDFT(x, freqs, true);
 %
 %   Changelog:
 %   2026-03-24: First version by Pedro Lourenço.

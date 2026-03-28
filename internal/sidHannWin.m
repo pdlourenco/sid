@@ -16,7 +16,7 @@ function W = sidHannWin(M)
 %     W - (M+1 x 1) vector of window values for lags 0..M
 %
 %   Example:
-%   TODO add example code here
+%     W = sidHannWin(30);  % Hann window for lags 0..30
 %
 %   Changelog:
 %   2026-03-24: First version by Pedro Lourenço.

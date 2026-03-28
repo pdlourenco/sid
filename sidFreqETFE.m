@@ -28,7 +28,10 @@ function result = sidFreqETFE(y, u, varargin)
 %   See also: sidFreqBT, sidFreqBTFDR
 %
 %   Example:
-%   TODO add example code here
+%     N = 1000; u = randn(N, 1);
+%     y = filter([1], [1 -0.9], u) + 0.1*randn(N, 1);
+%     result = sidFreqETFE(y, u, 'Smoothing', 5);
+%     sidBodePlot(result);
 %
 %   Changelog:
 %   2026-03-24: First version by Pedro Lourenço.

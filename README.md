@@ -22,6 +22,10 @@ sid is designed from the ground up to run on **GNU Octave** as a first-class tar
 | `sidFreqETFE` | `etfe` | Empirical transfer function estimate (FFT ratio) |
 | `sidBodePlot` | — | Bode diagram with shaded confidence bands |
 | `sidSpectrumPlot` | — | Power spectrum plot with shaded confidence bands |
+| `sidFreqBTMap` | — | Time-varying frequency response map |
+| `sidSpectrogram` | `spectrogram` | Short-time FFT spectrogram |
+| `sidMapPlot` | — | Time-frequency color map for `sidFreqBTMap` results |
+| `sidSpectrogramPlot` | — | Spectrogram color map |
 
 All estimation functions return uncertainty estimates and squared coherence (SISO), and support both positional and name-value calling conventions.
 

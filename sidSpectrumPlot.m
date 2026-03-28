@@ -23,7 +23,9 @@ function varargout = sidSpectrumPlot(result, varargin)
 %   See also: sidFreqBT, sidBodePlot
 %
 %   Example:
-%   TODO add example code here
+%     y = randn(500, 1);
+%     result = sidFreqBT(y, []);
+%     sidSpectrumPlot(result, 'Confidence', 3);
 %
 %   Changelog:
 %   2026-03-24: First version by Pedro Lourenço.
