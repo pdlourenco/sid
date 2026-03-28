@@ -1,7 +1,7 @@
 # sid — Algorithm Specification
 
-**Version:** 0.1.0-draft
-**Date:** 2026-03-24
+**Version:** 0.2.0-draft
+**Date:** 2026-03-28
 **Reference:** Ljung, L. *System Identification: Theory for the User*, 2nd ed., Prentice Hall, 1999.
 
 ---
@@ -638,7 +638,479 @@ The normalization follows the PSD convention (power per unit frequency), matchin
 
 ---
 
-## 8. Output Struct
+## 8. `sidLTVdisc` — Discrete-Time LTV State-Space Identification
+
+### 8.1 Problem Statement
+
+Identify the time-varying system matrices of a discrete linear time-varying system:
+
+```
+x(k+1) = A(k) x(k) + B(k) u(k)       k = 0, 1, ..., N-1
+```
+
+where `x(k) ∈ ℝᵖ` is the state, `u(k) ∈ ℝᵍ` is the control input, `A(k) ∈ ℝᵖˣᵖ` and `B(k) ∈ ℝᵖˣᵍ` are the unknown time-varying system matrices.
+
+Given measured state trajectories `X` and control inputs `U`, estimate `A(k)` and `B(k)` for all `k`.
+
+### 8.2 Inputs
+
+| Parameter | Symbol | Type | Default |
+|-----------|--------|------|---------|
+| State data | `X` | `(N+1 × p)` or `(N+1 × p × L)` | required |
+| Input data | `U` | `(N × q)` or `(N × q × L)` | required |
+| Regularization | `λ` | scalar, `(N-1 × 1)` vector, or `'auto'` | `'auto'` |
+| Algorithm | | `'cosmic'` | `'cosmic'` |
+| Precondition | | logical | `false` |
+
+Here `L` is the number of trajectories. All trajectories must have the same horizon `N+1`.
+
+### 8.3 COSMIC Algorithm
+
+**Reference:** Carvalho, Soares, Lourenço, Ventura. "COSMIC: fast closed-form identification from large-scale data for LTV systems." arXiv:2112.04355, 2022.
+
+#### 8.3.1 Optimization Variable
+
+Define the stacked optimization variable:
+
+```
+C(k) = [A(k)ᵀ; B(k)ᵀ] ∈ ℝ⁽ᵖ⁺ᵍ⁾ˣᵖ       k = 0, ..., N-1
+```
+
+#### 8.3.2 Data Matrices
+
+For `L` trajectories at time step `k`:
+
+```
+D(k) = [X(k)ᵀ  U(k)ᵀ] ∈ ℝᴸˣ⁽ᵖ⁺ᵍ⁾       (data matrix)
+X'(k) = X(k+1)ᵀ ∈ ℝᴸˣᵖ                    (next-state matrix)
+```
+
+where `X(k) = [x₁(k), x₂(k), ..., x_L(k)]` collects states from all trajectories.
+
+#### 8.3.3 Cost Function
+
+```
+f(C) = (1/2) Σ_{k=0}^{N-1} ||D(k)C(k) - X'(k)||²_F
+     + (1/2) Σ_{k=1}^{N-1} ||λ_k^{1/2} (C(k) - C(k-1))||²_F
+```
+
+The first term is **data fidelity**: how well the model predicts next states across all trajectories. The second term is **temporal smoothness**: penalizes large changes in system matrices between consecutive time steps.
+
+`λ_k > 0` is the regularization strength at time step `k`. Higher `λ_k` → smoother transitions (system changes slowly). Lower `λ_k` → more freedom for rapid changes.
+
+#### 8.3.4 Closed-Form Solution
+
+Setting ∇f(C) = 0 yields a **block tridiagonal** linear system. Define:
+
+```
+S_00         = D(0)ᵀD(0) + λ₁ I
+S_{N-1,N-1}  = D(N-1)ᵀD(N-1) + λ_{N-1} I
+S_kk         = D(k)ᵀD(k) + (λ_k + λ_{k+1}) I     for k = 1, ..., N-2
+Θ_k          = D(k)ᵀ X'(k)ᵀ                         for k = 0, ..., N-1
+```
+
+**Forward pass** (k = 0 to N-1):
+
+```
+Λ₀ = S_00
+Y₀ = Λ₀⁻¹ Θ₀
+
+For k = 1, ..., N-1:
+    Λ_k = S_kk - λ_k² Λ_{k-1}⁻¹
+    Y_k = Λ_k⁻¹ (Θ_k + λ_k Y_{k-1})
+```
+
+**Backward pass** (k = N-2 to 0):
+
+```
+C(N-1) = Y_{N-1}
+
+For k = N-2, ..., 0:
+    C(k) = Y_k + λ_{k+1} Λ_k⁻¹ C(k+1)
+```
+
+**Complexity:** `O(N × (p+q)³)` — linear in the number of time steps, cubic in state+input dimension, independent of the number of trajectories `L` (which only affects the precomputation of `D(k)ᵀD(k)` and `Θ_k`).
+
+#### 8.3.5 Existence and Uniqueness
+
+A unique solution exists if and only if the empirical covariance of the data is positive definite:
+
+```
+Σ = Σ₁ + Σ₂ + ... + Σ_L ≻ 0
+```
+
+where:
+
+```
+Σ_ℓ = (1/N) Σ_{k=0}^{N} [x_ℓ(k); u_ℓ(k)] [x_ℓ(k); u_ℓ(k)]ᵀ
+```
+
+Equivalently, the complete set of `[x_ℓ(k)ᵀ  u_ℓ(k)ᵀ]` vectors across all trajectories and time steps must span `ℝᵖ⁺ᵍ`.
+
+#### 8.3.6 Preconditioning
+
+When data matrices `D(k)ᵀD(k)` are ill-conditioned, preconditioning improves numerical stability by redefining:
+
+```
+S_kk^PC = I
+S_ij^PC = S_kk⁻¹ S_ij         for i ≠ j
+Θ_k^PC  = S_kk⁻¹ Θ_k
+```
+
+This rescales each block row of the tridiagonal system to have identity on the diagonal, reducing the condition number of the matrices that need to be inverted.
+
+### 8.4 Lambda Selection
+
+#### 8.4.1 Manual
+
+The user provides `λ` as a scalar (applied uniformly) or as an `(N-1 × 1)` vector (per-step).
+
+#### 8.4.2 L-Curve (Automatic)
+
+When `'Lambda', 'auto'` is specified, `sidLTVdisc` selects λ using the L-curve method:
+
+1. Define a grid of candidate values: `λ_grid = logspace(-3, 15, 50)`.
+2. For each candidate `λ_j`, run COSMIC and record:
+   - Data fidelity: `F_j = ||VC - X'||²_F`
+   - Regularization: `R_j = Σ ||λ^{1/2}(C(k) - C(k-1))||²_F`
+3. Plot `log(R_j)` vs. `log(F_j)`. This traces an L-shaped curve.
+4. Select the λ at the corner of the L — the point of maximum curvature:
+   ```
+   κ_j = |F''_j R'_j - F'_j R''_j| / (F'_j² + R'_j²)^{3/2}
+   ```
+   where derivatives are computed by finite differences along the curve.
+
+The L-curve method requires multiple COSMIC runs, but each is O(N(p+q)³), so the total cost is typically under a second for moderate problems.
+
+#### 8.4.3 Validation-Based Tuning (`sidLTVdiscTune`)
+
+A separate function that wraps `sidLTVdisc` in a grid search over λ, evaluating trajectory prediction loss on validation data:
+
+```matlab
+function [bestResult, bestLambda, allLosses] = sidLTVdiscTune(X_train, U_train, X_val, U_val, varargin)
+```
+
+**Trajectory prediction loss** (from the COSMIC paper):
+
+```
+L(λ) = (1/|S|) Σ_{ℓ∈S} sqrt( (1/N) Σ_{k=1}^{N} Σ_{m=1}^{p} (x̂_km^(ℓ)(λ) - x_km^(ℓ))² )
+```
+
+where `x̂` is the state predicted by propagating the identified model from initial conditions, and `S` is the set of validation trajectories.
+
+**Inputs:**
+
+| Parameter | Type | Default |
+|-----------|------|---------|
+| `X_train` | `(N+1 × p × L_train)` | required |
+| `U_train` | `(N × q × L_train)` | required |
+| `X_val` | `(N+1 × p × L_val)` | required |
+| `U_val` | `(N × q × L_val)` | required |
+| `'LambdaGrid'` | vector | `logspace(-3, 15, 50)` |
+| `'Algorithm'` | char | `'cosmic'` |
+
+**Outputs:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `bestResult` | struct | `sidLTVdisc` result at optimal λ |
+| `bestLambda` | scalar | Optimal λ value |
+| `allLosses` | `(n_grid × 1)` | Prediction loss at each λ |
+
+### 8.5 Output Struct
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `A` | `(p × p × N)` | Time-varying dynamics matrices A(0), ..., A(N-1) |
+| `B` | `(p × q × N)` | Time-varying input matrices B(0), ..., B(N-1) |
+| `AStd` | `(p × p × N)` | Standard deviation of A(k) elements (requires uncertainty) |
+| `BStd` | `(p × q × N)` | Standard deviation of B(k) elements (requires uncertainty) |
+| `Covariance` | `(p+q × p+q × N)` | Posterior covariance Σ_kk per step (requires uncertainty) |
+| `NoiseVariance` | scalar | Estimated σ̂² (requires uncertainty) |
+| `Lambda` | scalar or `(N-1 × 1)` | Regularization values used |
+| `Cost` | `(1 × 3)` | `[total, data_fidelity, regularization]` |
+| `DataLength` | scalar | N (number of time steps) |
+| `StateDim` | scalar | p |
+| `InputDim` | scalar | q |
+| `NumTrajectories` | scalar | L |
+| `Algorithm` | char | `'cosmic'` |
+| `Preconditioned` | logical | Whether preconditioning was applied |
+| `Method` | char | `'sidLTVdisc'` |
+
+### 8.6 Usage Examples
+
+```matlab
+% Basic identification with automatic lambda selection
+result = sidLTVdisc(X, U, 'Lambda', 'auto');
+
+% Manual lambda, scalar (uniform)
+result = sidLTVdisc(X, U, 'Lambda', 1e5);
+
+% Per-step lambda (e.g., lower near a known transient)
+lambdaVec = 1e5 * ones(N-1, 1);
+lambdaVec(50:60) = 1e2;    % allow more variation during transient
+result = sidLTVdisc(X, U, 'Lambda', lambdaVec);
+
+% With preconditioning for ill-conditioned data
+result = sidLTVdisc(X, U, 'Lambda', 1e5, 'Precondition', true);
+
+% Validation-based tuning
+[best, bestLam, losses] = sidLTVdiscTune(X_train, U_train, X_val, U_val);
+semilogx(logspace(-3,15,50), losses); xlabel('\lambda'); ylabel('RMSE');
+```
+
+### 8.7 Relationship to `sidFreqBTMap`
+
+`sidFreqBTMap` and `sidLTVdisc` answer the same question from different perspectives:
+
+| Aspect | `sidFreqBTMap` | `sidLTVdisc` |
+|--------|---------------|-------------|
+| Domain | Frequency × time | Time (state-space) |
+| Model type | Non-parametric G(ω,t) | Parametric A(k), B(k) |
+| Requires | Input-output data | State measurements |
+| State dimension | Not needed | Must be known/chosen |
+| Output | Transfer function estimate | Explicit state-space matrices |
+| Use case | Diagnosis: *is* the system changing? | Modeling: *what* are the matrices? |
+| Downstream | Visual analysis, coherence checking | Controller design (LTV LQR, MPC) |
+
+A recommended workflow:
+
+1. Run `sidSpectrogram` on `u` and `y` to understand signal characteristics.
+2. Run `sidFreqBTMap` to diagnose whether and where the system is time-varying.
+3. Run `sidLTVdisc` to obtain the explicit state-space model for controller design.
+4. Validate: propagate the `sidLTVdisc` model and compare predicted states to measured states.
+
+### 8.8 Variable-Length Trajectories
+
+**Reference:** `docs/cosmic_uncertainty_derivation.md` §1.
+
+When trajectories have different horizons, let `L(k) ⊆ {1,...,L}` be the set of trajectories active at time step `k`. The data matrices become:
+
+```
+D(k) = [X_{L(k)}(k)^T  U_{L(k)}(k)^T] / sqrt(|L(k)|)
+```
+
+Only the `S_kk` and `Θ_k` terms change; the regularization term `F^T Υ F` is unchanged because it couples only consecutive `C(k)` values and does not reference the data. The forward-backward pass structure is completely preserved.
+
+**API change:** `X` and `U` accept cell arrays:
+
+```matlab
+X = {X1, X2, X3};   % X1 is (N1+1 x p), X2 is (N2+1 x p), etc.
+U = {U1, U2, U3};   % U1 is (N1 x q), etc.
+```
+
+The total horizon `N` is `max(N1, N2, ..., N_L)`. Time steps with fewer active trajectories receive more regularization influence, which is the correct behavior.
+
+### 8.9 Bayesian Uncertainty Estimation
+
+**Reference:** `docs/cosmic_uncertainty_derivation.md` §2–4.
+
+#### 8.9.1 Bayesian Interpretation
+
+Under Gaussian noise `w(k) ~ N(0, σ² I)` on the state measurements, the COSMIC cost function is the negative log-posterior of a Bayesian model:
+
+- **Likelihood:** `p(X' | C) ∝ exp(-h(C) / σ²)` — the data fidelity term.
+- **Prior:** `p(C) ∝ exp(-g(C) / σ²)` — the smoothness regularizer is a Gaussian prior on consecutive differences of `C(k)` with precision `λ_k / σ²`.
+
+The posterior is Gaussian:
+
+```
+p(C | X') = N(C*, H⁻¹ σ²)
+```
+
+where `C*` is the COSMIC solution (the MAP estimate) and `H` is the Hessian:
+
+```
+H = V^T V + F^T Υ F
+```
+
+This is exactly the block tridiagonal matrix `LM` from the COSMIC derivation. The posterior covariance is `Σ = σ² H⁻¹`.
+
+#### 8.9.2 Diagonal Block Extraction via Forward-Backward Pass
+
+The full `H⁻¹` is `N(p+q) × N(p+q)` — too large to store. But we only need the diagonal blocks `Σ_kk = σ² [H⁻¹]_kk`, which give the marginal posterior covariance of `C(k)` at each time step.
+
+The diagonal blocks of a block tridiagonal inverse can be computed by a second backward pass reusing the `Λ_k` matrices from COSMIC's forward pass.
+
+**Algorithm (Uncertainty Backward Pass):**
+
+```
+// Λ_k already computed during COSMIC forward pass
+
+// Initialize at last time step
+P(N-1) = Λ_{N-1}⁻¹
+
+// Backward pass: k = N-2, ..., 0
+For k = N-2 down to 0:
+    G_k = λ_{k+1} Λ_k⁻¹                      // gain matrix
+    P(k) = Λ_k⁻¹ + G_k P(k+1) G_k^T          // Joseph form
+```
+
+where `P(k) = [H⁻¹]_kk` is the `(p+q) × (p+q)` diagonal block of the inverse Hessian at step `k`.
+
+**Complexity:** `O(N(p+q)³)` — identical to COSMIC itself. The `Λ_k⁻¹` are already computed during the forward pass, so the marginal cost is one additional backward sweep of matrix multiplications.
+
+**Connection to Kalman smoothing:** The forward pass computes `Λ_k` (analogous to the Kalman filter's predicted covariance), and the uncertainty backward pass computes `P(k)` (analogous to the Rauch-Tung-Striebel smoother's smoothed covariance). This is not a coincidence — the Bayesian interpretation of COSMIC's regularized least squares *is* a Kalman smoother applied to the parameter evolution model `C(k+1) = C(k) + w_k`.
+
+#### 8.9.3 Noise Variance Estimation
+
+The noise variance `σ²` can be estimated from the data fidelity residuals:
+
+```
+σ̂² = (2 / (N × L × p)) × h(C*)
+```
+
+where `h(C*)` is the data fidelity term evaluated at the optimal solution. This is the maximum likelihood estimate under the Gaussian assumption.
+
+#### 8.9.4 Output Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `AStd` | `(p × p × N)` | Standard deviation of each A(k) element |
+| `BStd` | `(p × q × N)` | Standard deviation of each B(k) element |
+| `Covariance` | `(p+q × p+q × N)` | Posterior covariance `Σ_kk` at each step |
+| `NoiseVariance` | scalar | Estimated `σ̂²` |
+
+The standard deviations are extracted from the diagonal of `Σ_kk`:
+
+```
+AStd(i, j, k) = σ̂ × sqrt(P(k)_{j, j})    for the (i,j) element of A(k)
+BStd(i, j, k) = σ̂ × sqrt(P(k)_{p+j, p+j}) for the (i,j) element of B(k)
+```
+
+(Note: `C(k) = [A(k)'; B(k)']`, so the rows of `C` are columns of `A` and `B`.)
+
+### 8.10 Online/Recursive COSMIC
+
+**Reference:** `docs/cosmic_online_recursion.md`.
+
+#### 8.10.1 The Insight: Forward Pass Is Naturally Causal
+
+COSMIC's forward pass computes `Λ_k` and `Y_k` sequentially — step `k` depends only on steps `0..k`. This means the forward pass can run in real time as data arrives. At any point, the "filtered" estimate `Y_k` is available as a causal estimate of `C(k)`, analogous to the Kalman filter's filtered state.
+
+The backward pass touches all time steps and is non-causal — it requires the full trajectory. However, under the Bayesian/Kalman interpretation, the relationship between forward-only and full solution is precise:
+
+| | Forward only (`Y_k`) | Full solution (`C(k)`) |
+|---|---|---|
+| Kalman analogy | Filtered estimate | Smoothed estimate |
+| Uses data from | `0..k` | `0..N-1` |
+| Uncertainty | Larger (`Λ_k⁻¹`) | Smaller (`P(k)`) |
+| Available | Causally (real-time) | After full trajectory |
+
+#### 8.10.2 Three Operating Modes
+
+**Mode 1: Batch (existing).** Process full trajectory, forward + backward. Best accuracy. Use when all data is available.
+
+**Mode 2: Filtered (real-time).** Run forward pass only. At each new time step `k`, compute `Λ_k` and `Y_k` from the new data `D(k)`, `X'(k)` and the previous `Λ_{k-1}`, `Y_{k-1}`. The estimate `Y_k` is immediately available. Uncertainty is `Λ_k⁻¹` (larger than smoothed, but honest about the causal constraint).
+
+```
+// When new measurement arrives at step k:
+D_k = [x(k)^T  u(k)^T] / sqrt(L)
+X'_k = x(k+1)^T / sqrt(L)
+S_kk = D_k^T D_k + (λ_k + λ_{k+1}) I
+Θ_k  = D_k^T X'_k
+
+Λ_k = S_kk - λ_k² Λ_{k-1}⁻¹
+Y_k = Λ_k⁻¹ (Θ_k + λ_k Y_{k-1})
+
+// Extract filtered estimate:
+A_filtered(k) = Y_k(1:p, :)'
+B_filtered(k) = Y_k(p+1:end, :)'
+// Filtered uncertainty:
+P_filtered(k) = Λ_k⁻¹
+```
+
+**Cost per step:** One `(p+q) × (p+q)` matrix inversion + one matrix multiply = `O((p+q)³)`. Constant time per step, independent of history length.
+
+**Mode 3: Windowed smoother.** Maintain a sliding window of the last `W` time steps. At each new step:
+1. Extend the forward pass by one step (Mode 2).
+2. Run the backward pass over only the window `[k-W+1, ..., k]`, using the forward pass quantities `Λ`, `Y` already stored.
+3. The smoothed estimates within the window are improved; older estimates are fixed.
+
+This gives a practical middle ground: `O(W(p+q)³)` per step, with smoothed accuracy within the window. The boundary condition at `k-W` uses the filtered estimate, which introduces a small approximation that decays exponentially with `W` if `λ` provides sufficient coupling.
+
+#### 8.10.3 API
+
+```matlab
+% Initialize the recursive estimator
+rec = sidLTVdiscInit(p, q, 'Lambda', lambda);
+
+% Process measurements one at a time
+for k = 1:N
+    rec = sidLTVdiscUpdate(rec, x(:,k), x(:,k+1), u(:,k));
+    A_now = rec.A_filtered;  % immediately available
+    P_now = rec.P_filtered;  % filtered uncertainty
+end
+
+% Optional: smooth over recent window
+rec = sidLTVdiscSmooth(rec, 'Window', 50);
+A_smoothed = rec.A_smoothed;  % improved estimates for last 50 steps
+```
+
+### 8.11 Lambda Tuning via Frequency Response
+
+**Reference:** `docs/cosmic_uncertainty_derivation.md` §5.
+
+#### 8.11.1 Concept
+
+`sidFreqBTMap` produces a non-parametric estimate `Ĝ_BT(ω, t)` with uncertainty, independent of `λ`. For any candidate `λ`, compute the frozen transfer function from COSMIC's `A(k)`, `B(k)`:
+
+```
+G_cosmic(ω, k) = (e^{jω} I - A(k))⁻¹ B(k)
+```
+
+and propagate the posterior covariance `Σ_kk` to obtain `σ_cosmic(ω, k)` via the Jacobian of the `(A, B) → G(ω)` mapping.
+
+The criterion: **find the largest λ whose COSMIC posterior bands are consistent with the non-parametric bands.**
+
+#### 8.11.2 Consistency Score
+
+At each grid point `(ω_j, t_i)`:
+
+```
+d²(j,i) = |G_cosmic(ω_j, t_i) - Ĝ_BT(ω_j, t_i)|² / (σ²_cosmic(j,i) + σ²_BT(j,i))
+```
+
+This is a Mahalanobis-like distance. Under the null hypothesis (both estimators are estimating the same true G), `d²` is approximately χ² distributed.
+
+Aggregate score:
+
+```
+S(λ) = (1 / n_grid) Σ_{j,i} 1[d²(j,i) < χ²_{0.95}]
+```
+
+i.e., the fraction of grid points where the two estimates are consistent at 95% level.
+
+Select `λ* = max{λ : S(λ) > 0.90}` — the largest λ for which at least 90% of grid points are consistent.
+
+#### 8.11.3 Depends On
+
+- `sidFreqBTMap` (§6) for the non-parametric reference.
+- Bayesian uncertainty (§8.9) for COSMIC posterior bands.
+- `sidLTVdiscFrozen` utility for computing `G_cosmic(ω, k)`.
+
+### 8.12 Output-Only Estimation (`sidLTVdiscIO`)
+
+Two-stage approach for when only outputs `y(k) = C_obs x(k) + D_obs u(k)` are measured:
+
+1. Use an initial LTI subspace method (or user-supplied observer) to estimate state trajectories `x̂(k)` from `y(k)` and `u(k)`.
+2. Feed `x̂(k)` into `sidLTVdisc` as if they were true states.
+
+The user is warned that state estimates carry observer error.
+
+### 8.13 Deferred Extensions
+
+The following are out of scope for v1.0:
+
+- **Alternative algorithms:** TVERA, TVOKID, LTVModels (the `'Algorithm'` parameter is ready for this).
+- **Alternative regularization norms:** Non-squared L2, L1 (total variation).
+- **EM-style output estimation:** Alternating state reconstruction and COSMIC.
+- **Direct output equation formulation:** Joint estimation of dynamics and output matrices.
+- **GCV lambda selection.**
+
+---
+
+## 9. Output Struct
 
 All `sidFreq*` functions return a struct with these fields:
 
@@ -664,9 +1136,9 @@ All `sidFreq*` functions return a struct with these fields:
 
 ---
 
-## 9. Edge Cases and Validation
+## 10. Edge Cases and Validation
 
-### 9.1 Input Validation
+### 10.1 Input Validation
 
 | Condition | Action |
 |-----------|--------|
@@ -679,7 +1151,7 @@ All `sidFreq*` functions return a struct with these fields:
 | Any frequency `ω_k ≤ 0` or `ω_k > π` | Error: frequencies must be in (0, π] rad/sample |
 | `Ts ≤ 0` | Error: sample time must be positive |
 
-### 9.2 Numerical Edge Cases
+### 10.2 Numerical Edge Cases
 
 | Condition | Action |
 |-----------|--------|
@@ -688,7 +1160,7 @@ All `sidFreq*` functions return a struct with these fields:
 | `γ̂²(ω_k) > 1` (numerical error) | Clamp to 1 |
 | `γ̂²(ω_k) < 0` (numerical error) | Clamp to 0 |
 
-### 9.3 Degenerate Inputs
+### 10.3 Degenerate Inputs
 
 | Condition | Action |
 |-----------|--------|
@@ -698,9 +1170,9 @@ All `sidFreq*` functions return a struct with these fields:
 
 ---
 
-## 10. Plotting
+## 11. Plotting
 
-### 10.1 `sidBodePlot`
+### 11.1 `sidBodePlot`
 
 Produces a two-panel figure:
 - **Top panel:** Magnitude `20 × log10(|Ĝ(ω)|)` in dB vs. frequency
@@ -712,13 +1184,13 @@ Confidence bands are shown as a shaded region at `±p` standard deviations (defa
 - Magnitude band: `20 × log10(|Ĝ| ± p × σ_G)` — note this is applied to the linear magnitude, then converted to dB.
 - Phase band: `±p × σ_G / |Ĝ| × 180/π` — small-angle approximation for phase uncertainty.
 
-### 10.2 `sidSpectrumPlot`
+### 11.2 `sidSpectrumPlot`
 
 Single panel: `10 × log10(Φ̂_v(ω))` in dB vs. frequency (log axis).
 
 Confidence band: `10 × log10(Φ̂_v ± p × σ_Φv)` — applied in linear scale, converted to dB.
 
-### 10.3 Options
+### 11.3 Options
 
 Both plotting functions accept name-value options:
 
@@ -733,7 +1205,7 @@ Both plotting functions accept name-value options:
 
 ---
 
-## 11. References
+## 12. References
 
 1. Ljung, L. *System Identification: Theory for the User*, 2nd ed. Prentice Hall, 1999.
    - §2.3: Spectral analysis fundamentals
@@ -747,3 +1219,13 @@ Both plotting functions accept name-value options:
 3. Kay, S.M. *Modern Spectral Estimation: Theory and Application*. Prentice Hall, 1988.
 
 4. Stoica, P. and Moses, R.L. *Spectral Analysis of Signals*. Prentice Hall, 2005.
+
+5. Carvalho, M., Soares, C., Lourenço, P., and Ventura, R. "COSMIC: fast closed-form identification from large-scale data for LTV systems." arXiv:2112.04355, 2022.
+
+6. Łaszkiewicz, P., Carvalho, M., Soares, C., and Lourenço, P. "The impact of modeling approaches on controlling safety-critical, highly perturbed systems: the case for data-driven models." arXiv:2509.13531, 2025.
+
+7. Carlson, F.B., Robertsson, A., and Johansson, R. "Identification of LTV dynamical models with smooth or discontinuous time evolution by means of convex optimization." IEEE ICCA, 2018.
+
+8. Majji, M., Juang, J.-N., and Junkins, J.L. "Time-varying eigensystem realization algorithm." JGCD 33(1), 2010.
+
+9. Majji, M., Juang, J.-N., and Junkins, J.L. "Observer/Kalman-filter time-varying system identification." JGCD 33(3), 2010.
