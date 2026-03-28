@@ -33,9 +33,9 @@ K = floor((N - L) / step) + 1;
 nBins = floor(nfft / 2) + 1;
 assert(length(result.Time) == K, 'Time vector length should be K=%d', K);
 assert(length(result.Frequency) == nBins, 'Frequency vector length should be %d', nBins);
-assert(isequal(size(result.Power), [nBins, K, 1]), 'Power dimensions wrong');
-assert(isequal(size(result.PowerDB), [nBins, K, 1]), 'PowerDB dimensions wrong');
-assert(isequal(size(result.Complex), [nBins, K, 1]), 'Complex dimensions wrong');
+assert(isequal(size(result.Power), [nBins, K]), 'Power dimensions wrong');
+assert(isequal(size(result.PowerDB), [nBins, K]), 'PowerDB dimensions wrong');
+assert(isequal(size(result.Complex), [nBins, K]), 'Complex dimensions wrong');
 fprintf('  Test 3 passed: output dimensions correct\n');
 
 %% Test 4: Frequency vector starts at 0 Hz
