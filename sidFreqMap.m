@@ -267,23 +267,23 @@ function result = sidFreqMap(y, u, varargin)
     % ---- Nested helper to store segment results ----
     function storeSegment(idx, rk)
         if ~isTimeSeries
-            if ndims(rk.Response) <= 2 %#ok<ISMAT>
-                G(:, idx) = rk.Response;
-                GStd(:, idx) = rk.ResponseStd;
+            if ny == 1 && nu == 1
+                G(:, idx) = rk.Response(:);
+                GStd(:, idx) = rk.ResponseStd(:);
             else
-                G(:, idx, :, :) = rk.Response;
-                GStd(:, idx, :, :) = rk.ResponseStd;
+                G(:, idx, :, :) = reshape(rk.Response, [], 1, ny, nu);
+                GStd(:, idx, :, :) = reshape(rk.ResponseStd, [], 1, ny, nu);
             end
             if ~isempty(Coh)
                 Coh(:, idx) = rk.Coherence;
             end
         end
-        if ndims(rk.NoiseSpectrum) <= 2 %#ok<ISMAT>
-            NS(:, idx) = rk.NoiseSpectrum;
-            NSStd(:, idx) = rk.NoiseSpectrumStd;
+        if ny == 1 || isTimeSeries
+            NS(:, idx) = rk.NoiseSpectrum(:);
+            NSStd(:, idx) = rk.NoiseSpectrumStd(:);
         else
-            NS(:, idx, :, :) = rk.NoiseSpectrum;
-            NSStd(:, idx, :, :) = rk.NoiseSpectrumStd;
+            NS(:, idx, :, :) = reshape(rk.NoiseSpectrum, [], 1, ny, ny);
+            NSStd(:, idx, :, :) = reshape(rk.NoiseSpectrumStd, [], 1, ny, ny);
         end
     end
 end
