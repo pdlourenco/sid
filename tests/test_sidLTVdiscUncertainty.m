@@ -289,12 +289,15 @@ fprintf('  Test 12 passed: variable-length trajectories with uncertainty.\n');
 
 %% Test 13: Monte Carlo validation
 % Generate many realizations, check empirical std matches AStd.
+% Use small lambda so Bayesian posterior ~ frequentist variance (§4.4 of
+% cosmic_uncertainty_derivation.md: they converge as lambda -> 0).
+% Use large L to stabilize the data Gram matrices across realizations.
 rng(1011);
-p = 2; q = 1; N = 20; L = 10;
+p = 2; q = 1; N = 15; L = 30;
 A_true = [0.9 0.1; -0.1 0.8]; B_true = [0.5; 0.3];
 sigma = 0.05;
 Sigma_true = sigma^2 * eye(p);
-lambda_val = 1e4;
+lambda_val = 1;
 nMC = 200;
 
 A_samples = zeros(p, p, N, nMC);
@@ -328,7 +331,7 @@ res_unc = sidLTVdisc(X, U, 'Lambda', lambda_val, 'Uncertainty', true, ...
 A_emp_std = std(A_samples, 0, 4);  % (p x p x N)
 
 % Check at interior time steps (edges have boundary effects)
-k_interior = 5:N-4;
+k_interior = 4:N-3;
 for k = k_interior
     for b = 1:p
         for a = 1:p
