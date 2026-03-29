@@ -40,6 +40,7 @@ testFiles = {
     'test_compareSpa'
     'test_compareEtfe'
     'test_compareSpafdr'
+    'test_compareWelch'
 };
 
 nTests = length(testFiles);
