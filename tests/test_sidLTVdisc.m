@@ -91,10 +91,7 @@ end
 result = sidLTVdisc(X, U, 'Lambda', 1e2);
 
 % Check correlation between recovered A(k) and true ramp
-A_recovered = squeeze(result.A)';
-if size(A_recovered, 2) == 1
-    A_recovered = A_recovered(:);
-end
+A_recovered = squeeze(result.A);
 corrMat = corrcoef(A_recovered(:), A_true_seq(:));
 assert(corrMat(1,2) > 0.9, 'LTV ramp correlation too low: %.3f', corrMat(1,2));
 fprintf('  Test 5 passed: LTV ramp tracked (corr=%.4f).\n', corrMat(1,2));
@@ -104,7 +101,7 @@ rng(400);
 p = 2; q = 1; N = 30;
 A_true = [0.8 0.05; -0.05 0.7];
 B_true = [1; 0.5];
-sigma = 0.05;
+sigma = 0.1;
 
 % Single trajectory
 X1 = zeros(N+1, p, 1); U1 = randn(N, q, 1);

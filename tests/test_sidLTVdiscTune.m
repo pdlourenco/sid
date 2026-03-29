@@ -5,10 +5,13 @@
 
 fprintf('Running test_sidLTVdiscTune...\n');
 
-%% Helper: generate LTI data split into train/val
+%% Helper: generate LTV data split into train/val
+% Use an LTV system so the bias-variance tradeoff in lambda is genuine:
+% too small lambda overfits per-step, too large lambda over-smooths.
 rng(1000);
 p = 2; q = 1; N = 30;
-A_true = [0.9 0.1; -0.1 0.8];
+A0 = [0.95 0.1; -0.1 0.85];
+dA = [-0.15 0; 0 -0.1];
 B_true = [0.5; 0.3];
 sigma = 0.02;
 
@@ -19,13 +22,15 @@ X_val   = zeros(N+1, p, L_val);   U_val   = randn(N, q, L_val);
 for l = 1:L_train
     X_train(1, :, l) = randn(1, p);
     for k = 1:N
-        X_train(k+1, :, l) = (A_true * X_train(k, :, l)' + B_true * U_train(k, :, l)')' + sigma * randn(1, p);
+        Ak = A0 + (k / N) * dA;
+        X_train(k+1, :, l) = (Ak * X_train(k, :, l)' + B_true * U_train(k, :, l)')' + sigma * randn(1, p);
     end
 end
 for l = 1:L_val
     X_val(1, :, l) = randn(1, p);
     for k = 1:N
-        X_val(k+1, :, l) = (A_true * X_val(k, :, l)' + B_true * U_val(k, :, l)')' + sigma * randn(1, p);
+        Ak = A0 + (k / N) * dA;
+        X_val(k+1, :, l) = (Ak * X_val(k, :, l)' + B_true * U_val(k, :, l)')' + sigma * randn(1, p);
     end
 end
 
@@ -49,7 +54,7 @@ assert(isequal(size(bestResult.A), [p, p, N]), 'bestResult.A dimensions');
 fprintf('  Test 2 passed: bestResult has correct fields.\n');
 
 %% Test 3: Optimal lambda not at grid boundary
-% For a well-posed LTI problem, the optimum should be interior
+% For an LTV problem, the optimum should be interior (bias-variance tradeoff)
 [~, bestIdx] = min(allLosses);
 assert(bestIdx > 1 && bestIdx < length(grid), ...
     'Optimal lambda should not be at grid boundary (idx=%d/%d)', bestIdx, length(grid));

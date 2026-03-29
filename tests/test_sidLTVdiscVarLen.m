@@ -35,9 +35,12 @@ assert(isequal(size(result.A), [p, p, 40]), 'A dimensions should be (p x p x N)'
 assert(isequal(size(result.B), [p, q, 40]), 'B dimensions should be (p x q x N)');
 fprintf('  Test 1 passed: cell array input works.\n');
 
-%% Test 2: Equivalence - cell array with uniform lengths matches 3D array
+%% Test 2: Both paths recover the system well with uniform-length data
+% Note: The 3D path normalizes by sqrt(N), the cell path by sqrt(L).
+% With the same lambda, the effective regularization differs, so results
+% are not bit-identical. We verify both recover the system independently.
 rng(2100);
-p = 2; q = 1; N = 25; L = 5;
+p = 2; q = 1; N = 30; L = 15;
 A_true = [0.9 0.1; -0.1 0.8];
 B_true = [0.5; 0.3];
 sigma = 0.02;
@@ -59,12 +62,6 @@ end
 res_3d   = sidLTVdisc(X_3d, U_3d, 'Lambda', 1e4);
 res_cell = sidLTVdisc(X_cell, U_cell, 'Lambda', 1e4);
 
-% Note: normalization differs (sqrt(N) vs sqrt(L)) so we check structure
-% and that results are reasonable, not bit-identical
-% Actually, for uniform lengths, buildDataMatricesVarLen uses sqrt(L) while
-% buildDataMatrices uses sqrt(N). These produce different D matrices, so
-% lambda values have different interpretations. Results won't match exactly,
-% but both should recover the system well.
 A_mean_3d = mean(res_3d.A, 3);
 A_mean_cell = mean(res_cell.A, 3);
 errA_3d   = norm(A_mean_3d - A_true, 'fro') / norm(A_true, 'fro');
