@@ -66,7 +66,7 @@ maxErr = 0;
 for iw = 1:length(w)
     z = exp(1i * w(iw));
     G_analytic = (z * Ip - A_true) \ B_true;
-    G_frozen_mid = squeeze(frz.Response(iw, :, :, round(N/2)));  % mid time step
+    G_frozen_mid = reshape(frz.Response(iw, :, :, round(N/2)), [p, q]);  % mid time step
     err = norm(G_frozen_mid - G_analytic) / max(norm(G_analytic), eps);
     maxErr = max(maxErr, err);
 end

@@ -1033,14 +1033,23 @@ The Kronecker structure means that `Σ` cancels from the COSMIC normal equations
 
 The row covariance `P(k) = [A⁻¹]_kk` (diagonal blocks of the inverse of the block tridiagonal Hessian) is computed by a backward recursion reusing the Schur complements `Λ_k` stored during COSMIC's forward pass:
 
-**Algorithm (Uncertainty Backward Pass):**
+**Algorithm (Two-Schur-Complement Method):**
+
+The diagonal blocks of the inverse of a block tridiagonal matrix require both
+left Schur complements `Λ_k^L` (from COSMIC's forward pass) and right Schur
+complements `Λ_k^R` (from a backward recursion):
 
 ```
-P(N-1) = Λ_{N-1}⁻¹
-
+// Right Schur complements (backward)
+Λ_{N-1}^R = S_{N-1}
 For k = N-2, ..., 0:
-    P(k) = (Λ_k - λ_{k+1}² P(k+1))⁻¹
+    Λ_k^R = S_kk - λ_{k+1}² (Λ_{k+1}^R)⁻¹
+
+// Combine
+P(k) = (Λ_k^L + Λ_k^R - S_kk)⁻¹
 ```
+
+where `S_kk = D(k)ᵀD(k) + regularization` is the original diagonal block.
 
 **Complexity:** `O(N(p+q)³)` — identical to COSMIC itself.
 

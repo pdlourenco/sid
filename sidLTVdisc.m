@@ -164,7 +164,7 @@ function result = sidLTVdisc(X, U, varargin)
         d = p + q;
 
         % Backward recursion for P(k) = [A^{-1}]_{kk}
-        P = uncertaintyBackwardPass(Lbd, lambda, N, d);
+        P = uncertaintyBackwardPass(Lbd, S, lambda, N, d);
 
         % Noise covariance
         noiseCovProvided = ~ischar(noiseCov);
@@ -631,23 +631,34 @@ function bestLambda = lcurveLambda(D, Xl, N, p, q, doPrecondition)
 end
 
 
-function P = uncertaintyBackwardPass(Lbd, lambda, N, d)
-%UNCERTAINTYBACKWARDPASS Compute P(k) = [A^{-1}]_{kk} via backward recursion.
+function P = uncertaintyBackwardPass(Lbd, S, lambda, N, d)
+%UNCERTAINTYBACKWARDPASS Compute P(k) = [A^{-1}]_{kk}.
 %
-%   P(N-1) = Lbd_{N-1}^{-1}
-%   P(k)   = (Lbd_k - lambda_{k+1}^2 * P(k+1))^{-1}   for k = N-2,...,0
+%   Uses both left Schur complements (Lbd, from COSMIC forward pass) and
+%   right Schur complements (LbdR, computed here via backward recursion).
+%
+%   The diagonal blocks of the inverse of a block tridiagonal matrix A
+%   satisfy:
+%       P(k) = (Lbd_k^L + Lbd_k^R - S_kk)^{-1}
+%
+%   where S_kk is the original diagonal block of A (before elimination).
 %
 %   Complexity: O(N * d^3), same as the forward pass.
 
+    I = eye(d);
+    LbdR = zeros(d, d, N);
     P = zeros(d, d, N);
 
-    % Base case
-    P(:, :, N) = inv(Lbd(:, :, N));  %#ok<MINV>
-
-    % Backward recursion
+    % Right Schur complements (backward recursion)
+    LbdR(:, :, N) = S(:, :, N);
     for k = N-1:-1:1
-        M = Lbd(:, :, k) - lambda(k)^2 * P(:, :, k+1);
-        P(:, :, k) = inv(M);  %#ok<MINV>
+        LbdR(:, :, k) = S(:, :, k) - lambda(k)^2 * (LbdR(:, :, k+1) \ I);
+    end
+
+    % Combine: P(k) = (Lbd^L(k) + Lbd^R(k) - S(k))^{-1}
+    for k = 1:N
+        M = Lbd(:, :, k) + LbdR(:, :, k) - S(:, :, k);
+        P(:, :, k) = M \ I;
     end
 end
 
