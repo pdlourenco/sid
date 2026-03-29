@@ -77,7 +77,7 @@ function result = sidLTVdisc(X, U, varargin)
 %     identification from large-scale data for LTV systems."
 %     arXiv:2112.04355, 2022.
 %
-%   See also: sidLTVdiscTune, sidFreqBTMap
+%   See also: sidLTVdiscTune, sidFreqMap
 
     % ---- Parse inputs ----
     [X, U, lambda, doPrecondition, algorithm, N, p, q, L, isVarLen, horizons] = ...

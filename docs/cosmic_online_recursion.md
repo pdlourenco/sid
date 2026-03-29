@@ -418,17 +418,17 @@ The optimal λ can be selected by:
 
 or, more robustly, by a chi-squared consistency test on the innovations.
 
-### 6.3 Cross-Validation Against sidFreqBTMap
+### 6.3 Cross-Validation Against sidFreqMap
 
 The innovations provide a time-domain diagnostic. For a frequency-domain
 diagnostic, compare the frozen transfer function at each time step against
-the non-parametric `sidFreqBTMap` estimate.
+the non-parametric `sidFreqMap` estimate.
 
 At each time step k and frequency ω:
 
 ```
 G_cosmic(k, ω) = C_out (e^{jω}I - A_filt(k))⁻¹ B_filt(k)
-G_BT(k, ω) = sidFreqBTMap estimate at time k
+G_BT(k, ω) = sidFreqMap estimate at time k
 ```
 
 Under a consistent model:
@@ -444,7 +444,7 @@ that is completely independent of the innovation-based criterion.
 **Combined λ selection:**
 1. Use trajectory prediction loss (time-domain, held-out data) for initial λ
 2. Verify against innovation consistency (time-domain, filter-based)
-3. Verify against `sidFreqBTMap` consistency (frequency-domain, independent method)
+3. Verify against `sidFreqMap` consistency (frequency-domain, independent method)
 
 If all three agree, confidence in λ is high. If they disagree, the
 discrepancy identifies the nature of the model deficiency.

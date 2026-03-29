@@ -10,8 +10,8 @@ rng(42);
 N = 2000;
 u = randn(N, 1);
 y = filter([1], [1 -0.9], u) + 0.1 * randn(N, 1);
-result_siso = sidFreqBTMap(y, u, 'SegmentLength', 256);
-result_ts = sidFreqBTMap(randn(1000, 1), [], 'SegmentLength', 128);
+result_siso = sidFreqMap(y, u, 'SegmentLength', 256);
+result_ts = sidFreqMap(randn(1000, 1), [], 'SegmentLength', 128);
 
 %% Test 1: Magnitude plot (default)
 try

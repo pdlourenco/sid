@@ -18,7 +18,7 @@ sid is designed from the ground up to run on **GNU Octave** as a first-class tar
 - **Blackman-Tukey spectral analysis** (`sidFreqBT`) — the workhorse estimator, with configurable window size and automatic defaults
 - **Frequency-dependent resolution** (`sidFreqBTFDR`) — vary the smoothing bandwidth across the frequency axis
 - **Empirical transfer function estimate** (`sidFreqETFE`) — maximum resolution via FFT ratio, with optional smoothing
-- **Time-varying analysis** — `sidFreqBTMap` for sliding-window frequency response maps, `sidSpectrogram` for short-time FFT spectrograms
+- **Time-varying analysis** — `sidFreqMap` for sliding-window frequency response maps (Blackman-Tukey or Welch), `sidSpectrogram` for short-time FFT spectrograms
 - **LTV state-space identification** (`sidLTVdisc`) — the COSMIC algorithm for identifying time-varying A(k), B(k) matrices from state measurements, with automatic or manual regularization tuning
 - **Asymptotic uncertainty** — standard deviations and squared coherence returned for every frequency-domain estimate (Ljung, 1999)
 - **Confidence-band plotting** — `sidBodePlot`, `sidSpectrumPlot`, `sidMapPlot`, and `sidSpectrogramPlot` render shaded confidence bands out of the box
@@ -44,7 +44,7 @@ The core frequency-domain estimators use the **Blackman-Tukey method**: compute 
 
 | sid function | Replaces | Description |
 |---|---|---|
-| `sidFreqBTMap` | — | Time-varying frequency response map (sliding-window BT) |
+| `sidFreqMap` | `tfestimate`, `mscohere` | Time-varying frequency response map (BT or Welch) |
 | `sidSpectrogram` | `spectrogram` | Short-time FFT spectrogram |
 | `sidLTVdisc` | — | Discrete LTV state-space identification (COSMIC algorithm) |
 | `sidLTVdiscTune` | — | Regularization tuning via validation loss or L-curve |
@@ -55,7 +55,7 @@ The core frequency-domain estimators use the **Blackman-Tukey method**: compute 
 |---|---|---|
 | `sidBodePlot` | — | Bode diagram with shaded confidence bands |
 | `sidSpectrumPlot` | — | Power spectrum plot with shaded confidence bands |
-| `sidMapPlot` | — | Time-frequency color map for `sidFreqBTMap` results |
+| `sidMapPlot` | — | Time-frequency color map for `sidFreqMap` results |
 | `sidSpectrogramPlot` | — | Spectrogram color map |
 
 All estimation functions support both positional and name-value calling conventions.

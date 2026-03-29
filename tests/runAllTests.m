@@ -31,7 +31,7 @@ testFiles = {
     'test_validation'
     'test_crossMethod'
     'test_sidSpectrogram'
-    'test_sidFreqBTMap'
+    'test_sidFreqMap'
     'test_sidSpectrogramPlot'
     'test_sidMapPlot'
     'test_sidLTVdisc'
@@ -40,6 +40,7 @@ testFiles = {
     'test_compareSpa'
     'test_compareEtfe'
     'test_compareSpafdr'
+    'test_compareWelch'
 };
 
 nTests = length(testFiles);

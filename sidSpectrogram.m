@@ -46,7 +46,7 @@ function result = sidSpectrogram(x, varargin)
 %     Oppenheim, A.V. and Schafer, R.W. "Discrete-Time Signal Processing",
 %     3rd ed., Prentice Hall, 2010.
 %
-%   See also: sidFreqBTMap, sidSpectrogramPlot
+%   See also: sidFreqMap, sidSpectrogramPlot
 %
 %   Example:
 %     % Spectrogram of a chirp signal

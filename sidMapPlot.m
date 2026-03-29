@@ -1,5 +1,5 @@
 function varargout = sidMapPlot(result, varargin)
-%SIDMAPPLOT Time-frequency color map for sidFreqBTMap results.
+%SIDMAPPLOT Time-frequency color map for sidFreqMap results.
 %
 %   sidMapPlot(result)
 %   sidMapPlot(result, 'PlotType', 'coherence')
@@ -9,7 +9,7 @@ function varargout = sidMapPlot(result, varargin)
 %   on the x-axis and frequency on the y-axis.
 %
 %   INPUTS:
-%     result - Struct returned by sidFreqBTMap.
+%     result - Struct returned by sidFreqMap.
 %
 %   NAME-VALUE OPTIONS:
 %     'PlotType'      - What to plot:
@@ -25,13 +25,13 @@ function varargout = sidMapPlot(result, varargin)
 %   OUTPUT:
 %     h - Struct with fields .fig, .ax, .surf.
 %
-%   See also: sidFreqBTMap, sidSpectrogramPlot, sidBodePlot
+%   See also: sidFreqMap, sidSpectrogramPlot, sidBodePlot
 %
 %   Example:
 %     % Time-varying magnitude map
 %     N = 4000; u = randn(N, 1);
 %     y = filter([1], [1 -0.9], u) + 0.1*randn(N, 1);
-%     result = sidFreqBTMap(y, u, 'SegmentLength', 512);
+%     result = sidFreqMap(y, u, 'SegmentLength', 512);
 %     sidMapPlot(result, 'PlotType', 'magnitude');
 %
 %   Changelog:
@@ -57,9 +57,9 @@ function varargout = sidMapPlot(result, varargin)
     p.parse(varargin{:});
     opts = p.Results;
 
-    if ~isfield(result, 'Method') || ~strcmp(result.Method, 'sidFreqBTMap')
+    if ~isfield(result, 'Method') || ~ismember(result.Method, {'sidFreqMap', 'sidFreqBTMap'})
         error('sid:invalidResult', ...
-            'Input must be a result struct from sidFreqBTMap.');
+            'Input must be a result struct from sidFreqMap.');
     end
 
     % ---- Frequency axis ----
