@@ -1,12 +1,12 @@
 # sid — Algorithm Specification
 
-**Version:** 0.2.0-draft
-**Date:** 2026-03-28
+**Version:** 0.3.0-draft
+**Date:** 2026-03-29
 **Reference:** Ljung, L. *System Identification: Theory for the User*, 2nd ed., Prentice Hall, 1999.
 
 ---
 
-> **Implementation status:** §1–7 (frequency-domain estimation, time-varying maps, spectrograms) and §8 base + §8.4 (`sidLTVdisc`, `sidLTVdiscTune`) are implemented. §8.8–8.12 (variable-length trajectories, Bayesian uncertainty, online/recursive COSMIC, frequency-response lambda tuning, output-only estimation) describe planned features not yet implemented.
+> **Implementation status:** §1–5 (frequency-domain estimation) and §7 (spectrograms) are implemented. §6 (`sidFreqMap`) is implemented for the BT algorithm; Welch algorithm support is planned. §8 base + §8.4 (`sidLTVdisc`, `sidLTVdiscTune`) are implemented. §8.8–8.12 (variable-length trajectories, Bayesian uncertainty, online/recursive COSMIC, frequency-response lambda tuning, output-only estimation) describe planned features not yet implemented. §9 (`sidFreqETFE`, `sidFreqBTFDR`) is implemented.
 
 ---
 
@@ -36,7 +36,7 @@ where `e(t)` is white noise with covariance matrix `Λ`.
 
 **Time series mode:** When no input is present (`n_u = 0`), the model reduces to `y(t) = v(t)` and only the output power spectrum is estimated.
 
-**LTV extension:** The `sidFreqBTMap` function (§6) relaxes the time-invariance assumption by applying the Blackman-Tukey method to overlapping segments, producing a time-varying frequency response Ĝ(ω, t). Within each segment, local time-invariance is assumed.
+**LTV extension:** The `sidFreqMap` function (§6) relaxes the time-invariance assumption by applying spectral analysis (Blackman-Tukey or Welch) to overlapping segments, producing a time-varying frequency response Ĝ(ω, t). Within each segment, local time-invariance is assumed.
 
 ---
 
@@ -410,11 +410,20 @@ This matches the default behavior of `sidFreqBT`.
 
 ---
 
-## 6. `sidFreqBTMap` — Time-Varying Frequency Response Map
+## 6. `sidFreqMap` — Time-Varying Frequency Response Map
 
 ### 6.1 Concept
 
-`sidFreqBTMap` applies `sidFreqBT` to overlapping segments of data, producing a **time-varying frequency response estimate** Ĝ(ω, t). This reveals how the system's transfer function, noise spectrum, and coherence evolve over time.
+`sidFreqMap` estimates a **time-varying frequency response** Ĝ(ω, t) by applying spectral analysis to overlapping segments of input-output data. This reveals how the system's transfer function, noise spectrum, and coherence evolve over time.
+
+Two algorithms are supported via the `'Algorithm'` parameter:
+
+| Algorithm | Method | Replaces | Within each segment |
+|-----------|--------|----------|---------------------|
+| `'bt'` (default) | Blackman-Tukey correlogram | `spa` applied per segment | Covariance → lag window → DFT |
+| `'welch'` | Welch's averaged periodogram | MathWorks `tfestimate` | Sub-segments → time-domain window → FFT → average → form ratios |
+
+Both produce identical output structures: Ĝ(ω, t), Φ̂_v(ω, t), γ̂²(ω, t). The choice affects the bias-variance tradeoff within each segment, not the user-facing interface.
 
 For an LTI system, the map is constant along the time axis — this serves as a diagnostic check. For an LTV (linear time-varying) system, the map shows modes appearing, disappearing, shifting in frequency, or changing in gain.
 
@@ -423,10 +432,10 @@ This extends the `spectrogram` concept from single-signal time-frequency analysi
 | Tool | Input | Output | Shows |
 |------|-------|--------|-------|
 | `spectrogram` / `sidSpectrogram` | One signal | \|X(ω,t)\|² | How signal frequency content changes |
-| `sidFreqBTMap` | Input + output pair | Ĝ(ω,t), Φ̂_v(ω,t), γ̂²(ω,t) | How the *system itself* changes |
-| `sidFreqBTMap` | One signal (time series) | Φ̂_y(ω,t) | How signal spectrum changes (≈ spectrogram) |
+| `sidFreqMap` | Input + output pair | Ĝ(ω,t), Φ̂_v(ω,t), γ̂²(ω,t) | How the *system itself* changes |
+| `sidFreqMap` | One signal (time series) | Φ̂_y(ω,t) | How signal spectrum changes (≈ spectrogram) |
 
-When used together, `sidSpectrogram` on `u` and `y` alongside `sidFreqBTMap` on the pair `(y, u)` provides a complete diagnostic picture: the input's spectral content, the output's spectral content, and the system connecting them — all on aligned time axes.
+When used together, `sidSpectrogram` on `u` and `y` alongside `sidFreqMap` on the pair `(y, u)` provides a complete diagnostic picture: the input's spectral content, the output's spectral content, and the system connecting them — all on aligned time axes.
 
 ### 6.2 Inputs
 
@@ -436,11 +445,23 @@ When used together, `sidSpectrogram` on `u` and `y` alongside `sidFreqBTMap` on 
 | Input data | `u` | `(N × n_u)` real matrix, or `[]` | `[]` (time series) |
 | Segment length | `L` | positive integer | `min(floor(N/4), 256)` |
 | Overlap | `P` | integer, `0 ≤ P < L` | `floor(L/2)` (50% overlap) |
-| Window size | `M` | positive integer, `M ≥ 2` | `min(floor(L/10), 30)` |
-| Frequencies | `ω` | `(n_f × 1)` vector, rad/sample | 128 points (default grid) |
+| Algorithm | | `'bt'` or `'welch'` | `'bt'` |
 | Sample time | `Ts` | positive scalar (seconds) | `1.0` |
 
-### 6.3 Algorithm
+**Algorithm-specific parameters:**
+
+| Parameter | Applies to | Type | Default |
+|-----------|-----------|------|---------|
+| `WindowSize` (M) | `'bt'` only | positive integer | `min(floor(L/10), 30)` |
+| `Frequencies` | `'bt'` only | `(n_f × 1)` vector | 128 linearly spaced in (0, π] |
+| `SubSegmentLength` | `'welch'` only | positive integer | `floor(L/4.5)` (matches `tfestimate` default) |
+| `SubOverlap` | `'welch'` only | non-negative integer | `floor(SubSegmentLength / 2)` |
+| `Window` | `'welch'` only | `'hann'`, `'hamming'`, or vector | `'hann'` |
+| `NFFT` | `'welch'` only | positive integer | `max(256, 2^nextpow2(SubSegmentLength))` |
+
+### 6.3 Outer Segmentation (Common to Both Algorithms)
+
+Both algorithms share the same outer segmentation:
 
 1. Divide the data into `K` overlapping segments, each of length `L` samples, with overlap `P`:
    ```
@@ -451,11 +472,76 @@ When used together, `sidSpectrogram` on `u` and `y` alongside `sidFreqBTMap` on 
 
 2. For each segment `k`, extract `y_k = y(start:end, :)` and `u_k = u(start:end, :)`.
 
-3. Run `sidFreqBT(y_k, u_k, M, freqs, Ts)` on each segment.
+3. Apply the selected algorithm to estimate `Ĝ(ω)`, `Φ̂_v(ω)`, `γ̂²(ω)` within the segment.
 
 4. Collect the per-segment results into time-frequency arrays.
 
-### 6.4 Time Vector
+### 6.4 Inner Estimation: Blackman-Tukey (`'bt'`)
+
+Within each segment of length `L`, apply `sidFreqBT`:
+
+1. Compute biased covariances `R̂_y(τ)`, `R̂_u(τ)`, `R̂_yu(τ)` for lags `0..M`.
+2. Apply Hann lag window `W_M(τ)`.
+3. Fourier transform to obtain `Φ̂_y(ω)`, `Φ̂_u(ω)`, `Φ̂_yu(ω)`.
+4. Form `Ĝ(ω) = Φ̂_yu(ω) / Φ̂_u(ω)`.
+5. Form `Φ̂_v(ω) = Φ̂_y(ω) - |Φ̂_yu(ω)|² / Φ̂_u(ω)`.
+6. Compute coherence `γ̂²(ω) = |Φ̂_yu(ω)|² / (Φ̂_y(ω) Φ̂_u(ω))`.
+7. Compute asymptotic uncertainty via `sidUncertainty`.
+
+**Frequency resolution** within the segment is controlled by the lag window size `M`. The constraint `L > 2M` must hold.
+
+### 6.5 Inner Estimation: Welch (`'welch'`)
+
+Within each segment of length `L`, apply the Welch method (equivalent to `tfestimate` + `mscohere` + `cpsd`):
+
+1. Divide the segment into `J` overlapping sub-segments of length `L_sub` with overlap `P_sub`:
+   ```
+   J = floor((L - L_sub) / (L_sub - P_sub)) + 1
+   ```
+
+2. For each sub-segment `j`:
+   a. Apply the time-domain window `w(n)` (Hann by default):
+      ```
+      y_j(n) = y_segment(n_start + n) × w(n)
+      u_j(n) = u_segment(n_start + n) × w(n)
+      ```
+   b. Compute FFTs: `Y_j(m) = FFT(y_j)`, `U_j(m) = FFT(u_j)`.
+
+3. Average the cross-spectral and auto-spectral periodograms:
+   ```
+   Φ̂_yu(ω) = (1/J) Σ_j Y_j(ω) conj(U_j(ω)) / S₁
+   Φ̂_u(ω)  = (1/J) Σ_j |U_j(ω)|² / S₁
+   Φ̂_y(ω)  = (1/J) Σ_j |Y_j(ω)|² / S₁
+   ```
+   where `S₁ = Σ_n w(n)²` is the window power normalization.
+
+4. Form `Ĝ(ω) = Φ̂_yu(ω) / Φ̂_u(ω)`.
+5. Form `Φ̂_v(ω)` and `γ̂²(ω)` as in the BT case.
+
+**Frequency resolution** is determined by the sub-segment length `L_sub` and the NFFT: `Δf = Fs / NFFT`. The sub-segment overlap `P_sub` controls variance reduction — more sub-segments (higher overlap) → lower variance but no change in resolution.
+
+**Uncertainty:** The variance of the Welch spectral estimate is approximately:
+
+```
+Var{Φ̂(ω)} ≈ Φ²(ω) / ν
+```
+
+where `ν = 2J × (1 - c_overlap)` is the equivalent degrees of freedom, and `c_overlap` is a correction factor depending on the overlap ratio and window shape. For 50% overlap with a Hann window, `ν ≈ 1.8J`.
+
+### 6.6 Comparison of BT and Welch
+
+| Aspect | BT (`sidFreqBT`) | Welch |
+|--------|-------------------|-------|
+| Resolution control | Lag window size `M` | Sub-segment length `L_sub` |
+| Variance control | `M` (smaller M → lower variance) | Number of sub-segments `J` (more → lower variance) |
+| Guaranteed non-negative spectrum | Yes (biased covariance estimator) | Yes (averaged periodograms) |
+| Custom frequency grid | Yes (direct DFT path) | No (FFT bins only) |
+| Normalization | System ID convention (no Ts factor) | PSD convention (includes Ts) |
+| Best for | Smooth spectra, custom frequencies | Standard analysis, `tfestimate` compatibility |
+
+**Default choice:** `'bt'` is the default because it matches the `sid` package's primary use case (system identification with `sidFreqBT`-compatible output) and supports custom frequency grids. Users coming from `tfestimate` should use `'welch'`.
+
+### 6.7 Time Vector
 
 The center time of each segment defines the time axis:
 
@@ -465,9 +551,9 @@ t_k = ((k-1)(L-P) + L/2) × Ts       for k = 1, ..., K
 
 in units of seconds.
 
-### 6.5 Output Struct
+### 6.8 Output Struct
 
-`sidFreqBTMap` returns a struct with fields:
+`sidFreqMap` returns a struct with fields:
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -482,12 +568,15 @@ in units of seconds.
 | `SampleTime` | scalar | Sample time Ts |
 | `SegmentLength` | scalar | Segment length L |
 | `Overlap` | scalar | Overlap P |
-| `WindowSize` | scalar | BT window size M |
-| `Method` | char | `'sidFreqBTMap'` |
+| `WindowSize` | scalar | BT lag window size M (BT only) |
+| `Algorithm` | char | `'bt'` or `'welch'` |
+| `Method` | char | `'sidFreqMap'` |
 
 **Dimensions shown are for SISO.** For MIMO, `Response` becomes `(n_f × K × n_y × n_u)`, etc.
 
-### 6.6 Visualization: `sidMapPlot`
+The output struct is identical regardless of algorithm, so `sidMapPlot` and downstream tools (including COSMIC lambda cross-validation in §8.11) work transparently with either.
+
+### 6.9 Visualization: `sidMapPlot`
 
 The natural visualization is a **color map** (like a spectrogram):
 
@@ -505,17 +594,32 @@ The function `sidMapPlot` provides selectable plot types via a `'PlotType'` opti
 | `'coherence'` | `γ̂²(ω,t)` on [0, 1] | Identify when LTI assumption breaks down |
 | `'spectrum'` | `10 log10(Φ̂_y(ω,t))` | Time series mode (equivalent to spectrogram) |
 
-### 6.7 Relationship to `spectrogram`
+### 6.10 Compatibility with MathWorks `tfestimate`
 
-In time series mode (`u = []`), `sidFreqBTMap` computes Φ̂_y(ω, t) over sliding windows. This is functionally similar to a spectrogram, but computed via the Blackman-Tukey (windowed correlogram) method rather than the short-time FFT (Welch/periodogram) method. The two approaches differ in their bias-variance characteristics and in how windowing is applied (lag-domain vs. time-domain), but produce qualitatively similar results.
+`sidFreqMap` with `'Algorithm', 'welch'` replicates the core functionality of the Signal Processing Toolbox `tfestimate`, `mscohere`, and `cpsd` functions. Specifically:
 
-The key differentiator is that with input-output data, `sidFreqBTMap` produces quantities that `spectrogram` cannot: the time-varying transfer function, noise spectrum, and coherence.
+```matlab
+% MathWorks style (single-window transfer function estimate):
+[Txy, F] = tfestimate(u, y, hann(256), 128, 512, Fs);
+[Cxy, F] = mscohere(u, y, hann(256), 128, 512, Fs);
 
-### 6.8 Design Considerations
+% sid equivalent (time-varying, but with segment = full data → single estimate):
+result = sidFreqMap(y, u, 'Algorithm', 'welch', ...
+                         'SegmentLength', length(y), ...
+                         'SubSegmentLength', 256, ...
+                         'SubOverlap', 128, ...
+                         'NFFT', 512, ...
+                         'SampleTime', 1/Fs);
+% result.Response ≈ Txy, result.Coherence ≈ Cxy
+```
 
-**Segment length vs. window size:** The BT window size `M` controls the frequency resolution within each segment; the segment length `L` determines how much data is used per estimate. The requirement `L > 2M` must hold. For good estimates, `L >> M` is preferred — a typical choice is `L = 10M` or more.
+The key difference: `sidFreqMap` always produces time-varying output. Setting `SegmentLength` equal to the data length reduces it to a single-window estimate equivalent to `tfestimate`.
 
-**Computational cost:** `K` calls to `sidFreqBT`, each operating on `L` samples. For default parameters this is fast, but for large `N` with small step size `L-P`, the number of segments can be large. The implementation should pre-compute covariances per segment efficiently rather than recomputing from scratch.
+### 6.11 Design Considerations
+
+**Segment length vs. inner parameters:** The outer segment length `L` determines the temporal resolution of the map (how finely you resolve changes in time). The inner parameters (`M` for BT, `L_sub` for Welch) control frequency resolution and variance within each segment. These are independent choices.
+
+**Computational cost:** `K` calls to the inner estimator. For BT, each is O(L×M + M×n_f). For Welch, each is O(J×L_sub×log(L_sub)). Both are fast for typical parameters.
 
 **Edge effects:** The first and last segments may produce less reliable estimates if the system is non-stationary near the boundaries. No special handling is applied — the uncertainty estimates from each segment naturally reflect the reduced confidence.
 
@@ -527,7 +631,7 @@ The key differentiator is that with input-output data, `sidFreqBTMap` produces q
 
 `sidSpectrogram` computes the short-time Fourier transform (STFT) spectrogram of one or more signals. It replicates the core functionality of the Signal Processing Toolbox `spectrogram` function, with two additional roles in the `sid` workflow:
 
-1. **Diagnostic companion to `sidFreqBTMap`.** Plotting the spectrograms of `y` and `u` alongside the time-varying transfer function map lets the user distinguish genuine system changes from input-driven effects. If a spectral feature appears in both the `y` spectrogram and the Ĝ(ω,t) map but *not* in the `u` spectrogram, it's likely a real system change. If it appears in `u` too, it's the input driving the output.
+1. **Diagnostic companion to `sidFreqMap`.** Plotting the spectrograms of `y` and `u` alongside the time-varying transfer function map lets the user distinguish genuine system changes from input-driven effects. If a spectral feature appears in both the `y` spectrogram and the Ĝ(ω,t) map but *not* in the `u` spectrogram, it's likely a real system change. If it appears in `u` too, it's the input driving the output.
 
 2. **Standalone time-frequency analysis** for users who don't have the Signal Processing Toolbox.
 
@@ -600,7 +704,7 @@ sidSpectrogramPlot(result);
 - **y-axis:** Frequency (Hz), linear or log scale
 - **Color:** Power in dB
 
-### 7.6 Relationship to `sidFreqBTMap`
+### 7.6 Relationship to `sidFreqMap`
 
 The two functions share segmentation conventions (segment length, overlap, time vector computation) so their time axes align when called with the same parameters. A typical diagnostic workflow:
 
@@ -613,7 +717,7 @@ specY = sidSpectrogram(y, 'WindowLength', L, 'Overlap', P, 'SampleTime', Ts);
 specU = sidSpectrogram(u, 'WindowLength', L, 'Overlap', P, 'SampleTime', Ts);
 
 % Time-varying transfer function
-mapG = sidFreqBTMap(y, u, 'SegmentLength', L, 'Overlap', P, 'SampleTime', Ts);
+mapG = sidFreqMap(y, u, 'SegmentLength', L, 'Overlap', P, 'SampleTime', Ts);
 
 % Compare side-by-side
 figure;
@@ -863,11 +967,11 @@ result = sidLTVdisc(X, U, 'Lambda', 1e5, 'Precondition', true);
 semilogx(logspace(-3,15,50), losses); xlabel('\lambda'); ylabel('RMSE');
 ```
 
-### 8.7 Relationship to `sidFreqBTMap`
+### 8.7 Relationship to `sidFreqMap`
 
-`sidFreqBTMap` and `sidLTVdisc` answer the same question from different perspectives:
+`sidFreqMap` and `sidLTVdisc` answer the same question from different perspectives:
 
-| Aspect | `sidFreqBTMap` | `sidLTVdisc` |
+| Aspect | `sidFreqMap` | `sidLTVdisc` |
 |--------|---------------|-------------|
 | Domain | Frequency × time | Time (state-space) |
 | Model type | Non-parametric G(ω,t) | Parametric A(k), B(k) |
@@ -880,7 +984,7 @@ semilogx(logspace(-3,15,50), losses); xlabel('\lambda'); ylabel('RMSE');
 A recommended workflow:
 
 1. Run `sidSpectrogram` on `u` and `y` to understand signal characteristics.
-2. Run `sidFreqBTMap` to diagnose whether and where the system is time-varying.
+2. Run `sidFreqMap` to diagnose whether and where the system is time-varying.
 3. Run `sidLTVdisc` to obtain the explicit state-space model for controller design.
 4. Validate: propagate the `sidLTVdisc` model and compare predicted states to measured states.
 
@@ -1057,7 +1161,7 @@ A_smoothed = rec.A_smoothed;  % improved estimates for last 50 steps
 
 #### 8.11.1 Concept
 
-`sidFreqBTMap` produces a non-parametric estimate `Ĝ_BT(ω, t)` with uncertainty, independent of `λ`. For any candidate `λ`, compute the frozen transfer function from COSMIC's `A(k)`, `B(k)`:
+`sidFreqMap` produces a non-parametric estimate `Ĝ_BT(ω, t)` with uncertainty, independent of `λ`. For any candidate `λ`, compute the frozen transfer function from COSMIC's `A(k)`, `B(k)`:
 
 ```
 G_cosmic(ω, k) = (e^{jω} I - A(k))⁻¹ B(k)
@@ -1089,7 +1193,7 @@ Select `λ* = max{λ : S(λ) > 0.90}` — the largest λ for which at least 90% 
 
 #### 8.11.3 Depends On
 
-- `sidFreqBTMap` (§6) for the non-parametric reference.
+- `sidFreqMap` (§6) for the non-parametric reference.
 - Bayesian uncertainty (§8.9) for COSMIC posterior bands.
 - `sidLTVdiscFrozen` utility for computing `G_cosmic(ω, k)`.
 

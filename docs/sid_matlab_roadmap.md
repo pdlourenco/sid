@@ -19,7 +19,7 @@ sid  [Domain]  [Method/Variant]
 | **`sidFreqBT`** | `spa` | Frequency response via Blackman-Tukey | ✅ |
 | **`sidFreqBTFDR`** | `spafdr` | Blackman-Tukey, frequency-dependent resolution | ✅ |
 | **`sidFreqETFE`** | `etfe` | Empirical transfer function estimate | ✅ |
-| **`sidFreqBTMap`** | — | Time-varying frequency response map (LTV analysis) | ✅ |
+| **`sidFreqMap`** | `tfestimate`, `mscohere`, `cpsd` | Time-varying frequency response map (BT or Welch) | ✅ (BT), ⬜ (Welch) |
 | **`sidSpectrogram`** | `spectrogram` | Short-time FFT spectrogram | ✅ |
 | **`sidLTVdisc`** | — | Discrete LTV state-space identification (COSMIC) | ✅ |
 | **`sidLTVdiscTune`** | — | Lambda tuning (validation-based and frequency-response) | ✅ |
@@ -40,7 +40,7 @@ sid  [Domain]  [Method/Variant]
 |----------|-------------|--------|
 | **`sidBodePlot`** | Bode diagram with confidence bands | ✅ |
 | **`sidSpectrumPlot`** | Power spectrum with confidence bands | ✅ |
-| **`sidMapPlot`** | Time-frequency color map (for sidFreqBTMap results) | ✅ |
+| **`sidMapPlot`** | Time-frequency color map (for sidFreqMap results) | ✅ |
 | **`sidSpectrogramPlot`** | Spectrogram color map (for sidSpectrogram results) | ✅ |
 | `sidNyquistPlot` | Nyquist plot | — |
 | `sidPolePlot` | Pole-zero map | — |
@@ -63,7 +63,7 @@ sid-matlab/
 ├── sidFreqBT.m              % Blackman-Tukey spectral analysis
 ├── sidFreqBTFDR.m           % BT with frequency-dependent resolution
 ├── sidFreqETFE.m            % Empirical transfer function estimate
-├── sidFreqBTMap.m           % Time-varying frequency response map
+├── sidFreqMap.m              % Time-varying frequency response map (BT or Welch)
 ├── sidSpectrogram.m         % Short-time FFT spectrogram
 ├── sidLTVdisc.m             % Discrete LTV state-space identification (COSMIC)
 ├── sidLTVdiscTune.m         % Lambda tuning via validation or frequency response
@@ -89,7 +89,7 @@ sid-matlab/
 │   ├── test_sidFreqBT.m     % SISO + time series + MIMO
 │   ├── test_sidFreqBTFDR.m
 │   ├── test_sidFreqETFE.m
-│   ├── test_sidFreqBTMap.m
+│   ├── test_sidFreqMap.m
 │   ├── test_sidSpectrogram.m
 │   ├── test_sidMapPlot.m
 │   ├── test_sidSpectrogramPlot.m
@@ -156,7 +156,7 @@ result.Coherence          % (n_freq x 1) squared coherence (SISO only, [] for MI
 result.SampleTime         % scalar (seconds)
 result.WindowSize         % scalar integer (or vector for BTFDR)
 result.DataLength         % N (number of samples used)
-result.Method             % 'sidFreqBT', 'sidFreqBTFDR', 'sidFreqETFE', or 'sidFreqBTMap'
+result.Method             % 'sidFreqBT', 'sidFreqBTFDR', 'sidFreqETFE', or 'sidFreqMap'
 ```
 
 ---
@@ -207,32 +207,27 @@ result.Method             % 'sidFreqBT', 'sidFreqBTFDR', 'sidFreqETFE', or 'sidF
 - `sidBodePlot.m` extended: subplot grid per channel pair
 - Tests: 2x2 known system, verify channel-by-channel
 
-### Phase 7 — `sidFreqBTMap` + `sidSpectrogram` — Time-Varying Analysis (~5 days) ✅
+### Phase 7 — `sidFreqMap` + `sidSpectrogram` — Time-Varying Analysis (~6 days) ✅ (BT), ⬜ (Welch)
 
-- `sidSpectrogram.m`:
-  - Short-time FFT spectrogram (replaces Signal Processing Toolbox `spectrogram`)
-  - Windowed segments → FFT → one-sided PSD
-  - Supports Hann, Hamming, rectangular, or custom window vector
-  - Returns struct with Time, Frequency, Power, PowerDB, Complex coefficients
-- `sidFreqBTMap.m`:
-  - Segment the data into overlapping windows
-  - Run `sidFreqBT` on each segment
-  - Collect G(w,t), Phi_v(w,t), coherence(w,t) into 2D arrays
-  - Compute time vector from segment centers
+- `sidFreqMap.m`:
+  - Outer segmentation: sliding overlapping windows (shared by both algorithms)
+  - `'Algorithm', 'bt'` (default): calls `sidFreqBT` per segment (BT correlogram) ✅
+  - `'Algorithm', 'welch'`: Welch's method per segment (replaces `tfestimate`/`mscohere`/`cpsd`) ⬜
+    - Sub-segmentation within each outer segment
+    - Time-domain window (Hann default), FFT, averaged cross/auto periodograms
+    - Form G, Phi_v, coherence from averaged spectra
+  - Identical output struct regardless of algorithm
   - Share segmentation conventions with `sidSpectrogram` for aligned time axes
-- `sidMapPlot.m`:
-  - Color map visualization (pcolor/imagesc)
-  - Plot types: magnitude, phase, noise, coherence, spectrum
-  - Log frequency axis, time on x-axis, colorbar
-  - Octave-compatible
-- `sidSpectrogramPlot.m`:
-  - Standard spectrogram color map (time × frequency × power dB)
-  - Shared visual style with `sidMapPlot`
+- `sidSpectrogram.m` ✅
+- `sidMapPlot.m` ✅
+- `sidSpectrogramPlot.m` ✅
 - Tests:
-  - `sidSpectrogram`: chirp signal (verify moving peak), white noise (flat), known sinusoid
-  - `sidFreqBTMap`: LTI system (constant map), step change in system, chirp
-  - Alignment test: verify time axes match between `sidSpectrogram` and `sidFreqBTMap`
-  - Compare `sidSpectrogram` output to MathWorks `spectrogram` (if available)
+  - `sidFreqMap` BT: LTI system (constant map), step change, chirp ✅
+  - `sidFreqMap` Welch: same tests, verify qualitatively similar results to BT ⬜
+  - `sidFreqMap` Welch vs. MathWorks `tfestimate`: numerical comparison ⬜
+  - `sidSpectrogram`: chirp signal (verify moving peak), white noise (flat), known sinusoid ✅
+  - Alignment test: verify time axes match between `sidSpectrogram` and `sidFreqMap` ✅
+  - Compare `sidSpectrogram` output to MathWorks `spectrogram` (if available) ✅
 
 ### Phase 8 — `sidLTVdisc` Base (~5 days) ✅
 
@@ -296,10 +291,10 @@ Key insight: COSMIC forward pass = Kalman filter on parameter evolution; backwar
 ### Phase 8d — Lambda Tuning via Frequency Response (~4 days) ⬜
 
 - Extend `sidLTVdiscTune` with `'Method', 'frequency'` option
-- Frozen transfer function vs. `sidFreqBTMap` comparison
+- Frozen transfer function vs. `sidFreqMap` comparison
 - Mahalanobis consistency scoring at each (ω, t) grid point
 - Select largest λ where ≥90% of grid points consistent at 95% level
-- Depends on: Phase 7 (`sidFreqBTMap`) and Phase 8b (uncertainty)
+- Depends on: Phase 7 (`sidFreqMap`) and Phase 8b (uncertainty)
 - Tests: known LTV system, verify selected lambda is reasonable
 
 ### Phase 8e — Output-Only Estimation (~3 days) ⬜
@@ -333,15 +328,15 @@ Key insight: COSMIC forward pass = Kalman filter on parameter evolution; backwar
 | 4. Uncertainty | 3 days | 11 days | ✅ |
 | 5. Plotting | 2 days | 13 days | ✅ |
 | 6. MIMO | 4 days | 17 days | ✅ |
-| 7. sidFreqBTMap + sidSpectrogram | 5 days | 22 days | ✅ |
-| 8. sidLTVdisc base | 5 days | 27 days | ✅ |
-| 8a. Variable-length trajectories | 2 days | 29 days | ⬜ |
-| 8b. Bayesian uncertainty | 4 days | 33 days | ⬜ |
-| 8c. Online/recursive COSMIC | 4 days | 37 days | ⬜ |
-| 8d. Lambda via frequency response | 4 days | 41 days | ⬜ |
-| 8e. Output-only (two-stage) | 3 days | 44 days | ⬜ |
-| 9. ETFE + BTFDR | 4 days | 48 days | ✅ |
-| 10. Validation + release | 4 days | 52 days | 🔄 |
+| 7. sidFreqMap + sidSpectrogram | 6 days | 23 days | ✅ (BT), ⬜ (Welch) |
+| 8. sidLTVdisc base | 5 days | 28 days | ✅ |
+| 8a. Variable-length trajectories | 2 days | 30 days | ⬜ |
+| 8b. Bayesian uncertainty | 4 days | 34 days | ⬜ |
+| 8c. Online/recursive COSMIC | 4 days | 38 days | ⬜ |
+| 8d. Lambda via frequency response | 4 days | 42 days | ⬜ |
+| 8e. Output-only (two-stage) | 3 days | 45 days | ⬜ |
+| 9. ETFE + BTFDR | 4 days | 49 days | ✅ |
+| 10. Validation + release | 4 days | 53 days | 🔄 |
 
 ---
 
