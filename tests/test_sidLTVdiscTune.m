@@ -11,11 +11,11 @@ fprintf('Running test_sidLTVdiscTune...\n');
 rng(1000);
 p = 2; q = 1; N = 30;
 A0 = [0.95 0.1; -0.1 0.85];
-dA = [-0.15 0; 0 -0.1];
+dA = [-0.3 0.05; 0.05 -0.25];
 B_true = [0.5; 0.3];
-sigma = 0.02;
+sigma = 0.15;
 
-L_train = 8; L_val = 4;
+L_train = 3; L_val = 4;
 X_train = zeros(N+1, p, L_train); U_train = randn(N, q, L_train);
 X_val   = zeros(N+1, p, L_val);   U_val   = randn(N, q, L_val);
 
@@ -35,7 +35,7 @@ for l = 1:L_val
 end
 
 %% Test 1: Output shapes
-grid = logspace(0, 8, 15);
+grid = logspace(-2, 6, 15);
 [bestResult, bestLambda, allLosses] = sidLTVdiscTune(X_train, U_train, X_val, U_val, ...
     'LambdaGrid', grid);
 
