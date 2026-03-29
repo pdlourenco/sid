@@ -37,6 +37,8 @@ testFiles = {
     'test_sidLTVdisc'
     'test_sidLTVdiscTune'
     'test_sidLTVdiscVarLen'
+    'test_sidLTVdiscUncertainty'
+    'test_sidLTVdiscFrozen'
     'test_compareSpa'
     'test_compareEtfe'
     'test_compareSpafdr'

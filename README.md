@@ -19,12 +19,13 @@ sid is designed from the ground up to run on **GNU Octave** as a first-class tar
 - **Frequency-dependent resolution** (`sidFreqBTFDR`) — vary the smoothing bandwidth across the frequency axis
 - **Empirical transfer function estimate** (`sidFreqETFE`) — maximum resolution via FFT ratio, with optional smoothing
 - **Time-varying analysis** — `sidFreqMap` for sliding-window frequency response maps (Blackman-Tukey or Welch), `sidSpectrogram` for short-time FFT spectrograms
-- **LTV state-space identification** (`sidLTVdisc`) — the COSMIC algorithm for identifying time-varying A(k), B(k) matrices from state measurements, with automatic or manual regularization tuning
+- **LTV state-space identification** (`sidLTVdisc`) — the COSMIC algorithm for identifying time-varying A(k), B(k) matrices from state measurements, with automatic or manual regularization tuning and optional Bayesian uncertainty quantification
+- **Frozen transfer function** (`sidLTVdiscFrozen`) — compute instantaneous G(w,k) = (e^{jw}I - A(k))^{-1} B(k) with propagated uncertainty bands
 - **Asymptotic uncertainty** — standard deviations and squared coherence returned for every frequency-domain estimate (Ljung, 1999)
 - **Confidence-band plotting** — `sidBodePlot`, `sidSpectrumPlot`, `sidMapPlot`, and `sidSpectrogramPlot` render shaded confidence bands out of the box
 - **SISO, MIMO, and time-series modes** — unified API across all frequency-domain estimation functions
 - **Validated against MATLAB's System Identification Toolbox** — comparison tests for `spa`, `spafdr`, and `etfe` run in CI
-- **19 test suites** with continuous integration on both MATLAB and GNU Octave
+- **25 test suites** with continuous integration on both MATLAB and GNU Octave
 
 ## How It Works
 
@@ -48,6 +49,7 @@ The core frequency-domain estimators use the **Blackman-Tukey method**: compute 
 | `sidSpectrogram` | `spectrogram` | Short-time FFT spectrogram |
 | `sidLTVdisc` | — | Discrete LTV state-space identification (COSMIC algorithm) |
 | `sidLTVdiscTune` | — | Regularization tuning via validation loss or L-curve |
+| `sidLTVdiscFrozen` | — | Frozen transfer function G(w,k) with uncertainty propagation |
 
 **Plotting:**
 

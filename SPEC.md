@@ -6,7 +6,7 @@
 
 ---
 
-> **Implementation status:** §1–5 (frequency-domain estimation) and §7 (spectrograms) are implemented. §6 (`sidFreqMap`) is implemented for the BT algorithm; Welch algorithm support is planned. §8 base + §8.4 (`sidLTVdisc`, `sidLTVdiscTune`) are implemented. §8.8–8.12 (variable-length trajectories, Bayesian uncertainty, online/recursive COSMIC, frequency-response lambda tuning, output-only estimation) describe planned features not yet implemented. §9 (`sidFreqETFE`, `sidFreqBTFDR`) is implemented.
+> **Implementation status:** §1–5 (frequency-domain estimation), §6 (`sidFreqMap` BT + Welch), §7 (spectrograms), §8 base + §8.4 (`sidLTVdisc`, `sidLTVdiscTune`), §8.8 (variable-length trajectories), §8.9 (Bayesian uncertainty + `sidLTVdiscFrozen`), and §9 (`sidFreqETFE`, `sidFreqBTFDR`) are implemented. §8.10–8.12 (online/recursive COSMIC, frequency-response lambda tuning, output-only estimation) describe planned features not yet implemented.
 
 ---
 
@@ -1009,84 +1009,107 @@ U = {U1, U2, U3};   % U1 is (N1 x q), etc.
 
 The total horizon `N` is `max(N1, N2, ..., N_L)`. Time steps with fewer active trajectories receive more regularization influence, which is the correct behavior.
 
-### 8.9 Bayesian Uncertainty Estimation
+### 8.9 Bayesian Uncertainty Estimation ✅
 
-**Reference:** `docs/cosmic_uncertainty_derivation.md` §2–4.
+**Status:** Implemented. **Reference:** `docs/cosmic_uncertainty_derivation.md`.
 
 #### 8.9.1 Bayesian Interpretation
 
-Under Gaussian noise `w(k) ~ N(0, σ² I)` on the state measurements, the COSMIC cost function is the negative log-posterior of a Bayesian model:
-
-- **Likelihood:** `p(X' | C) ∝ exp(-h(C) / σ²)` — the data fidelity term.
-- **Prior:** `p(C) ∝ exp(-g(C) / σ²)` — the smoothness regularizer is a Gaussian prior on consecutive differences of `C(k)` with precision `λ_k / σ²`.
-
-The posterior is Gaussian:
+Under Gaussian noise `w_ℓ(k) ~ N(0, Σ)` on the state measurements, the COSMIC cost function is the negative log-posterior of a Bayesian model with a matrix-normal posterior:
 
 ```
-p(C | X') = N(C*, H⁻¹ σ²)
+C(k) | data, Σ  ~  MN(Ĉ(k), P(k), Σ)
 ```
 
-where `C*` is the COSMIC solution (the MAP estimate) and `H` is the Hessian:
+where `Ĉ(k)` is the COSMIC solution (MAP estimate / posterior mean), `P(k) ∈ ℝ^{(p+q)×(p+q)}` is the row covariance (determined by data geometry and regularization), and `Σ ∈ ℝ^{p×p}` is the noise covariance. The full posterior covariance is:
 
 ```
-H = V^T V + F^T Υ F
+Cov(vec(C(k))) = Σ ⊗ P(k)
 ```
 
-This is exactly the block tridiagonal matrix `LM` from the COSMIC derivation. The posterior covariance is `Σ = σ² H⁻¹`.
+The Kronecker structure means that `Σ` cancels from the COSMIC normal equations — the MAP estimate and `P(k)` are independent of `Σ`. The noise covariance enters only through the final posterior covariance.
 
-#### 8.9.2 Diagonal Block Extraction via Forward-Backward Pass
+#### 8.9.2 Diagonal Block Extraction via Backward Recursion
 
-The full `H⁻¹` is `N(p+q) × N(p+q)` — too large to store. But we only need the diagonal blocks `Σ_kk = σ² [H⁻¹]_kk`, which give the marginal posterior covariance of `C(k)` at each time step.
-
-The diagonal blocks of a block tridiagonal inverse can be computed by a second backward pass reusing the `Λ_k` matrices from COSMIC's forward pass.
+The row covariance `P(k) = [A⁻¹]_kk` (diagonal blocks of the inverse of the block tridiagonal Hessian) is computed by a backward recursion reusing the Schur complements `Λ_k` stored during COSMIC's forward pass:
 
 **Algorithm (Uncertainty Backward Pass):**
 
 ```
-// Λ_k already computed during COSMIC forward pass
-
-// Initialize at last time step
 P(N-1) = Λ_{N-1}⁻¹
 
-// Backward pass: k = N-2, ..., 0
-For k = N-2 down to 0:
-    G_k = λ_{k+1} Λ_k⁻¹                      // gain matrix
-    P(k) = Λ_k⁻¹ + G_k P(k+1) G_k^T          // Joseph form
+For k = N-2, ..., 0:
+    P(k) = (Λ_k - λ_{k+1}² P(k+1))⁻¹
 ```
 
-where `P(k) = [H⁻¹]_kk` is the `(p+q) × (p+q)` diagonal block of the inverse Hessian at step `k`.
+**Complexity:** `O(N(p+q)³)` — identical to COSMIC itself.
 
-**Complexity:** `O(N(p+q)³)` — identical to COSMIC itself. The `Λ_k⁻¹` are already computed during the forward pass, so the marginal cost is one additional backward sweep of matrix multiplications.
+**Proof:** By block matrix inversion formula applied to the tridiagonal structure. See `docs/cosmic_uncertainty_derivation.md` §5.2.
 
-**Connection to Kalman smoothing:** The forward pass computes `Λ_k` (analogous to the Kalman filter's predicted covariance), and the uncertainty backward pass computes `P(k)` (analogous to the Rauch-Tung-Striebel smoother's smoothed covariance). This is not a coincidence — the Bayesian interpretation of COSMIC's regularized least squares *is* a Kalman smoother applied to the parameter evolution model `C(k+1) = C(k) + w_k`.
+#### 8.9.3 Noise Covariance Estimation
 
-#### 8.9.3 Noise Variance Estimation
-
-The noise variance `σ²` can be estimated from the data fidelity residuals:
+The noise covariance `Σ` can be provided by the user or estimated from residuals:
 
 ```
-σ̂² = (2 / (N × L × p)) × h(C*)
+Σ̂ = (1/ν) Σ_{k=0}^{N-1} E(k)ᵀ E(k)
 ```
 
-where `h(C*)` is the data fidelity term evaluated at the optimal solution. This is the maximum likelihood estimate under the Gaussian assumption.
+where `E(k) = X'(k)ᵀ - D(k) Ĉ(k)` are the residuals and `ν` is the effective degrees of freedom:
 
-#### 8.9.4 Output Fields
+```
+ν = Σ_k |L(k)| - Σ_k trace(D(k)ᵀ D(k) P(k))
+```
+
+Three estimation modes are supported:
+
+| Mode | Estimate | When to use |
+|------|----------|-------------|
+| `'full'` | Full `Σ̂` | Default for small p, captures cross-correlations |
+| `'diagonal'` | `diag(σ̂₁², ..., σ̂ₚ²)` | Default. Safe when p is large. |
+| `'isotropic'` | `σ̂² Iₚ` | Simplest, assumes equal noise on all states |
+
+When the user provides a known `Σ` via `'NoiseCov'`, estimation is skipped entirely.
+
+#### 8.9.4 Standard Deviations
+
+From the Kronecker structure `Cov(vec(C(k))) = Σ ⊗ P(k)`:
+
+```
+Var(A(k)_{ba}) = Σ_{bb} × P(k)_{aa}       for a = 1,...,p
+Var(B(k)_{ba}) = Σ_{bb} × P(k)_{p+a,p+a}  for a = 1,...,q
+```
+
+(Note: `C(k) = [A(k)ᵀ; B(k)ᵀ]`, so row `a` of `C` corresponds to column `a` of `A` or `B`.)
+
+#### 8.9.5 Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `'Uncertainty'` | logical | `false` | Enable uncertainty computation |
+| `'NoiseCov'` | `(p×p)` or `'estimate'` | `'estimate'` | Known noise covariance or auto-estimate |
+| `'CovarianceMode'` | char | `'diagonal'` | `'full'`, `'diagonal'`, or `'isotropic'` |
+
+#### 8.9.6 Output Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `AStd` | `(p × p × N)` | Standard deviation of each A(k) element |
-| `BStd` | `(p × q × N)` | Standard deviation of each B(k) element |
-| `Covariance` | `(p+q × p+q × N)` | Posterior covariance `Σ_kk` at each step |
-| `NoiseVariance` | scalar | Estimated `σ̂²` |
+| `AStd` | `(p × p × N)` | Standard deviation of each A(k) entry |
+| `BStd` | `(p × q × N)` | Standard deviation of each B(k) entry |
+| `P` | `(d × d × N)` | Row covariance matrices, d = p+q |
+| `NoiseCov` | `(p × p)` | Noise covariance (provided or estimated) |
+| `NoiseCovEstimated` | logical | `true` if estimated from residuals |
+| `NoiseVariance` | scalar | `trace(NoiseCov)/p` |
+| `DegreesOfFreedom` | scalar | Effective d.o.f. (`NaN` if `NoiseCov` provided) |
 
-The standard deviations are extracted from the diagonal of `Σ_kk`:
+#### 8.9.7 `sidLTVdiscFrozen` — Frozen Transfer Function
+
+Computes the instantaneous (frozen) transfer function at each time step and frequency:
 
 ```
-AStd(i, j, k) = σ̂ × sqrt(P(k)_{j, j})    for the (i,j) element of A(k)
-BStd(i, j, k) = σ̂ × sqrt(P(k)_{p+j, p+j}) for the (i,j) element of B(k)
+G(ω, k) = (e^{jω} I - A(k))⁻¹ B(k)
 ```
 
-(Note: `C(k) = [A(k)'; B(k)']`, so the rows of `C` are columns of `A` and `B`.)
+When uncertainty is available, `ResponseStd` is computed via first-order Jacobian propagation of the posterior covariance through the transfer function formula.
 
 ### 8.10 Online/Recursive COSMIC
 
