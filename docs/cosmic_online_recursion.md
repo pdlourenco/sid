@@ -5,7 +5,7 @@ developed in the companion derivation, is exactly a Rauch-Tung-Striebel (RTS)
 smoother in parameter space. This equivalence yields a natural online/recursive
 formulation and connects λ selection to Kalman filter consistency diagnostics.
 
-**Prerequisites:** The Bayesian interpretation document (sid_cosmic_bayesian_derivation.md),
+**Prerequisites:** The [Bayesian interpretation document](docs/cosmic_uncertainty_derivation.md),
 which establishes the probabilistic model and the posterior covariance Σ ⊗ P(k).
 
 ---
