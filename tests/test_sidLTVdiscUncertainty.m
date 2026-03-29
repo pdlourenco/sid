@@ -297,7 +297,7 @@ p = 2; q = 1; N = 15; L = 30;
 A_true = [0.9 0.1; -0.1 0.8]; B_true = [0.5; 0.3];
 sigma = 0.05;
 Sigma_true = sigma^2 * eye(p);
-lambda_val = 1;
+lambda_val = 0.001;
 nMC = 200;
 
 A_samples = zeros(p, p, N, nMC);
