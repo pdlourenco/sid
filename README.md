@@ -101,7 +101,7 @@ result_ts = sidFreqBT(y, []);
 sidSpectrumPlot(result_ts);
 ```
 
-See [`examples/`](examples/) for more usage patterns, including MIMO and time-series estimation.
+See the [examples guide](examples/README.md) for more usage patterns, including ETFE, frequency-dependent resolution, MIMO, time-varying maps, spectrograms, and LTV state-space identification.
 
 ## Compatibility
 
@@ -118,7 +118,7 @@ No toolboxes are required. The entire codebase uses only core MATLAB/Octave func
 - [**Roadmap**](docs/sid_matlab_roadmap.md) — Development phases and planned features
 - [**COSMIC uncertainty derivation**](docs/cosmic_uncertainty_derivation.md) — Bayesian posterior covariance for LTV identification
 - [**COSMIC online recursion**](docs/cosmic_online_recursion.md) — Recursive/streaming formulation of the COSMIC algorithm
-- [**Examples**](examples/) — Runnable scripts demonstrating typical workflows
+- [**Examples**](examples/README.md) — Runnable scripts demonstrating typical workflows
 
 ## Contributing
 

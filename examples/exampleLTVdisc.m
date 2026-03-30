@@ -179,3 +179,77 @@ fprintf('  Data fidelity:  %.4f\n', result_tv.Cost(2));
 fprintf('  Regularization: %.4f\n', result_tv.Cost(3));
 fprintf('  Check: %.4e (should be ~0)\n', ...
     result_tv.Cost(1) - result_tv.Cost(2) - result_tv.Cost(3));
+
+%% Uncertainty quantification
+% Enable Bayesian posterior uncertainty to get standard deviations for each
+% A(k) and B(k) entry. The noise covariance is estimated from residuals.
+
+result_unc = sidLTVdisc(X_tv, U_tv, 'Lambda', 1e4, 'Uncertainty', true);
+
+fprintf('\nUncertainty results:\n');
+fprintf('  Noise covariance estimated: %d\n', result_unc.NoiseCovEstimated);
+fprintf('  Noise variance (trace/p):   %.6f\n', result_unc.NoiseVariance);
+fprintf('  Degrees of freedom:         %.1f\n', result_unc.DegreesOfFreedom);
+fprintf('  NoiseCov:\n');  disp(result_unc.NoiseCov);
+
+% Plot A(1,1,k) with +/-2 sigma uncertainty band
+a11     = squeeze(result_unc.A(1,1,:));
+a11_std = squeeze(result_unc.AStd(1,1,:));
+kk = (1:N)';
+
+figure;
+fill([kk; flipud(kk)], [a11 - 2*a11_std; flipud(a11 + 2*a11_std)], ...
+    [0.8 0.8 1], 'EdgeColor', 'none', 'DisplayName', '\pm 2\sigma');
+hold on;
+plot(kk, a11, 'b', 'LineWidth', 1.5, 'DisplayName', 'Recovered A_{11}(k)');
+plot(kk, a_ramp, 'k--', 'LineWidth', 1.5, 'DisplayName', 'True A_{11}(k)');
+xlabel('Time step k');
+ylabel('A_{11}(k)');
+title('LTV Identification with Uncertainty Bands');
+legend('show', 'Location', 'southeast');
+grid on;
+hold off;
+
+%% Frozen transfer function with sidLTVdiscFrozen
+% Compute the instantaneous frequency response G(w,k) = (e^{jw}I - A(k))^{-1} B(k)
+% at selected time steps. When the LTV result includes uncertainty,
+% ResponseStd is propagated via first-order linearization.
+
+kSteps = [1, round(N/2), N];
+frz = sidLTVdiscFrozen(result_unc, 'TimeSteps', kSteps);
+
+fprintf('\nFrozen transfer function:\n');
+fprintf('  Method: %s\n', frz.Method);
+fprintf('  Response size: %s\n', mat2str(size(frz.Response)));
+fprintf('  ResponseStd available: %d\n', ~isempty(frz.ResponseStd));
+
+% Plot Bode magnitude at the three time steps
+figure;
+w = frz.Frequency;
+colors = {'b', 'r', [0 0.6 0]};
+for i = 1:length(kSteps)
+    G_k = squeeze(frz.Response(:, 1, 1, i));
+    mag_dB = 20*log10(abs(G_k));
+    semilogx(w, mag_dB, 'Color', colors{i}, 'LineWidth', 1.5, ...
+        'DisplayName', sprintf('k = %d', kSteps(i)));
+    hold on;
+end
+
+% Add +/-2 sigma band for the last time step
+G_last = squeeze(frz.Response(:, 1, 1, length(kSteps)));
+G_std  = squeeze(frz.ResponseStd(:, 1, 1, length(kSteps)));
+mag_upper = 20*log10(abs(G_last) + 2*G_std);
+mag_lower = 20*log10(max(abs(G_last) - 2*G_std, eps));
+fill([w; flipud(w)], [mag_lower; flipud(mag_upper)], ...
+    [0.8 1 0.8], 'EdgeColor', 'none', 'FaceAlpha', 0.5, ...
+    'HandleVisibility', 'off');
+% Re-plot the line on top
+semilogx(w, 20*log10(abs(G_last)), 'Color', colors{end}, 'LineWidth', 1.5, ...
+    'HandleVisibility', 'off');
+
+xlabel('Frequency (rad/sample)');
+ylabel('|G(w,k)| (dB)');
+title('Frozen Transfer Function at Selected Time Steps');
+legend('show');
+grid on;
+hold off;
