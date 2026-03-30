@@ -253,3 +253,36 @@ title('Frozen Transfer Function at Selected Time Steps');
 legend('show');
 grid on;
 hold off;
+
+
+%% 6. Frequency-Based Lambda Tuning (no validation data needed)
+%
+% sidLTVdiscTune with 'Method','frequency' selects lambda by comparing
+% the COSMIC frozen transfer function against a non-parametric sidFreqMap
+% estimate. No validation data is required — only training data.
+
+fprintf('\n--- Frequency-based lambda tuning ---\n');
+
+% Use a smaller lambda grid for speed in this demo
+grid_freq = logspace(1, 8, 12);
+[bestResult_freq, bestLambda_freq, info_freq] = sidLTVdiscTune(X, U, ...
+    'Method', 'frequency', 'LambdaGrid', grid_freq, 'SegmentLength', 20);
+
+fprintf('Frequency-tuned lambda: %.2e (consistency: %.1f%%)\n', ...
+    bestLambda_freq, info_freq.bestFraction * 100);
+fprintf('Validation-tuned lambda: %.2e\n', bestLambda);
+
+% Plot consistency fraction vs lambda
+figure;
+semilogx(info_freq.lambdaGrid, info_freq.fractions * 100, 'b.-', 'MarkerSize', 10);
+hold on;
+semilogx(bestLambda_freq, info_freq.bestFraction * 100, 'ro', 'MarkerSize', 12, 'LineWidth', 2);
+plot(xlim, [90 90], 'k--');  % 90% threshold line
+hold off;
+xlabel('\lambda');
+ylabel('Consistency fraction (%)');
+title('Frequency-Response Consistency Scoring');
+legend('Consistency', 'Selected \lambda', '90% threshold');
+grid on;
+
+fprintf('\nFrequency-based tuning complete.\n');
