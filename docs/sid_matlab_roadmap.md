@@ -19,10 +19,10 @@ sid  [Domain]  [Method/Variant]
 | **`sidFreqBT`** | `spa` | Frequency response via Blackman-Tukey | ✅ |
 | **`sidFreqBTFDR`** | `spafdr` | Blackman-Tukey, frequency-dependent resolution | ✅ |
 | **`sidFreqETFE`** | `etfe` | Empirical transfer function estimate | ✅ |
-| **`sidFreqMap`** | `tfestimate`, `mscohere`, `cpsd` | Time-varying frequency response map (BT or Welch) | ✅ |
+| **`sidFreqMap`** | `tfestimate`, `mscohere`, `cpsd` | Time-varying frequency response map (BT or Welch) | ✅ (BT), ⬜ (Welch) |
 | **`sidSpectrogram`** | `spectrogram` | Short-time FFT spectrogram | ✅ |
 | **`sidLTVdisc`** | — | Discrete LTV state-space identification (COSMIC) | ✅ |
-| **`sidLTVdiscTune`** | — | Lambda tuning (validation-based and frequency-response) | ✅ |
+| **`sidLTVdiscTune`** | — | Lambda tuning (validation-based and frequency-response) | ✅ (validation-based only) |
 | **`sidLTVdiscFrozen`** | — | Frozen transfer function G(ω,k) from A(k), B(k) | ✅ |
 | **`sidLTVdiscInit`** | — | Initialize recursive/online COSMIC estimator | ⬜ |
 | **`sidLTVdiscUpdate`** | — | Process one time step (filtered estimate) | ⬜ |
@@ -49,7 +49,7 @@ sid  [Domain]  [Method/Variant]
 
 | Function | Description |
 |----------|-------------|
-| **`sidCov`** | Biased cross-covariance estimation |
+| **`sidCov`** | Biased cross-covariance estimation (single and multi-trajectory) |
 | **`sidHannWin`** | Hann lag window |
 | **`sidWindowedDFT`** | Windowed Fourier transform (FFT + direct paths) |
 | **`sidUncertainty`** | Asymptotic variance formulas |
@@ -212,12 +212,12 @@ result.Method             % 'sidFreqBT', 'sidFreqBTFDR', 'sidFreqETFE', or 'sidF
 - `sidBodePlot.m` extended: subplot grid per channel pair
 - Tests: 2x2 known system, verify channel-by-channel
 
-### Phase 7 — `sidFreqMap` + `sidSpectrogram` — Time-Varying Analysis (~6 days) ✅
+### Phase 7 — `sidFreqMap` + `sidSpectrogram` — Time-Varying Analysis (~6 days) ✅ (BT), ⬜ (Welch)
 
 - `sidFreqMap.m`:
   - Outer segmentation: sliding overlapping windows (shared by both algorithms)
   - `'Algorithm', 'bt'` (default): calls `sidFreqBT` per segment (BT correlogram) ✅
-  - `'Algorithm', 'welch'`: Welch's method per segment (replaces `tfestimate`/`mscohere`/`cpsd`) ✅
+  - `'Algorithm', 'welch'`: Welch's method per segment (replaces `tfestimate`/`mscohere`/`cpsd`) ⬜
     - Sub-segmentation within each outer segment
     - Time-domain window (Hann default), FFT, averaged cross/auto periodograms
     - Form G, Phi_v, coherence from averaged spectra
@@ -228,8 +228,8 @@ result.Method             % 'sidFreqBT', 'sidFreqBTFDR', 'sidFreqETFE', or 'sidF
 - `sidSpectrogramPlot.m` ✅
 - Tests:
   - `sidFreqMap` BT: LTI system (constant map), step change, chirp ✅
-  - `sidFreqMap` Welch: same tests, verify qualitatively similar results to BT ✅
-  - `sidFreqMap` Welch vs. MathWorks `tfestimate`: numerical comparison ✅
+  - `sidFreqMap` Welch: same tests, verify qualitatively similar results to BT ⬜
+  - `sidFreqMap` Welch vs. MathWorks `tfestimate`: numerical comparison ⬜
   - `sidSpectrogram`: chirp signal (verify moving peak), white noise (flat), known sinusoid ✅
   - Alignment test: verify time axes match between `sidSpectrogram` and `sidFreqMap` ✅
   - Compare `sidSpectrogram` output to MathWorks `spectrogram` (if available) ✅
@@ -255,14 +255,14 @@ result.Method             % 'sidFreqBT', 'sidFreqBTFDR', 'sidFreqETFE', or 'sidF
   - L-curve lambda selection: verify reasonable choice
   - Preconditioning and uniqueness condition checks
 
-### Phase 8a — Variable-Length Trajectories (~2 days) ✅
+### Phase 8a — Variable-Length Trajectories (~2 days) ⬜
 
 - Extend input parsing to accept cell arrays of different-length trajectories
 - Modify `buildDataMatrices` to handle per-step active trajectory sets
 - Normalization: `1/sqrt(|L(k)|)` per step
 - Tests: mix of short and long trajectories, verify identical to uniform when all same length
 
-### Phase 8b — Bayesian Uncertainty (~4 days) ✅
+### Phase 8b — Bayesian Uncertainty (~4 days) ⬜
 
 **Theory:** `docs/cosmic_uncertainty_derivation.md`
 
@@ -314,6 +314,23 @@ Key insight: COSMIC forward pass = Kalman filter on parameter evolution; backwar
 - `sidFreqBTFDR.m` — frequency-dependent window size
 - Tests for both
 
+### Phase 9a — Multi-Trajectory Support for Frequency Functions (~3 days) ⬜
+
+**Theory:** `docs/multi_trajectory_spectral_theory.md`
+
+- Extend `sidFreqBT`, `sidFreqETFE` input parsing to accept 3D arrays `(N × n_ch × L)` and cell arrays
+- Implement ensemble-averaged covariance in `sidCov` (average per-trajectory covariances across 3rd dimension)
+- Extend `sidFreqMap` to ensemble-average per-segment spectra across trajectories
+- Extend `sidSpectrogram` to ensemble-average per-segment PSDs (ERSP-like)
+- Handle variable-length trajectories (per-segment active trajectory count)
+- Add `NumTrajectories` field to all output structs
+- Update `sidUncertainty` to use `L` in variance formulas (`1/(L×N)` instead of `1/N`)
+- Tests:
+  - LTI system: verify L-trajectory estimate matches single trajectory with L× data length
+  - LTV system: verify ensemble-averaged `sidFreqMap` + `sidLTVdisc` use same data consistently
+  - Variable-length: verify graceful handling when not all trajectories span all segments
+  - Variance check: Monte Carlo confirm 1/L variance reduction
+
 ### Phase 10 — Validation + Release (~4 days) 🔄
 
 - `exampleCompare.m` — head-to-head vs. MathWorks `spa`
@@ -333,7 +350,7 @@ Key insight: COSMIC forward pass = Kalman filter on parameter evolution; backwar
 | 4. Uncertainty | 3 days | 11 days | ✅ |
 | 5. Plotting | 2 days | 13 days | ✅ |
 | 6. MIMO | 4 days | 17 days | ✅ |
-| 7. sidFreqMap + sidSpectrogram | 6 days | 23 days | ✅ |
+| 7. sidFreqMap + sidSpectrogram | 6 days | 23 days | ✅ (BT), ⬜ (Welch) |
 | 8. sidLTVdisc base | 5 days | 28 days | ✅ |
 | 8a. Variable-length trajectories | 2 days | 30 days | ✅ |
 | 8b. Bayesian uncertainty | 4 days | 34 days | ✅ |
@@ -341,7 +358,8 @@ Key insight: COSMIC forward pass = Kalman filter on parameter evolution; backwar
 | 8d. Lambda via frequency response | 4 days | 42 days | ⬜ |
 | 8e. Output-only (two-stage) | 3 days | 45 days | ⬜ |
 | 9. ETFE + BTFDR | 4 days | 49 days | ✅ |
-| 10. Validation + release | 4 days | 53 days | 🔄 |
+| 9a. Multi-trajectory spectral | 3 days | 52 days | ⬜ |
+| 10. Validation + release | 4 days | 56 days | 🔄 |
 
 ---
 
