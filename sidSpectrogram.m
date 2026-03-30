@@ -87,7 +87,13 @@ function result = sidSpectrogram(x, varargin)
     if isvector(x)
         x = x(:);
     end
-    [N, nCh] = size(x);
+    N = size(x, 1);
+    nCh = size(x, 2);
+    if ndims(x) == 3 %#ok<ISMAT>
+        nTrajS = size(x, 3);
+    else
+        nTrajS = 1;
+    end
 
     if ~isreal(x)
         error('sid:complexData', 'Complex data is not supported. Signal x must be real.');
@@ -149,20 +155,32 @@ function result = sidSpectrogram(x, varargin)
     for ch = 1:nCh
         for k = 1:K
             startIdx = (k - 1) * step + 1;
-            seg = x(startIdx:startIdx + L - 1, ch) .* w;
-            X = fft(seg, nfft);
-            X = X(1:nBins);
-            stftCoeffs(:, k, ch) = X;
+            PkSum = zeros(nBins, 1);
+            XSum  = zeros(nBins, 1);
 
-            % One-sided PSD
-            Pk = (1 / (Fs * S1)) * abs(X) .^ 2;
-            % Double positive-frequency bins (not DC or Nyquist)
-            if mod(nfft, 2) == 0
-                Pk(2:end-1) = 2 * Pk(2:end-1);
-            else
-                Pk(2:end) = 2 * Pk(2:end);
+            for lt = 1:nTrajS
+                if nTrajS > 1
+                    seg = x(startIdx:startIdx + L - 1, ch, lt) .* w;
+                else
+                    seg = x(startIdx:startIdx + L - 1, ch) .* w;
+                end
+                X = fft(seg, nfft);
+                X = X(1:nBins);
+                XSum = XSum + X;
+
+                % One-sided PSD for this trajectory
+                Pk = (1 / (Fs * S1)) * abs(X) .^ 2;
+                % Double positive-frequency bins (not DC or Nyquist)
+                if mod(nfft, 2) == 0
+                    Pk(2:end-1) = 2 * Pk(2:end-1);
+                else
+                    Pk(2:end) = 2 * Pk(2:end);
+                end
+                PkSum = PkSum + Pk;
             end
-            Pxx(:, k, ch) = Pk;
+
+            stftCoeffs(:, k, ch) = XSum / nTrajS;
+            Pxx(:, k, ch) = PkSum / nTrajS;
         end
     end
 
@@ -187,6 +205,7 @@ function result = sidSpectrogram(x, varargin)
     result.WindowLength  = L;
     result.Overlap       = P;
     result.NFFT          = nfft;
+    result.NumTrajectories = nTrajS;
     result.Method        = 'sidSpectrogram';
 end
 

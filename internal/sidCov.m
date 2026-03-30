@@ -9,9 +9,17 @@ function R = sidCov(x, z, maxLag)
 %
 %   for tau = 0, 1, ..., maxLag.
 %
+%   Multi-trajectory support: if x and z are 3D arrays (N x p x L) and
+%   (N x q x L), the covariance is ensemble-averaged across L trajectories:
+%
+%     R(tau) = (1/L) * sum_{l=1}^{L} R_l(tau)
+%
+%   where R_l is the per-trajectory biased covariance. This reduces
+%   variance by a factor of L without affecting frequency resolution.
+%
 %   INPUTS:
-%     x      - (N x p) matrix, first signal
-%     z      - (N x q) matrix, second signal (can equal x for auto-cov)
+%     x      - (N x p) or (N x p x L) matrix, first signal
+%     z      - (N x q) or (N x q x L) matrix, second signal (can equal x)
 %     maxLag - maximum lag M (non-negative integer)
 %
 %   OUTPUT:
@@ -41,12 +49,29 @@ function R = sidCov(x, z, maxLag)
     p = size(x, 2);
     q = size(z, 2);
 
+    % Detect multi-trajectory (3D arrays)
+    if ndims(x) == 3 %#ok<ISMAT>
+        L = size(x, 3);
+    else
+        L = 1;
+    end
+
     R = zeros(maxLag + 1, p, q);
 
-    for tau = 0:maxLag
-        % x(t+tau) for t = 1..N-tau  =>  x(tau+1:N, :)
-        % z(t)     for t = 1..N-tau  =>  z(1:N-tau, :)
-        R(tau + 1, :, :) = (x(tau + 1 : N, :)' * z(1 : N - tau, :)) / N;
+    if L == 1
+        % Single trajectory (original path)
+        for tau = 0:maxLag
+            R(tau + 1, :, :) = (x(tau + 1 : N, :)' * z(1 : N - tau, :)) / N;
+        end
+    else
+        % Multi-trajectory: ensemble-average per-trajectory covariances
+        for tau = 0:maxLag
+            Rsum = zeros(p, q);
+            for l = 1:L
+                Rsum = Rsum + x(tau + 1 : N, :, l)' * z(1 : N - tau, :, l);
+            end
+            R(tau + 1, :, :) = Rsum / (L * N);
+        end
     end
 
     % Squeeze trailing singleton dimensions for scalar signals

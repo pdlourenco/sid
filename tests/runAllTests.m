@@ -43,6 +43,8 @@ testFiles = {
     'test_compareEtfe'
     'test_compareSpafdr'
     'test_compareWelch'
+    'test_multiTrajectory'
+    'test_compareMultiTraj'
 };
 
 nTests = length(testFiles);

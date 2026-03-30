@@ -1,7 +1,7 @@
-function [y, u, M, freqs, Ts, isTimeSeries] = sidValidate(y, u, varargin)
+function [y, u, M, freqs, Ts, isTimeSeries, nTraj] = sidValidate(y, u, varargin)
 %SIDVALIDATE Parse and validate inputs for sidFreq* functions.
 %
-%   [y, u, M, freqs, Ts, isTimeSeries] = sidValidate(y, u, ...)
+%   [y, u, M, freqs, Ts, isTimeSeries, nTraj] = sidValidate(y, u, ...)
 %
 %   Supports both positional and name-value calling conventions:
 %     sidValidate(y, u, M)
@@ -38,6 +38,13 @@ function [y, u, M, freqs, Ts, isTimeSeries] = sidValidate(y, u, varargin)
         end
     end
 
+    % ---- Detect multi-trajectory (3D arrays) ----
+    if ndims(y) == 3 %#ok<ISMAT>
+        nTraj = size(y, 3);
+    else
+        nTraj = 1;
+    end
+
     N = size(y, 1);
 
     % ---- Validate data ----
@@ -62,6 +69,13 @@ function [y, u, M, freqs, Ts, isTimeSeries] = sidValidate(y, u, varargin)
         end
         if any(~isfinite(u(:)))
             error('sid:nonFinite', 'Data u contains NaN or Inf values.');
+        end
+        % Multi-trajectory: u must have same number of trajectories
+        if nTraj > 1
+            if ndims(u) ~= 3 || size(u, 3) ~= nTraj %#ok<ISMAT>
+                error('sid:trajMismatch', ...
+                    'y has %d trajectories but u does not match.', nTraj);
+            end
         end
     end
 

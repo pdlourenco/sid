@@ -86,7 +86,7 @@ function result = sidFreqBT(y, u, varargin)
 %  -----------------------------------------------------------------------
 
     % ---- Parse inputs ----
-    [y, u, M, freqs, Ts, isTimeSeries] = sidValidate(y, u, varargin{:});
+    [y, u, M, freqs, Ts, isTimeSeries, nTraj] = sidValidate(y, u, varargin{:});
 
     N = size(y, 1);
     ny = size(y, 2);
@@ -143,10 +143,10 @@ function result = sidFreqBT(y, u, varargin)
 
     % ---- Uncertainty ----
     if isTimeSeries
-        [~, PhiVStd] = sidUncertainty([], PhiV, [], N, W);
+        [~, PhiVStd] = sidUncertainty([], PhiV, [], N, W, nTraj);
         GStd = [];
     else
-        [GStd, PhiVStd] = sidUncertainty(G, PhiV, Coh, N, W);
+        [GStd, PhiVStd] = sidUncertainty(G, PhiV, Coh, N, W, nTraj);
     end
 
     % ---- Pack result ----
@@ -160,6 +160,7 @@ function result = sidFreqBT(y, u, varargin)
     result.SampleTime       = Ts;
     result.WindowSize       = M;
     result.DataLength       = N;
+    result.NumTrajectories  = nTraj;
     result.Method           = 'sidFreqBT';
 end
 

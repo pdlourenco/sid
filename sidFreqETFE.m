@@ -74,7 +74,7 @@ function result = sidFreqETFE(y, u, varargin)
 %   See also: sidFreqBT, sidFreqBTFDR, sidBodePlot, sidSpectrumPlot
 
     % ---- Parse inputs ----
-    [y, u, N, ny, nu, isTimeSeries] = sidValidateData(y, u);
+    [y, u, N, ny, nu, isTimeSeries, nTraj] = sidValidateData(y, u);
 
     S = 1;
     freqs = [];
@@ -128,26 +128,65 @@ function result = sidFreqETFE(y, u, varargin)
         error('sid:badFreqs', 'Frequencies must be in the range (0, pi] rad/sample.');
     end
 
-    % ---- Compute DFTs ----
-    Ydft = sidDFT(y, freqs, useFFT);    % (nf x ny)
-
-    if ~isTimeSeries
-        Udft = sidDFT(u, freqs, useFFT);  % (nf x nu)
+    % ---- Compute DFTs and ensemble-average cross-periodograms ----
+    if nTraj == 1
+        Ydft = sidDFT(y, freqs, useFFT);    % (nf x ny)
+        if ~isTimeSeries
+            Udft = sidDFT(u, freqs, useFFT);  % (nf x nu)
+        end
+    else
+        % Multi-trajectory: average cross-periodograms before forming ratios
+        Ydft = sidDFT(y(:, :, 1), freqs, useFFT);
+        if ~isTimeSeries
+            Udft = sidDFT(u(:, :, 1), freqs, useFFT);
+        end
+        for l = 2:nTraj
+            Ydft = Ydft + sidDFT(y(:, :, l), freqs, useFFT);
+            if ~isTimeSeries
+                Udft = Udft + sidDFT(u(:, :, l), freqs, useFFT);
+            end
+        end
+        % Note: for ETFE, we keep the summed DFTs (not averaged), because
+        % G = sum(Y)/sum(U) is the H1 estimator from pooled data.
+        % The periodogram scaling (1/N) is applied per original convention.
     end
 
     % ---- Form transfer function and noise spectrum ----
     if isTimeSeries
-        % Periodogram: Phi_y(w) = (1/N) * |Y(w)|^2
+        % Periodogram: Phi_y(w) = (1/(N*L)) * |sum_l Y_l(w)|^2 / L
+        % Ensemble average of per-trajectory periodograms:
         G = [];
-        if ny == 1
-            PhiV = (1/N) * abs(Ydft).^2;
-        else
-            PhiV = zeros(nf, ny, ny);
-            for kk = 1:nf
-                Yk = Ydft(kk, :).';  % (ny x 1)
-                PhiV(kk, :, :) = (1/N) * (Yk * Yk');
+        if nTraj == 1
+            if ny == 1
+                PhiV = (1/N) * abs(Ydft).^2;
+            else
+                PhiV = zeros(nf, ny, ny);
+                for kk = 1:nf
+                    Yk = Ydft(kk, :).';
+                    PhiV(kk, :, :) = (1/N) * (Yk * Yk');
+                end
+                PhiV = real(PhiV);
             end
-            PhiV = real(PhiV);
+        else
+            % Ensemble average of per-trajectory periodograms
+            if ny == 1
+                PhiV = zeros(nf, 1);
+                for l = 1:nTraj
+                    Yl = sidDFT(y(:, :, l), freqs, useFFT);
+                    PhiV = PhiV + (1/N) * abs(Yl).^2;
+                end
+                PhiV = PhiV / nTraj;
+            else
+                PhiV = zeros(nf, ny, ny);
+                for l = 1:nTraj
+                    Yl = sidDFT(y(:, :, l), freqs, useFFT);
+                    for kk = 1:nf
+                        Yk = Yl(kk, :).';
+                        PhiV(kk, :, :) = PhiV(kk, :, :) + reshape((1/N) * (Yk * Yk'), [1 ny ny]);
+                    end
+                end
+                PhiV = real(PhiV) / nTraj;
+            end
         end
         Coh = [];
 
@@ -254,6 +293,7 @@ function result = sidFreqETFE(y, u, varargin)
     result.SampleTime       = Ts;
     result.WindowSize       = N;
     result.DataLength       = N;
+    result.NumTrajectories  = nTraj;
     result.Method           = 'sidFreqETFE';
 end
 

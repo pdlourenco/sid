@@ -24,6 +24,7 @@ exampleFiles = {
     'exampleFreqMap'
     'exampleSpectrogram'
     'exampleLTVdisc'
+    'exampleMultiTrajectory'
 };
 
 nExamples = length(exampleFiles);
