@@ -1,12 +1,13 @@
 # sid — Algorithm Specification
 
-**Version:** 0.3.0-draft
-**Date:** 2026-03-29
+**Version:** 0.4.0-draft
+**Date:** 2026-03-30
 **Reference:** Ljung, L. *System Identification: Theory for the User*, 2nd ed., Prentice Hall, 1999.
 
 ---
 
-> **Implementation status:** §1–5 (frequency-domain estimation), §6 (`sidFreqMap` BT + Welch), §7 (spectrograms), §8 base + §8.4 (`sidLTVdisc`, `sidLTVdiscTune`), §8.8 (variable-length trajectories), §8.9 (Bayesian uncertainty + `sidLTVdiscFrozen`), and §9 (`sidFreqETFE`, `sidFreqBTFDR`) are implemented. §8.10–8.12 (online/recursive COSMIC, frequency-response lambda tuning, output-only estimation) describe planned features not yet implemented.
+> **Implementation status:** §1–5 (frequency-domain estimation) and §7 (spectrograms) are implemented. §6 (`sidFreqMap`) is implemented for the BT algorithm; Welch algorithm support is planned. §8 base + §8.4 (`sidLTVdisc`, `sidLTVdiscTune`) are implemented. §8.8–8.12 (variable-length trajectories, Bayesian uncertainty, online/recursive COSMIC, frequency-response lambda tuning, output-only estimation) describe planned features not yet implemented. §9 (`sidFreqETFE`, `sidFreqBTFDR`) is implemented.
+> Implementation status: §1–5 (frequency-domain estimation), §6 (sidFreqMap BT + Welch), §7 (spectrograms), §8 base + §8.4 (sidLTVdisc, sidLTVdiscTune), §8.8 (variable-length trajectories), §8.9 (Bayesian uncertainty + sidLTVdiscFrozen), and §9 (sidFreqETFE, sidFreqBTFDR) are implemented. §8.10–8.12 (online/recursive COSMIC, frequency-response lambda tuning, output-only estimation) describe planned features not yet implemented. Multiple trajectory support from the spectral methods are also planned throughout the document.
 
 ---
 
@@ -38,6 +39,8 @@ where `e(t)` is white noise with covariance matrix `Λ`.
 
 **LTV extension:** The `sidFreqMap` function (§6) relaxes the time-invariance assumption by applying spectral analysis (Blackman-Tukey or Welch) to overlapping segments, producing a time-varying frequency response Ĝ(ω, t). Within each segment, local time-invariance is assumed.
 
+**Multi-trajectory support:** All `sid` functions accept multiple independent trajectories (experiments) of the same system. For frequency-domain functions (`sidFreqBT`, `sidFreqETFE`, `sidFreqMap`, `sidSpectrogram`), spectral estimates are ensemble-averaged across trajectories before forming transfer function ratios or power spectra, reducing variance by a factor of `L` without sacrificing frequency resolution. For `sidLTVdisc`, multiple trajectories are aggregated in the data matrices as described in §8. Multi-trajectory data is passed as 3D arrays `(N × n_ch × L)` when all trajectories share the same length, or as cell arrays `{y1, y2, ..., yL}` when lengths differ. See `docs/multi_trajectory_spectral_theory.md` for the mathematical basis.
+
 ---
 
 ## 2. `sidFreqBT` — Blackman-Tukey Spectral Analysis
@@ -53,6 +56,14 @@ where `e(t)` is white noise with covariance matrix `Λ`.
 | Sample time | `Ts` | positive scalar (seconds) | `1.0` |
 
 All data must be real-valued and uniformly sampled. If `y` or `u` is a column vector, it is treated as a single channel.
+
+**Multi-trajectory input:** When `y` is `(N × n_y × L)` and `u` is `(N × n_u × L)`, the function computes per-trajectory covariances and averages them before windowing and Fourier transformation:
+
+```
+R̂_yu^ens(τ) = (1/L) Σ_{l=1}^{L} R̂_yu^(l)(τ)
+```
+
+This ensemble averaging reduces variance by a factor of `L` without affecting frequency resolution. When trajectories have different lengths, pass cell arrays: `y = {y1, y2, ..., yL}`, `u = {u1, u2, ..., uL}`.
 
 ### 2.2 Default Frequency Grid
 
@@ -95,7 +106,13 @@ For the `sidFreqBT` algorithm, the following covariances are needed for lags `τ
 
 **Time series mode** (`u = []`): Only `R̂_y(τ)` is computed.
 
-### 2.4 Lag Window
+**Multi-trajectory covariance:** When `L` trajectories are available, the ensemble-averaged covariance is used:
+
+```
+R̂_xz^ens(τ) = (1/L) Σ_{l=1}^{L} R̂_xz^(l)(τ)
+```
+
+where `R̂_xz^(l)(τ)` is the biased covariance from trajectory `l`. The averaging is performed at the covariance level, before windowing and Fourier transformation. This preserves the H1 estimator structure (ratio of averaged spectra, not average of ratios).
 
 The Hann (Hanning) window of size `M`:
 
@@ -296,6 +313,14 @@ The standard deviation returned in the result struct is:
 
 where `p` is the number of standard deviations (default: 3 for ≈99.7% coverage under Gaussian assumptions).
 
+**Multi-trajectory variance:** When `L` trajectories are ensemble-averaged, the variance is reduced by a factor of `L`:
+
+```
+Var{Ĝ^ens(ω)} ≈ (C_W / (L × N)) × |Ĝ(ω)|² × (1 - γ̂²(ω)) / γ̂²(ω)
+```
+
+The coherence `γ̂²` is now the ensemble coherence, which is generally higher than any single-trajectory coherence because the noise averages out while the signal accumulates.
+
 ### 3.4 Variance of the Noise Spectrum
 
 The asymptotic variance of the spectral estimate (Ljung 1999, p. 188):
@@ -340,6 +365,14 @@ U(ω_k) = Σ_{t=1}^{N} u(t) exp(-j ω_k t)
 ```
 
 This is equivalent to `sidFreqBT` with window size `M = N` (rectangular window). It provides the maximum frequency resolution but has high variance.
+
+**Multi-trajectory ETFE:** When `L` trajectories are available, the cross-periodograms are averaged before forming the ratio:
+
+```
+Ĝ_ETFE^ens(ω_k) = Φ̂_yu^ens(ω_k) / Φ̂_u^ens(ω_k)
+```
+
+where `Φ̂_yu^ens(ω_k) = (1/L) Σ_l Y_l(ω_k) conj(U_l(ω_k))`. This is the multi-trajectory H1 estimator, reducing variance by a factor of `L`.
 
 ### 4.2 Optional Smoothing
 
@@ -459,6 +492,8 @@ When used together, `sidSpectrogram` on `u` and `y` alongside `sidFreqMap` on th
 | `Window` | `'welch'` only | `'hann'`, `'hamming'`, or vector | `'hann'` |
 | `NFFT` | `'welch'` only | positive integer | `max(256, 2^nextpow2(SubSegmentLength))` |
 
+**Multi-trajectory input:** When `y` is `(N × n_y × L)` and `u` is `(N × n_u × L)`, spectral estimates within each segment are ensemble-averaged across trajectories before forming transfer function ratios. For variable-length trajectories, pass cell arrays. At each segment `k`, only trajectories that span segment `k` contribute to the ensemble. This directly parallels COSMIC's multi-trajectory aggregation (§8.3.2), ensuring consistent use of the same data across time-domain and frequency-domain analyses.
+
 ### 6.3 Outer Segmentation (Common to Both Algorithms)
 
 Both algorithms share the same outer segmentation:
@@ -570,6 +605,7 @@ in units of seconds.
 | `Overlap` | scalar | Overlap P |
 | `WindowSize` | scalar | BT lag window size M (BT only) |
 | `Algorithm` | char | `'bt'` or `'welch'` |
+| `NumTrajectories` | scalar or `(K × 1)` | Number of trajectories used (scalar if constant, vector if variable-length) |
 | `Method` | char | `'sidFreqMap'` |
 
 **Dimensions shown are for SISO.** For MIMO, `Response` becomes `(n_f × K × n_y × n_u)`, etc.
@@ -647,6 +683,14 @@ The key difference: `sidFreqMap` always produces time-varying output. Setting `S
 | Sample time | `Ts` | positive scalar (seconds) | `1.0` |
 
 **Note on window terminology:** The window here is a **time-domain** tapering window applied to each data segment before FFT — this is distinct from the **lag-domain** Hann window used in `sidFreqBT`. The spectrogram window reduces spectral leakage; the BT lag window controls frequency resolution of the correlogram.
+
+**Multi-trajectory input:** When `x` is `(N × n_ch × L)`, the power spectral density within each segment is averaged across trajectories:
+
+```
+P̂^ens(ω, t_k) = (1/L) Σ_l P̂^(l)(ω, t_k)
+```
+
+This is the event-related spectral perturbation (ERSP) approach, standard in neuroscience and vibration analysis. It reduces noise while preserving time-locked spectral features that are consistent across realizations. For variable-length trajectories, pass cell arrays.
 
 ### 7.3 Algorithm
 
@@ -984,7 +1028,7 @@ semilogx(logspace(-3,15,50), losses); xlabel('\lambda'); ylabel('RMSE');
 A recommended workflow:
 
 1. Run `sidSpectrogram` on `u` and `y` to understand signal characteristics.
-2. Run `sidFreqMap` to diagnose whether and where the system is time-varying.
+2. Run `sidFreqMap` to diagnose whether and where the system is time-varying. When multiple trajectories are available, pass all of them — the ensemble-averaged spectral estimates will be more reliable than any single trajectory.
 3. Run `sidLTVdisc` to obtain the explicit state-space model for controller design.
 4. Validate: propagate the `sidLTVdisc` model and compare predicted states to measured states.
 
@@ -1009,116 +1053,84 @@ U = {U1, U2, U3};   % U1 is (N1 x q), etc.
 
 The total horizon `N` is `max(N1, N2, ..., N_L)`. Time steps with fewer active trajectories receive more regularization influence, which is the correct behavior.
 
-### 8.9 Bayesian Uncertainty Estimation ✅
+### 8.9 Bayesian Uncertainty Estimation
 
-**Status:** Implemented. **Reference:** `docs/cosmic_uncertainty_derivation.md`.
+**Reference:** `docs/cosmic_uncertainty_derivation.md` §2–4.
 
 #### 8.9.1 Bayesian Interpretation
 
-Under Gaussian noise `w_ℓ(k) ~ N(0, Σ)` on the state measurements, the COSMIC cost function is the negative log-posterior of a Bayesian model with a matrix-normal posterior:
+Under Gaussian noise `w(k) ~ N(0, σ² I)` on the state measurements, the COSMIC cost function is the negative log-posterior of a Bayesian model:
+
+- **Likelihood:** `p(X' | C) ∝ exp(-h(C) / σ²)` — the data fidelity term.
+- **Prior:** `p(C) ∝ exp(-g(C) / σ²)` — the smoothness regularizer is a Gaussian prior on consecutive differences of `C(k)` with precision `λ_k / σ²`.
+
+The posterior is Gaussian:
 
 ```
-C(k) | data, Σ  ~  MN(Ĉ(k), P(k), Σ)
+p(C | X') = N(C*, H⁻¹ σ²)
 ```
 
-where `Ĉ(k)` is the COSMIC solution (MAP estimate / posterior mean), `P(k) ∈ ℝ^{(p+q)×(p+q)}` is the row covariance (determined by data geometry and regularization), and `Σ ∈ ℝ^{p×p}` is the noise covariance. The full posterior covariance is:
+where `C*` is the COSMIC solution (the MAP estimate) and `H` is the Hessian:
 
 ```
-Cov(vec(C(k))) = Σ ⊗ P(k)
+H = V^T V + F^T Υ F
 ```
 
-The Kronecker structure means that `Σ` cancels from the COSMIC normal equations — the MAP estimate and `P(k)` are independent of `Σ`. The noise covariance enters only through the final posterior covariance.
+This is exactly the block tridiagonal matrix `LM` from the COSMIC derivation. The posterior covariance is `Σ = σ² H⁻¹`.
 
-#### 8.9.2 Diagonal Block Extraction via Backward Recursion
+#### 8.9.2 Diagonal Block Extraction via Forward-Backward Pass
 
-The row covariance `P(k) = [A⁻¹]_kk` (diagonal blocks of the inverse of the block tridiagonal Hessian) is computed by a backward recursion reusing the Schur complements `Λ_k` stored during COSMIC's forward pass:
+The full `H⁻¹` is `N(p+q) × N(p+q)` — too large to store. But we only need the diagonal blocks `Σ_kk = σ² [H⁻¹]_kk`, which give the marginal posterior covariance of `C(k)` at each time step.
 
-**Algorithm (Two-Schur-Complement Method):**
+The diagonal blocks of a block tridiagonal inverse can be computed by a second backward pass reusing the `Λ_k` matrices from COSMIC's forward pass.
 
-The diagonal blocks of the inverse of a block tridiagonal matrix require both
-left Schur complements `Λ_k^L` (from COSMIC's forward pass) and right Schur
-complements `Λ_k^R` (from a backward recursion):
+**Algorithm (Uncertainty Backward Pass):**
 
 ```
-// Right Schur complements (backward)
-Λ_{N-1}^R = S_{N-1}
-For k = N-2, ..., 0:
-    Λ_k^R = S_kk - λ_{k+1}² (Λ_{k+1}^R)⁻¹
+// Λ_k already computed during COSMIC forward pass
 
-// Combine
-P(k) = (Λ_k^L + Λ_k^R - S_kk)⁻¹
+// Initialize at last time step
+P(N-1) = Λ_{N-1}⁻¹
+
+// Backward pass: k = N-2, ..., 0
+For k = N-2 down to 0:
+    G_k = λ_{k+1} Λ_k⁻¹                      // gain matrix
+    P(k) = Λ_k⁻¹ + G_k P(k+1) G_k^T          // Joseph form
 ```
 
-where `S_kk = D(k)ᵀD(k) + regularization` is the original diagonal block.
+where `P(k) = [H⁻¹]_kk` is the `(p+q) × (p+q)` diagonal block of the inverse Hessian at step `k`.
 
-**Complexity:** `O(N(p+q)³)` — identical to COSMIC itself.
+**Complexity:** `O(N(p+q)³)` — identical to COSMIC itself. The `Λ_k⁻¹` are already computed during the forward pass, so the marginal cost is one additional backward sweep of matrix multiplications.
 
-**Proof:** By block matrix inversion formula applied to the tridiagonal structure. See `docs/cosmic_uncertainty_derivation.md` §5.2.
+**Connection to Kalman smoothing:** The forward pass computes `Λ_k` (analogous to the Kalman filter's predicted covariance), and the uncertainty backward pass computes `P(k)` (analogous to the Rauch-Tung-Striebel smoother's smoothed covariance). This is not a coincidence — the Bayesian interpretation of COSMIC's regularized least squares *is* a Kalman smoother applied to the parameter evolution model `C(k+1) = C(k) + w_k`.
 
-#### 8.9.3 Noise Covariance Estimation
+#### 8.9.3 Noise Variance Estimation
 
-The noise covariance `Σ` can be provided by the user or estimated from residuals:
-
-```
-Σ̂ = (1/ν) Σ_{k=0}^{N-1} E(k)ᵀ E(k)
-```
-
-where `E(k) = X'(k)ᵀ - D(k) Ĉ(k)` are the residuals and `ν` is the effective degrees of freedom:
+The noise variance `σ²` can be estimated from the data fidelity residuals:
 
 ```
-ν = Σ_k |L(k)| - Σ_k trace(D(k)ᵀ D(k) P(k))
+σ̂² = (2 / (N × L × p)) × h(C*)
 ```
 
-Three estimation modes are supported:
+where `h(C*)` is the data fidelity term evaluated at the optimal solution. This is the maximum likelihood estimate under the Gaussian assumption.
 
-| Mode | Estimate | When to use |
-|------|----------|-------------|
-| `'full'` | Full `Σ̂` | Default for small p, captures cross-correlations |
-| `'diagonal'` | `diag(σ̂₁², ..., σ̂ₚ²)` | Default. Safe when p is large. |
-| `'isotropic'` | `σ̂² Iₚ` | Simplest, assumes equal noise on all states |
-
-When the user provides a known `Σ` via `'NoiseCov'`, estimation is skipped entirely.
-
-#### 8.9.4 Standard Deviations
-
-From the Kronecker structure `Cov(vec(C(k))) = Σ ⊗ P(k)`:
-
-```
-Var(A(k)_{ba}) = Σ_{bb} × P(k)_{aa}       for a = 1,...,p
-Var(B(k)_{ba}) = Σ_{bb} × P(k)_{p+a,p+a}  for a = 1,...,q
-```
-
-(Note: `C(k) = [A(k)ᵀ; B(k)ᵀ]`, so row `a` of `C` corresponds to column `a` of `A` or `B`.)
-
-#### 8.9.5 Options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `'Uncertainty'` | logical | `false` | Enable uncertainty computation |
-| `'NoiseCov'` | `(p×p)` or `'estimate'` | `'estimate'` | Known noise covariance or auto-estimate |
-| `'CovarianceMode'` | char | `'diagonal'` | `'full'`, `'diagonal'`, or `'isotropic'` |
-
-#### 8.9.6 Output Fields
+#### 8.9.4 Output Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `AStd` | `(p × p × N)` | Standard deviation of each A(k) entry |
-| `BStd` | `(p × q × N)` | Standard deviation of each B(k) entry |
-| `P` | `(d × d × N)` | Row covariance matrices, d = p+q |
-| `NoiseCov` | `(p × p)` | Noise covariance (provided or estimated) |
-| `NoiseCovEstimated` | logical | `true` if estimated from residuals |
-| `NoiseVariance` | scalar | `trace(NoiseCov)/p` |
-| `DegreesOfFreedom` | scalar | Effective d.o.f. (`NaN` if `NoiseCov` provided) |
+| `AStd` | `(p × p × N)` | Standard deviation of each A(k) element |
+| `BStd` | `(p × q × N)` | Standard deviation of each B(k) element |
+| `Covariance` | `(p+q × p+q × N)` | Posterior covariance `Σ_kk` at each step |
+| `NoiseVariance` | scalar | Estimated `σ̂²` |
 
-#### 8.9.7 `sidLTVdiscFrozen` — Frozen Transfer Function
-
-Computes the instantaneous (frozen) transfer function at each time step and frequency:
+The standard deviations are extracted from the diagonal of `Σ_kk`:
 
 ```
-G(ω, k) = (e^{jω} I - A(k))⁻¹ B(k)
+AStd(i, j, k) = σ̂ × sqrt(P(k)_{j, j})    for the (i,j) element of A(k)
+BStd(i, j, k) = σ̂ × sqrt(P(k)_{p+j, p+j}) for the (i,j) element of B(k)
 ```
 
-When uncertainty is available, `ResponseStd` is computed via first-order Jacobian propagation of the posterior covariance through the transfer function formula.
+(Note: `C(k) = [A(k)'; B(k)']`, so the rows of `C` are columns of `A` and `B`.)
 
 ### 8.10 Online/Recursive COSMIC
 
@@ -1203,6 +1215,8 @@ and propagate the posterior covariance `Σ_kk` to obtain `σ_cosmic(ω, k)` via 
 
 The criterion: **find the largest λ whose COSMIC posterior bands are consistent with the non-parametric bands.**
 
+**Multi-trajectory:** When multiple trajectories are available, `sidFreqMap` should be called with all `L` trajectories to produce ensemble-averaged estimates. This makes the variation metric `Δ_k` in the spectral pre-scan significantly more reliable, since the within-trajectory estimation noise averages out while genuine system variation is preserved. See `docs/multi_trajectory_spectral_theory.md` §3 and §7.
+
 #### 8.11.2 Consistency Score
 
 At each grid point `(ω_j, t_i)`:
@@ -1266,6 +1280,7 @@ All `sidFreq*` functions return a struct with these fields:
 | `SampleTime` | scalar | Sample time `Ts` in seconds |
 | `WindowSize` | scalar or vector | Window size `M` (scalar for BT, vector for BTFDR) |
 | `DataLength` | scalar | Number of samples `N` |
+| `NumTrajectories` | scalar | Number of trajectories `L` used in estimation |
 | `Method` | char | `'sidFreqBT'`, `'sidFreqBTFDR'`, or `'sidFreqETFE'` |
 
 **Dimension conventions:**
@@ -1369,3 +1384,7 @@ Both plotting functions accept name-value options:
 8. Majji, M., Juang, J.-N., and Junkins, J.L. "Time-varying eigensystem realization algorithm." JGCD 33(1), 2010.
 
 9. Majji, M., Juang, J.-N., and Junkins, J.L. "Observer/Kalman-filter time-varying system identification." JGCD 33(3), 2010.
+
+10. Bendat, J.S. and Piersol, A.G. *Random Data: Analysis and Measurement Procedures*, 4th ed. Wiley, 2010. (Ch. 9: Statistical errors in spectral estimates; Ch. 11: Multiple-input/output relationships.)
+
+11. Antoni, J. and Schoukens, J. "A comprehensive study of the bias and variance of frequency-response-function measurements: optimal window selection and overlapping strategies." Automatica, 43(10):1723–1736, 2007.
