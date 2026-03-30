@@ -78,7 +78,8 @@ function result = sidFreqBTFDR(y, u, varargin)
 %  -----------------------------------------------------------------------
 
     % ---- Parse inputs ----
-    [y, u, N, ny, nu, isTimeSeries] = sidValidateData(y, u);
+    [y, u, N, ny, nu, isTimeSeries, nTraj] = sidValidateData(y, u);
+    Neff = N * nTraj;  % effective sample size for variance scaling
 
     R = [];
     freqs = [];
@@ -187,7 +188,7 @@ function result = sidFreqBTFDR(y, u, varargin)
 
             % Uncertainty: Var{Phi_y} = (2*C_W/N) * Phi_y^2
             CW = W(1)^2 + 2 * sum(W(2:end).^2);
-            PhiVStd(kk, :, :) = sqrt(2 * CW / N) * abs(PhiY_k);
+            PhiVStd(kk, :, :) = sqrt(2 * CW / Neff) * abs(PhiY_k);
         end
 
         % Squeeze if scalar
@@ -242,12 +243,12 @@ function result = sidFreqBTFDR(y, u, varargin)
                 % Uncertainty with local window norm
                 CW = W(1)^2 + 2 * sum(W(2:end).^2);
                 cohSafe = max(Coh(kk), epsReg);
-                GStd(kk) = sqrt((CW / N) * abs(G(kk))^2 * (1 - cohSafe) / cohSafe);
+                GStd(kk) = sqrt((CW / Neff) * abs(G(kk))^2 * (1 - cohSafe) / cohSafe);
             end
 
             % Noise uncertainty
             CW = W(1)^2 + 2 * sum(W(2:end).^2);
-            PhiVStd(kk) = sqrt(2 * CW / N) * abs(PhiV(kk));
+            PhiVStd(kk) = sqrt(2 * CW / Neff) * abs(PhiV(kk));
         end
 
     else
@@ -277,7 +278,7 @@ function result = sidFreqBTFDR(y, u, varargin)
 
             % Noise uncertainty
             CW = W(1)^2 + 2 * sum(W(2:end).^2);
-            PhiVStd(kk, :, :) = sqrt(2 * CW / N) * abs(PhiV_k);
+            PhiVStd(kk, :, :) = sqrt(2 * CW / Neff) * abs(PhiV_k);
         end
     end
 
@@ -292,6 +293,7 @@ function result = sidFreqBTFDR(y, u, varargin)
     result.SampleTime       = Ts;
     result.WindowSize       = Mk(:);
     result.DataLength       = N;
+    result.NumTrajectories  = nTraj;
     result.Method           = 'sidFreqBTFDR';
 end
 

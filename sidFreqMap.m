@@ -72,7 +72,7 @@ function result = sidFreqMap(y, u, varargin)
 %  -----------------------------------------------------------------------
 
     % ---- Validate data ----
-    [y, u, N, ny, nu, isTimeSeries] = sidValidateData(y, u);
+    [y, u, N, ny, nu, isTimeSeries, nTraj] = sidValidateData(y, u);
 
     % ---- Parse options ----
     p = inputParser;
@@ -188,11 +188,20 @@ function result = sidFreqMap(y, u, varargin)
     % ---- Run inner estimator on first segment to get dimensions ----
     s1 = 1;
     e1 = L;
-    yk = y(s1:e1, :);
-    if isTimeSeries
-        uk = [];
+    if nTraj > 1
+        yk = y(s1:e1, :, :);
+        if isTimeSeries
+            uk = [];
+        else
+            uk = u(s1:e1, :, :);
+        end
     else
-        uk = u(s1:e1, :);
+        yk = y(s1:e1, :);
+        if isTimeSeries
+            uk = [];
+        else
+            uk = u(s1:e1, :);
+        end
     end
 
     if strcmp(algorithm, 'bt')
@@ -231,11 +240,20 @@ function result = sidFreqMap(y, u, varargin)
     for k = 2:K
         startIdx = (k - 1) * step + 1;
         endIdx   = startIdx + L - 1;
-        yk = y(startIdx:endIdx, :);
-        if isTimeSeries
-            uk = [];
+        if nTraj > 1
+            yk = y(startIdx:endIdx, :, :);
+            if isTimeSeries
+                uk = [];
+            else
+                uk = u(startIdx:endIdx, :, :);
+            end
         else
-            uk = u(startIdx:endIdx, :);
+            yk = y(startIdx:endIdx, :);
+            if isTimeSeries
+                uk = [];
+            else
+                uk = u(startIdx:endIdx, :);
+            end
         end
         if strcmp(algorithm, 'bt')
             rk = sidFreqBT(yk, uk, btArgs{:});
@@ -262,6 +280,7 @@ function result = sidFreqMap(y, u, varargin)
     result.Overlap          = P;
     result.WindowSize       = M;
     result.Algorithm        = algorithm;
+    result.NumTrajectories  = nTraj;
     result.Method           = 'sidFreqMap';
 
     % ---- Nested helper to store segment results ----
@@ -297,8 +316,14 @@ function result = welchEstimate(y, u, isTimeSeries, ny, nu, Lsub, Psub, nfft, wi
 %WELCHESTIMATE Welch averaged periodogram estimate within one segment.
 %
 %   Returns a result struct with the same fields as sidFreqBT output.
+%   Supports multi-trajectory input: y is (Lseg x ny x L), u is (Lseg x nu x L).
 
     Lseg = size(y, 1);
+    if ndims(y) == 3 %#ok<ISMAT>
+        nTrajW = size(y, 3);
+    else
+        nTrajW = 1;
+    end
 
     % ---- Build window ----
     if isnumeric(winType)
@@ -344,37 +369,47 @@ function result = welchEstimate(y, u, isTimeSeries, ny, nu, Lsub, Psub, nfft, wi
         PhiYU = zeros(nBins, ny, nu);
     end
 
-    for j = 1:J
-        s = (j - 1) * subStep + 1;
-        e = s + Lsub - 1;
+    for lt = 1:nTrajW
+        for j = 1:J
+            s = (j - 1) * subStep + 1;
+            e = s + Lsub - 1;
 
-        % Windowed FFT of output
-        Yj = fft(bsxfun(@times, y(s:e, :), w), nfft, 1);
-        Yj = Yj(2:nBins+1, :);  % one-sided, skip DC
-
-        % Auto-spectrum of y
-        for a = 1:ny
-            for b = 1:ny
-                PhiY(:, a, b) = PhiY(:, a, b) + Yj(:, a) .* conj(Yj(:, b));
+            % Windowed FFT of output
+            if nTrajW > 1
+                Yj = fft(bsxfun(@times, y(s:e, :, lt), w), nfft, 1);
+            else
+                Yj = fft(bsxfun(@times, y(s:e, :), w), nfft, 1);
             end
-        end
+            Yj = Yj(2:nBins+1, :);  % one-sided, skip DC
 
-        if ~isTimeSeries
-            % Windowed FFT of input
-            Uj = fft(bsxfun(@times, u(s:e, :), w), nfft, 1);
-            Uj = Uj(2:nBins+1, :);
-
-            % Auto-spectrum of u
-            for a = 1:nu
-                for b = 1:nu
-                    PhiU(:, a, b) = PhiU(:, a, b) + Uj(:, a) .* conj(Uj(:, b));
+            % Auto-spectrum of y
+            for a = 1:ny
+                for b = 1:ny
+                    PhiY(:, a, b) = PhiY(:, a, b) + Yj(:, a) .* conj(Yj(:, b));
                 end
             end
 
-            % Cross-spectrum y*u'
-            for a = 1:ny
-                for b = 1:nu
-                    PhiYU(:, a, b) = PhiYU(:, a, b) + Yj(:, a) .* conj(Uj(:, b));
+            if ~isTimeSeries
+                % Windowed FFT of input
+                if nTrajW > 1
+                    Uj = fft(bsxfun(@times, u(s:e, :, lt), w), nfft, 1);
+                else
+                    Uj = fft(bsxfun(@times, u(s:e, :), w), nfft, 1);
+                end
+                Uj = Uj(2:nBins+1, :);
+
+                % Auto-spectrum of u
+                for a = 1:nu
+                    for b = 1:nu
+                        PhiU(:, a, b) = PhiU(:, a, b) + Uj(:, a) .* conj(Uj(:, b));
+                    end
+                end
+
+                % Cross-spectrum y*u'
+                for a = 1:ny
+                    for b = 1:nu
+                        PhiYU(:, a, b) = PhiYU(:, a, b) + Yj(:, a) .* conj(Uj(:, b));
+                    end
                 end
             end
         end
@@ -384,20 +419,22 @@ function result = welchEstimate(y, u, isTimeSeries, ny, nu, Lsub, Psub, nfft, wi
     % Factor of 2 for one-sided spectrum (we exclude DC and use positive
     % frequencies only). This cancels in G = Pyu/Puu and coherence, but is
     % needed for correct PSD magnitude.
-    PhiY = 2 * PhiY / (J * S1);
+    % Total number of periodogram segments: J sub-segments × nTrajW trajectories
+    Jtotal = J * nTrajW;
+    PhiY = 2 * PhiY / (Jtotal * S1);
     if ~isTimeSeries
-        PhiU  = 2 * PhiU  / (J * S1);
-        PhiYU = 2 * PhiYU / (J * S1);
+        PhiU  = 2 * PhiU  / (Jtotal * S1);
+        PhiYU = 2 * PhiYU / (Jtotal * S1);
     end
 
     % ---- Degrees of freedom for uncertainty ----
-    % For Hann window at 50% overlap: nu_dof ≈ 1.8 * J
-    % General approximation: 2 * J * (1 - overlap_ratio * correction)
+    % For Hann window at 50% overlap: nu_dof ≈ 1.8 * J per trajectory
+    % Multi-trajectory multiplies by nTrajW (independent realizations)
     overlapRatio = Psub / Lsub;
     if overlapRatio <= 0
-        nuDof = 2 * J;
+        nuDof = 2 * J * nTrajW;
     else
-        nuDof = max(2, 1.8 * J);  % conservative for Hann at ~50% overlap
+        nuDof = max(2, 1.8 * J * nTrajW);  % conservative for Hann at ~50% overlap
     end
 
     % ---- Form transfer function, noise spectrum, coherence ----

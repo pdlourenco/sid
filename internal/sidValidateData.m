@@ -1,23 +1,28 @@
-function [y, u, N, ny, nu, isTimeSeries] = sidValidateData(y, u)
+function [y, u, N, ny, nu, isTimeSeries, nTraj] = sidValidateData(y, u)
 %SIDVALIDATEDATA Validate and orient data for sidFreq* functions.
 %
-%   [y, u, N, ny, nu, isTimeSeries] = sidValidateData(y, u)
+%   [y, u, N, ny, nu, isTimeSeries, nTraj] = sidValidateData(y, u)
 %
 %   Shared data validation used by sidFreqBT, sidFreqETFE, sidFreqBTFDR.
 %   Ensures column orientation, checks for NaN/Inf, complex data, and
 %   size consistency.
 %
+%   Supports multi-trajectory input:
+%     - 3D arrays: y is (N x n_y x L), u is (N x n_u x L)
+%     - 2D arrays: y is (N x n_y), treated as L=1
+%
 %   INPUTS:
-%     y - Output data, (N x n_y) or vector
-%     u - Input data, (N x n_u) or vector, or [] for time series
+%     y - Output data, (N x n_y), (N x n_y x L), or vector
+%     u - Input data, (N x n_u), (N x n_u x L), vector, or [] for time series
 %
 %   OUTPUTS:
-%     y            - (N x ny) oriented output data
-%     u            - (N x nu) oriented input data, or []
-%     N            - Number of samples
+%     y            - (N x ny x nTraj) oriented output data
+%     u            - (N x nu x nTraj) oriented input data, or []
+%     N            - Number of samples per trajectory
 %     ny           - Number of output channels
 %     nu           - Number of input channels (0 for time series)
 %     isTimeSeries - Logical, true when u is empty
+%     nTraj        - Number of trajectories (1 for single-trajectory)
 %
 %   Example:
 %     y = randn(500, 1); u = randn(500, 1);
@@ -49,6 +54,13 @@ function [y, u, N, ny, nu, isTimeSeries] = sidValidateData(y, u)
         end
     end
 
+    % ---- Detect multi-trajectory (3D arrays) ----
+    if ndims(y) == 3 %#ok<ISMAT>
+        nTraj = size(y, 3);
+    else
+        nTraj = 1;
+    end
+
     N = size(y, 1);
     ny = size(y, 2);
 
@@ -75,6 +87,13 @@ function [y, u, N, ny, nu, isTimeSeries] = sidValidateData(y, u)
         end
         if any(~isfinite(u(:)))
             error('sid:nonFinite', 'Data u contains NaN or Inf values.');
+        end
+        % Multi-trajectory: u must have same number of trajectories
+        if nTraj > 1
+            if ndims(u) ~= 3 || size(u, 3) ~= nTraj %#ok<ISMAT>
+                error('sid:trajMismatch', ...
+                    'y has %d trajectories but u does not match.', nTraj);
+            end
         end
     else
         nu = 0;
