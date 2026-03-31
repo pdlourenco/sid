@@ -286,3 +286,20 @@ legend('Consistency', 'Selected \lambda', '90% threshold');
 grid on;
 
 fprintf('\nFrequency-based tuning complete.\n');
+
+%% Model validation with sidCompare and sidResidual
+% Compare COSMIC model predictions against the training data.
+
+comp = sidCompare(result_auto, X_tv, U_tv);
+fprintf('\nCOSMIC model fit (per state component):\n');
+for ch = 1:p
+    fprintf('  x_%d: %.1f%%\n', ch, comp.Fit(ch));
+end
+
+% Residual diagnostics
+resid = sidResidual(result_auto, X_tv, U_tv);
+if resid.WhitenessPass
+    fprintf('Residual whiteness test: PASS\n');
+else
+    fprintf('Residual whiteness test: FAIL (model may need refinement)\n');
+end

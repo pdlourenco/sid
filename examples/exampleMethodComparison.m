@@ -114,6 +114,17 @@ legend('show', 'Location', 'southwest');
 grid on;
 hold off;
 
+%% Model output comparison using sidCompare
+% Compare how well each method predicts the measured output.
+comp_bt   = sidCompare(r_bt, y, u);
+comp_fdr  = sidCompare(r_fdr, y, u);
+comp_etfe = sidCompare(r_etfe, y, u);
+
+fprintf('\n--- Prediction Fit (NRMSE %%) ---\n');
+fprintf('  sidFreqBT:    %.1f%%\n', comp_bt.Fit);
+fprintf('  sidFreqBTFDR: %.1f%%\n', comp_fdr.Fit);
+fprintf('  sidFreqETFE:  %.1f%%\n', comp_etfe.Fit);
+
 %% Summary of method trade-offs
 fprintf('\n--- Method Comparison Summary ---\n');
 fprintf('%-12s  %-12s  %-11s  %-9s\n', 'Method', 'WindowSize', 'Uncertainty', 'Coherence');

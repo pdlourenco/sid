@@ -45,6 +45,9 @@ testFiles = {
     'test_compareWelch'
     'test_multiTrajectory'
     'test_compareMultiTraj'
+    'test_sidDetrend'
+    'test_sidResidual'
+    'test_sidCompare'
 };
 
 nTests = length(testFiles);
