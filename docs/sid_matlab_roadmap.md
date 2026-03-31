@@ -28,9 +28,9 @@ sid  [Domain]  [Method/Variant]
 | **`sidLTVdiscUpdate`** | — | Process one time step (filtered estimate) | ⬜ |
 | **`sidLTVdiscSmooth`** | — | Backward pass over window (smoothed estimates) | ⬜ |
 | **`sidLTVdiscIO`** | — | Partial-observation LTV identification (alternating COSMIC + RTS smoother) | ⬜ |
-| **`sidDetrend`** | `detrend` | Polynomial detrending (preprocessing) | ⬜ |
-| **`sidResidual`** | `resid` | Residual analysis (whiteness + independence tests) | ⬜ |
-| **`sidCompare`** | `compare` | Model output comparison with fit metric | ⬜ |
+| **`sidDetrend`** | `detrend` | Polynomial detrending (preprocessing) | ✅ |
+| **`sidResidual`** | `resid` | Residual analysis (whiteness + independence tests) | ✅ |
+| **`sidCompare`** | `compare` | Model output comparison with fit metric | ✅ |
 | `sidTfARX` | `arx` | Transfer function, ARX model | — |
 | `sidTfARMAX` | `armax` | Transfer function, ARMAX model | — |
 | `sidSsN4SID` | `n4sid` | State-space, N4SID subspace method | — |
@@ -79,9 +79,9 @@ sid-matlab/
 ├── sidSpectrumPlot.m        % Power spectrum plot
 ├── sidMapPlot.m             % Time-frequency color map
 ├── sidSpectrogramPlot.m     % Spectrogram color map
-├── sidDetrend.m             % Polynomial detrending (preprocessing)              (planned)
-├── sidResidual.m            % Residual analysis (whiteness + independence)        (planned)
-├── sidCompare.m             % Model output comparison with fit metric             (planned)
+├── sidDetrend.m             % Polynomial detrending (preprocessing)
+├── sidResidual.m            % Residual analysis (whiteness + independence)
+├── sidCompare.m             % Model output comparison with fit metric
 ├── internal/
 │   ├── sidCov.m             % Biased covariance estimation
 │   ├── sidDFT.m             % DFT computation (FFT + direct paths)
@@ -119,9 +119,9 @@ sid-matlab/
 │   ├── test_sidLTVdiscUncertainty.m
 │   ├── test_sidLTVdiscFrozen.m
 │   ├── test_sidLTVdiscVarLen.m
-│   ├── test_sidDetrend.m                                         (planned)
-│   ├── test_sidResidual.m                                        (planned)
-│   └── test_sidCompare.m                                         (planned)
+│   ├── test_sidDetrend.m
+│   ├── test_sidResidual.m
+│   └── test_sidCompare.m
 ├── examples/
 │   ├── README.md
 │   ├── exampleSISO.m
@@ -141,7 +141,7 @@ sid-matlab/
 │   ├── cosmic_online_recursion.md
 │   ├── cosmic_automatic_tuning.md
 │   ├── multi_trajectory_spectral_theory.md
-│   └── sid_cosmic_output_theory.md
+│   └── cosmic_output.md
 ├── SPEC.md
 ├── LICENSE                    % MIT
 ├── README.md
@@ -376,7 +376,7 @@ Core: alternating minimisation of joint objective (observation fidelity + dynami
   - Variable-length: verify graceful handling when not all trajectories span all segments
   - Variance check: Monte Carlo confirm 1/L variance reduction
 
-### Phase 11 — Workflow Utilities (~4 days) ⬜
+### Phase 11 — Workflow Utilities (~4 days) ✅
 
 - `sidDetrend.m`:
   - Polynomial detrending: remove mean (d=0), linear trend (d=1, default), or higher order
@@ -430,7 +430,7 @@ Core: alternating minimisation of joint objective (observation fidelity + dynami
 | 8e. Output-COSMIC (`sidLTVdiscIO`) | 5 days | 47 days | ⬜ |
 | 9. ETFE + BTFDR | 4 days | 51 days | ✅ |
 | 9a. Multi-trajectory spectral | 3 days | 54 days | ✅ |
-| 11. Workflow utilities | 4 days | 58 days | ⬜ |
+| 11. Workflow utilities | 4 days | 58 days | ✅ |
 | 10. Validation, freeze + release | 4 days | 62 days | 🔄 |
 
 ---
