@@ -282,8 +282,7 @@ function plotResidualDiagnostics(autoCorr, crossCorr, confBound, maxLag, isTimeS
     % Top panel: autocorrelation
     subplot(nPanels, 1, 1);
     lags_auto = (0:maxLag)';
-    h = bar(lags_auto, autoCorr, 0.5);
-    set(h, 'FaceColor', [0.3 0.5 0.8]);
+    bar(lags_auto, autoCorr, 0.5);
     hold on;
     plot([0 maxLag], [confBound confBound], 'r--', 'LineWidth', 1);
     plot([0 maxLag], [-confBound -confBound], 'r--', 'LineWidth', 1);
@@ -296,8 +295,7 @@ function plotResidualDiagnostics(autoCorr, crossCorr, confBound, maxLag, isTimeS
     if ~isTimeSeries && ~isempty(crossCorr)
         subplot(nPanels, 1, 2);
         lags_cross = (-maxLag:maxLag)';
-        h2 = bar(lags_cross, crossCorr, 0.5);
-        set(h2, 'FaceColor', [0.3 0.5 0.8]);
+        bar(lags_cross, crossCorr, 0.5);
         hold on;
         plot([-maxLag maxLag], [confBound confBound], 'r--', 'LineWidth', 1);
         plot([-maxLag maxLag], [-confBound -confBound], 'r--', 'LineWidth', 1);
