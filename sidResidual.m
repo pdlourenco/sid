@@ -262,8 +262,10 @@ function G_interp = interpG(freqs_model, G, freqs_target)
 %   Uses linear interpolation of real and imaginary parts.
 %   Always returns a column vector.
 
-    G_interp = interp1(freqs_model(:), real(G(:)), freqs_target(:), 'linear', 'extrap') + ...
-        1i * interp1(freqs_model(:), imag(G(:)), freqs_target(:), 'linear', 'extrap');
+    % Use 0 as extrap value for Octave compatibility (avoids sq_string error
+    % with 'extrap' argument in some Octave versions)
+    G_interp = interp1(freqs_model(:), real(G(:)), freqs_target(:), 'linear', 0) + ...
+        1i * interp1(freqs_model(:), imag(G(:)), freqs_target(:), 'linear', 0);
     G_interp = G_interp(:);  % ensure column
 end
 
