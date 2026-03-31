@@ -6,7 +6,7 @@
 
 ---
 
-> **Implementation status:** §1–5 (frequency-domain estimation), §6 (`sidFreqMap` BT + Welch), §7 (spectrograms), §8 base + §8.4 (`sidLTVdisc`, `sidLTVdiscTune`), §8.8 (variable-length trajectories), §8.9 (Bayesian uncertainty + `sidLTVdiscFrozen`), §8.11 (lambda tuning via frequency response), §9 (`sidFreqETFE`, `sidFreqBTFDR`), §9a (multi-trajectory spectral), §13 (`sidDetrend`), §14 (`sidResidual`), and §15 (`sidCompare`) are implemented. §8.10 (online/recursive COSMIC) and §8.12 (output-COSMIC) describe planned features not yet implemented.
+> **Implementation status:** §1–5 (frequency-domain estimation), §6 (`sidFreqMap` BT + Welch), §7 (spectrograms), §8 base + §8.4 (`sidLTVdisc`, `sidLTVdiscTune`), §8.8 (variable-length trajectories), §8.9 (Bayesian uncertainty + `sidLTVdiscFrozen`), §8.11 (lambda tuning via frequency response), §9 (`sidFreqETFE`, `sidFreqBTFDR`), and §9a (multi-trajectory spectral) are implemented. §8.10 (online/recursive COSMIC), §8.12 (output-COSMIC), §13 (`sidDetrend`), §14 (`sidResidual`), and §15 (`sidCompare`) describe planned features not yet implemented.
 
 ---
 
@@ -1284,7 +1284,7 @@ J_init(X, B) = J(X, C)|_{A=I}
              + λ Σ_k ||B(k) - B(k-1)||²_F
 ```
 
-This is jointly convex in `{x_l(k)}` and `{B(k)}` (no bilinear terms — `B(k) u_l(k)` is linear in `B(k)` since `u_l(k)` is known data). The `B(k)` are shared across trajectories (same LTV dynamics); each trajectory has its own state sequence. The minimiser is unique and obtained in a single linear solve. The autonomous state evolution is modelled as a random walk (`A = I`) with input-driven corrections; the smoothness prior on `B(k)` prevents the input matrix from absorbing dynamics attributable to `A(k)`.
+This is jointly convex in `{x_l(k)}` and `{B(k)}` (no bilinear terms — `B(k) u_l(k)` is linear in `B(k)` since `u_l(k)` is known data). The `B(k)` are shared across trajectories (same LTV dynamics); each trajectory has its own state sequence. The minimiser is unique. In practice, it is computed by alternating between solving for `{x_l(k)}` given `{B(k)}` (the state step with `A = I`, Appendix A of the theory document) and solving for `{B(k)}` given `{x_l(k)}` (a standard COSMIC problem), starting from `B(k) = 0`. Convergence is typically achieved in 3–10 alternations. The autonomous state evolution is modelled as a random walk (`A = I`) with input-driven corrections; the smoothness prior on `B(k)` prevents the input matrix from absorbing dynamics attributable to `A(k)`.
 
 Since `J_init = J|_{A=I}`, the initialisation is the exact minimisation of the global objective over a restricted subspace, not a separate heuristic.
 
@@ -1330,7 +1330,7 @@ When disabled (`μ = 0` from iteration 2 onward), the trust-region adds no compu
 
 #### 8.12.6 Computational Complexity
 
-- **Initialisation:** Single linear solve, `O(N (n + nq)²)` per trajectory.
+- **Initialisation:** Alternating x–B solve, `O(n_init × (L N n³ + N q³))` where `n_init` is typically 3–10.
 - **State step:** RTS smoother, `O(N n³)` per trajectory, `O(L N n³)` total.
 - **COSMIC step:** Standard COSMIC tridiagonal solve, `O(N (n+q)³)`, independent of `L`.
 - **Per iteration:** `O(L N n³ + N (n+q)³)`.
