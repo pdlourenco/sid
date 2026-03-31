@@ -28,6 +28,7 @@ sid  [Domain]  [Method/Variant]
 | **`sidLTVdiscUpdate`** | — | Process one time step (filtered estimate) | ⬜ |
 | **`sidLTVdiscSmooth`** | — | Backward pass over window (smoothed estimates) | ⬜ |
 | **`sidLTVdiscIO`** | — | Partial-observation LTV identification (alternating COSMIC + RTS smoother) | ⬜ |
+| **`sidModelOrder`** | — | Model order estimation from frequency response (Hankel SVD) | ⬜ |
 | **`sidDetrend`** | `detrend` | Polynomial detrending (preprocessing) | ✅ |
 | **`sidResidual`** | `resid` | Residual analysis (whiteness + independence tests) | ✅ |
 | **`sidCompare`** | `compare` | Model output comparison with fit metric | ✅ |
@@ -75,6 +76,7 @@ sid-matlab/
 ├── sidLTVdiscUpdate.m       % Online: process one time step                      (planned)
 ├── sidLTVdiscSmooth.m       % Windowed backward pass for smoothed estimates      (planned)
 ├── sidLTVdiscIO.m           % Partial-observation LTV identification              (planned)
+├── sidModelOrder.m          % Model order estimation (Hankel SVD)                 (planned)
 ├── sidBodePlot.m            % Bode diagram with confidence bands
 ├── sidSpectrumPlot.m        % Power spectrum plot
 ├── sidMapPlot.m             % Time-frequency color map
@@ -121,7 +123,8 @@ sid-matlab/
 │   ├── test_sidLTVdiscVarLen.m
 │   ├── test_sidDetrend.m
 │   ├── test_sidResidual.m
-│   └── test_sidCompare.m
+│   ├── test_sidCompare.m
+│   └── test_sidModelOrder.m                                     (planned)
 ├── examples/
 │   ├── README.md
 │   ├── exampleSISO.m
@@ -134,6 +137,7 @@ sid-matlab/
 │   ├── exampleMethodComparison.m
 │   ├── exampleLTVdisc.m
 │   ├── exampleMultiTrajectory.m
+│   ├── exampleOutputCOSMIC.m                                    (planned)
 │   └── runAllExamples.m
 ├── docs/
 │   ├── sid_matlab_roadmap.md
@@ -328,12 +332,20 @@ Key insight: COSMIC forward pass = Kalman filter on parameter evolution; backwar
 - Depends on: Phase 7 (`sidFreqMap`) and Phase 8b (uncertainty)
 - Tests: known LTV system, verify selected lambda is reasonable
 
-### Phase 8e — Output-COSMIC (`sidLTVdiscIO`) (~5 days) ⬜
+### Phase 8e — Output-COSMIC (`sidLTVdiscIO`) (~6 days) ⬜
 
 **Theory:** `docs/cosmic_output.md`
 
 Core: alternating minimisation of joint objective (observation fidelity + dynamics fidelity + COSMIC smoothness). When `H = I`, reduces to standard `sidLTVdisc`.
 
+- `sidModelOrder.m`:
+  - Input: `sidFreqBT` (or any `sidFreq*`) result struct
+  - Compute impulse response coefficients via IFFT of `Response`
+  - Build block Hankel matrix from impulse response
+  - SVD → singular values
+  - Detect model order from largest singular value ratio gap (default) or user-specified threshold
+  - Return `n`, singular values, and Hankel matrix (for inspection)
+  - Optional: `'Plot', true` for singular value bar chart with detected gap
 - `sidLTVdiscIO.m`:
   - Initialisation: single forward-backward pass for states `{x_l(k)}` and input matrices `{B(k)}` jointly with `A = I` (exact minimisation of `J|_{A=I}`, jointly convex, composite block tridiagonal)
   - COSMIC step: standard `sidLTVdisc` on estimated states (reuses existing implementation)
@@ -344,7 +356,11 @@ Core: alternating minimisation of joint objective (observation fidelity + dynami
   - Variable-length trajectories via cell arrays
   - Returns estimated `A(k)`, `B(k)`, `X(k)`, cost history, iteration count
   - Uncertainty: run COSMIC uncertainty backward pass (Phase 8b) at final iteration
+- `exampleOutputCOSMIC.m`:
+  - End-to-end workflow: `sidFreqBT` → `sidModelOrder` → construct `H` → `sidLTVdiscIO`
+  - Demonstrates partially-known H case (some states measured, hidden states estimated)
 - Tests:
+  - `sidModelOrder`: known 4th-order system, verify n = 4 detected; known 2nd-order, verify n = 2
   - Known LTV system with `H = I`: verify identical to `sidLTVdisc`
   - Known LTV system with `H ≠ I`: compare estimated `A(k)`, `B(k)` to ground truth
   - Convergence: verify monotone cost decrease across iterations
@@ -427,11 +443,11 @@ Core: alternating minimisation of joint objective (observation fidelity + dynami
 | 8b. Bayesian uncertainty | 4 days | 34 days | ✅ |
 | 8c. Online/recursive COSMIC | 4 days | 38 days | ⬜ |
 | 8d. Lambda via frequency response | 4 days | 42 days | ✅ |
-| 8e. Output-COSMIC (`sidLTVdiscIO`) | 5 days | 47 days | ⬜ |
-| 9. ETFE + BTFDR | 4 days | 51 days | ✅ |
-| 9a. Multi-trajectory spectral | 3 days | 54 days | ✅ |
-| 11. Workflow utilities | 4 days | 58 days | ✅ |
-| 10. Validation, freeze + release | 4 days | 62 days | 🔄 |
+| 8e. Output-COSMIC (`sidLTVdiscIO`) | 6 days | 48 days | ⬜ |
+| 9. ETFE + BTFDR | 4 days | 52 days | ✅ |
+| 9a. Multi-trajectory spectral | 3 days | 55 days | ✅ |
+| 11. Workflow utilities | 4 days | 59 days | ✅ |
+| 10. Validation, freeze + release | 4 days | 63 days | 🔄 |
 
 ---
 
@@ -458,7 +474,6 @@ Core: alternating minimisation of joint objective (observation fidelity + dynami
 - Online/recursive COSMIC (Phase 8c — v2)
 - Unknown observation matrix estimation (joint H + dynamics)
 - Time-varying observation matrix H(k)
-- Model order selection (N4SID singular value analysis, BIC sweep)
 - Alternative regularization norms (non-squared L2, L1 total variation)
 - Alternative LTV algorithms (TVERA, TVOKID) — `'Algorithm'` parameter is ready
 - GCV lambda selection
