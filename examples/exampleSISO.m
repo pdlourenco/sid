@@ -44,6 +44,39 @@ legend('show');
 grid on;
 hold off;
 
+%% Preprocessing: detrend data before estimation
+% Add a drift to the data and show that detrending improves results.
+y_drift = y + 0.01 * (1:N)';  % add linear drift
+u_drift = u + 5;              % add DC offset to input
+
+% Without detrending: drift biases the low-frequency estimate
+result_raw = sidFreqBT(y_drift, u_drift, 'SampleTime', Ts);
+
+% With detrending
+y_dt = sidDetrend(y_drift);
+u_dt = sidDetrend(u_drift);
+result_dt = sidFreqBT(y_dt, u_dt, 'SampleTime', Ts);
+
+fprintf('Without detrend: max |G| at low freq = %.2f\n', max(abs(result_raw.Response)));
+fprintf('With detrend:    max |G| at low freq = %.2f\n', max(abs(result_dt.Response)));
+
+%% Model validation: residual analysis
+resid = sidResidual(result, y, u);
+if resid.WhitenessPass
+    fprintf('Whiteness test: PASS\n');
+else
+    fprintf('Whiteness test: FAIL\n');
+end
+if resid.IndependencePass
+    fprintf('Independence test: PASS\n');
+else
+    fprintf('Independence test: FAIL\n');
+end
+
+%% Model validation: compare predicted vs measured
+comp = sidCompare(result, y, u);
+fprintf('NRMSE fit: %.1f%%\n', comp.Fit);
+
 %% Time series mode (no input)
 % Estimate the output power spectrum of an AR(1) process.
 y_ts = filter(1, [1 -0.8], randn(500, 1));
