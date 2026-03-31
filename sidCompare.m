@@ -188,8 +188,9 @@ function [y_pred, y_meas] = simulateFreq(model, y, u)
             else
                 Gij = reshape(G_model(:, iy, iu), [], 1);
             end
-            G_interp = interp1(freqs_model, real(Gij), freqs_fft, 'linear', 'extrap') + ...
-                1i * interp1(freqs_model, imag(Gij), freqs_fft, 'linear', 'extrap');
+            Gr = interp1(freqs_model(:), real(Gij(:)), freqs_fft(:), 'linear', 'extrap');
+            Gi = interp1(freqs_model(:), imag(Gij(:)), freqs_fft(:), 'linear', 'extrap');
+            G_interp = Gr(:) + 1i * Gi(:);  % ensure column
             Y_pred_fft(2:npos+1, iy) = Y_pred_fft(2:npos+1, iy) + ...
                 G_interp .* U_fft(2:npos+1, iu);
         end
