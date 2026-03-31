@@ -1409,16 +1409,65 @@ frozen = sidLTVdiscFrozen(result, 'SampleTime', Ts);
 sidBodePlot(frozen);
 ```
 
-#### 8.12.12 Model Order Determination
+#### 8.12.12 Model Order Determination (`sidModelOrder`)
 
-When the state dimension `n` is unknown, it can be determined prior to calling `sidLTVdiscIO` using standard methods:
+When the state dimension `n` is unknown, it can be determined prior to calling `sidLTVdiscIO` using `sidModelOrder`, which estimates `n` from the singular value decomposition of a block Hankel matrix built from the frequency response.
 
-1. **Subspace identification (N4SID/MOESP):** Estimate the transfer function `G(jω)` from I/O data, build the block Hankel matrix from impulse response coefficients, and determine `n` from the singular value gap. Use `sidFreqMap` for windowed spectral estimation if the system is time-varying (the model order `n` is constant even if `A(k)` varies).
-2. **Information criteria (BIC/AIC):** Run `sidLTVdiscIO` for `n = 1, 2, 3, ...` and select `n` minimising BIC.
+**Algorithm:**
 
-For the common case where some states are directly measured (`H = [H_known, 0]`), the number of hidden states `n_h = n - p_known` is the only unknown. The frequency response reveals observable modes beyond those directly measured.
+1. Take a frequency response estimate `Ĝ(ω)` from any `sidFreq*` function.
+2. Compute impulse response coefficients `g(k)` via IFFT of `Ĝ(ω)`.
+3. Build the block Hankel matrix:
+   ```
+   H_hankel = [ g(1)   g(2)   ... g(r)   ]
+              [ g(2)   g(3)   ... g(r+1) ]
+              [ ...                       ]
+              [ g(r)   g(r+1) ... g(2r-1) ]
+   ```
+   where `r` is the prediction horizon (default: `min(floor(N_imp/3), 50)` where `N_imp` is the number of impulse response coefficients). For MIMO systems with `n_y` outputs and `n_u` inputs, each entry `g(k)` is an `n_y × n_u` block.
+4. Compute the SVD: `H_hankel = U Σ V'`.
+5. Detect model order `n` as the index of the largest normalised singular value gap:
+   ```
+   n = argmax_k  σ_k / σ_{k+1}       for k = 1, ..., r-1
+   ```
+   Alternatively, when a threshold `τ` is specified, `n` is the number of singular values satisfying `σ_k / σ_1 > τ`.
 
-These model order selection methods are not implemented in `sid` v1.0 but can be performed using external tools or manually.
+**Inputs:**
+
+| Parameter | Type | Default |
+|-----------|------|---------|
+| `result` | sid result struct with `Response` field | required |
+| `'Horizon'` | positive integer | `min(floor(N_imp/3), 50)` |
+| `'Threshold'` | positive scalar | `[]` (use gap method) |
+| `'Plot'` | logical | `false` |
+
+**Output:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `n` | scalar | Estimated model order |
+| `SingularValues` | `(r × 1)` real | Singular values of the Hankel matrix |
+| `Horizon` | scalar | Prediction horizon used |
+
+**Usage:**
+
+```matlab
+% Automated model order detection
+G = sidFreqBT(y, u);
+[n, sv] = sidModelOrder(G);
+
+% Visual inspection
+sidModelOrder(G, 'Plot', true);
+
+% Use with output-COSMIC
+p_y = size(y, 2);
+H = [eye(p_y), zeros(p_y, n - p_y)];
+result = sidLTVdiscIO(y, u, H, 'Lambda', 1e5);
+```
+
+**For time-varying systems:** the model order `n` is constant even if `A(k)` varies. Use `sidFreqMap` for windowed spectral estimation; `sidModelOrder` can be applied to any single segment or to the overall (averaged) frequency response. Take the maximum `n` across segments if modes appear transiently.
+
+**For partially-known H:** when some states are directly measured (`H = [H_known, 0]`), the number of hidden states `n_h = n - p_known` is the only unknown. The frequency response reveals observable modes beyond those directly measured.
 
 ### 8.13 Deferred Extensions
 
@@ -1428,7 +1477,6 @@ The following are out of scope for v1.0:
 - **Alternative regularization norms:** Non-squared L2, L1 (total variation).
 - **Unknown observation matrix:** Joint estimation of `H` alongside dynamics and states (three-block alternating minimisation).
 - **Time-varying observation matrix:** `H(k)` with smoothness prior; requires separate treatment.
-- **Model order selection:** N4SID-style singular value analysis or BIC sweep for automatic `n` determination.
 - **GCV lambda selection.**
 - **Parametric identification:** ARX, ARMAX, state-space subspace methods (`sidTfARX`, `sidSsN4SID`, etc.).
 - **LPV identification:** Structured parameter-varying models via direct least-squares or post-hoc regression on COSMIC output. See `docs/lpv_extension_theory.md` for design notes.
