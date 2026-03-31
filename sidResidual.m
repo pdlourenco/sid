@@ -92,14 +92,18 @@ function result = sidResidual(model, y, u, varargin)
 
     % ---- Independence test: normalised cross-correlation ----
     if ~isTimeSeries
-        u_test = u;
-        if size(u_test, 2) > 1
-            u_test = u_test(:, 1);  % first input channel
+        % Extract first channel, first trajectory as column vector
+        if ndims(u) == 3 %#ok<ISMAT>
+            u_test = u(:, 1, 1);
+        elseif size(u, 2) > 1
+            u_test = u(:, 1);
+        else
+            u_test = u(:);
         end
-        % Ensure same length
+        % Ensure same length as residual
         Nu = min(size(e_test, 1), size(u_test, 1));
-        e_test_trim = e_test(1:Nu);
-        u_test_trim = u_test(1:Nu);
+        e_test_trim = e_test(1:Nu, 1);
+        u_test_trim = u_test(1:Nu, 1);
 
         Reu_pos = sidCov(e_test_trim, u_test_trim, maxLag);  % positive lags
         Rue_pos = sidCov(u_test_trim, e_test_trim, maxLag);  % for negative lags
