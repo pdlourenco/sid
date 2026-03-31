@@ -180,6 +180,10 @@ function [y_pred, y_meas] = simulateFreq(model, y, u)
     U_fft = fft(u, nfft, 1);
     Y_pred_fft = zeros(nfft, ny);
 
+    % Ensure G_model is 3D (Octave may drop trailing singleton dims)
+    if ndims(G_model) == 2 && (ny > 1 || nu > 1) %#ok<ISMAT>
+        G_model = reshape(G_model, size(G_model, 1), ny, nu);
+    end
     npos = length(freqs_fft);
     for iy = 1:ny
         for iu = 1:nu

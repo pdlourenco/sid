@@ -232,6 +232,10 @@ function [e, N] = computeResidualFreq(model, y, u)
         end
     else
         % MIMO: interpolate each channel
+        % Ensure G_model is 3D (Octave may drop trailing singleton dims)
+        if ndims(G_model) == 2 %#ok<ISMAT>
+            G_model = reshape(G_model, size(G_model, 1), ny, nu);
+        end
         for iy = 1:ny
             for iu = 1:nu
                 Gij = reshape(G_model(:, iy, iu), [], 1);
