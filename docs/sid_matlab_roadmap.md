@@ -27,7 +27,7 @@ sid  [Domain]  [Method/Variant]
 | **`sidLTVdiscInit`** | — | Initialize recursive/online COSMIC estimator | ⬜ |
 | **`sidLTVdiscUpdate`** | — | Process one time step (filtered estimate) | ⬜ |
 | **`sidLTVdiscSmooth`** | — | Backward pass over window (smoothed estimates) | ⬜ |
-| **`sidLTVdiscIO`** | — | Output-only LTV identification (two-stage) | ⬜ |
+| **`sidLTVdiscIO`** | — | Partial-observation LTV identification (alternating COSMIC + RTS smoother) | ⬜ |
 | **`sidDetrend`** | `detrend` | Polynomial detrending (preprocessing) | ⬜ |
 | **`sidResidual`** | `resid` | Residual analysis (whiteness + independence tests) | ⬜ |
 | **`sidCompare`** | `compare` | Model output comparison with fit metric | ⬜ |
@@ -74,7 +74,7 @@ sid-matlab/
 ├── sidLTVdiscInit.m         % Initialize recursive COSMIC estimator              (planned)
 ├── sidLTVdiscUpdate.m       % Online: process one time step                      (planned)
 ├── sidLTVdiscSmooth.m       % Windowed backward pass for smoothed estimates      (planned)
-├── sidLTVdiscIO.m           % Output-only LTV identification (two-stage)         (planned)
+├── sidLTVdiscIO.m           % Partial-observation LTV identification              (planned)
 ├── sidBodePlot.m            % Bode diagram with confidence bands
 ├── sidSpectrumPlot.m        % Power spectrum plot
 ├── sidMapPlot.m             % Time-frequency color map
@@ -140,7 +140,8 @@ sid-matlab/
 │   ├── cosmic_uncertainty_derivation.md
 │   ├── cosmic_online_recursion.md
 │   ├── cosmic_automatic_tuning.md
-│   └── multi_trajectory_spectral_theory.md
+│   ├── multi_trajectory_spectral_theory.md
+│   └── sid_cosmic_output_theory.md
 ├── SPEC.md
 ├── LICENSE                    % MIT
 ├── README.md
@@ -327,11 +328,30 @@ Key insight: COSMIC forward pass = Kalman filter on parameter evolution; backwar
 - Depends on: Phase 7 (`sidFreqMap`) and Phase 8b (uncertainty)
 - Tests: known LTV system, verify selected lambda is reasonable
 
-### Phase 8e — Output-Only Estimation (~3 days) ⬜
+### Phase 8e — Output-COSMIC (`sidLTVdiscIO`) (~5 days) ⬜
 
-- `sidLTVdiscIO.m`: two-stage (initial LTI observer → state reconstruction → COSMIC)
-- Warning to user about approximate state estimates
-- Tests: known system with measured outputs only, compare to full-state COSMIC
+**Theory:** `docs/sid_cosmic_output_theory.md`
+
+Core: alternating minimisation of joint objective (observation fidelity + dynamics fidelity + COSMIC smoothness). When `H = I`, reduces to standard `sidLTVdisc`.
+
+- `sidLTVdiscIO.m`:
+  - Initialisation: joint solve for states `{x_l(k)}` and input matrices `{B(k)}` with `A = I` (exact minimisation of `J|_{A=I}`, jointly convex, single linear solve)
+  - COSMIC step: standard `sidLTVdisc` on estimated states (reuses existing implementation)
+  - State step: RTS smoother per trajectory with current `A(k)`, `B(k)`, `H`, `R`
+  - Alternating loop with convergence monitoring (`|ΔJ/J| < ε_J`)
+  - Optional trust-region interpolation `Ã(k) = (1-μ) A(k) + μ I` with adaptive μ schedule
+  - Multi-trajectory support: shared `C(k)`, independent state sequences
+  - Variable-length trajectories via cell arrays
+  - Returns estimated `A(k)`, `B(k)`, `X(k)`, cost history, iteration count
+  - Uncertainty: run COSMIC uncertainty backward pass (Phase 8b) at final iteration
+- Tests:
+  - Known LTV system with `H = I`: verify identical to `sidLTVdisc`
+  - Known LTV system with `H ≠ I`: compare estimated `A(k)`, `B(k)` to ground truth
+  - Convergence: verify monotone cost decrease across iterations
+  - Multi-trajectory: verify pooling improves estimates vs single trajectory
+  - Noisy measurements: verify `R` weighting improves estimates vs `R = I`
+  - Trust-region: verify convergence on difficult case where `μ = 0` diverges
+  - State recovery: compare estimated `x̂(k)` to true states
 
 ### Phase 9 — `sidFreqETFE` and `sidFreqBTFDR` (~4 days) ✅
 
@@ -407,11 +427,11 @@ Key insight: COSMIC forward pass = Kalman filter on parameter evolution; backwar
 | 8b. Bayesian uncertainty | 4 days | 34 days | ✅ |
 | 8c. Online/recursive COSMIC | 4 days | 38 days | ⬜ |
 | 8d. Lambda via frequency response | 4 days | 42 days | ✅ |
-| 8e. Output-only (two-stage) | 3 days | 45 days | ⬜ |
-| 9. ETFE + BTFDR | 4 days | 49 days | ✅ |
-| 9a. Multi-trajectory spectral | 3 days | 52 days | ✅ |
-| 11. Workflow utilities | 4 days | 56 days | ⬜ |
-| 10. Validation, freeze + release | 4 days | 60 days | 🔄 |
+| 8e. Output-COSMIC (`sidLTVdiscIO`) | 5 days | 47 days | ⬜ |
+| 9. ETFE + BTFDR | 4 days | 51 days | ✅ |
+| 9a. Multi-trajectory spectral | 3 days | 54 days | ✅ |
+| 11. Workflow utilities | 4 days | 58 days | ⬜ |
+| 10. Validation, freeze + release | 4 days | 62 days | 🔄 |
 
 ---
 
@@ -436,8 +456,9 @@ Key insight: COSMIC forward pass = Kalman filter on parameter evolution; backwar
 - Python / Julia ports (v1.0 freeze → port → release)
 - C reference implementation
 - Online/recursive COSMIC (Phase 8c — v2)
-- Output-only LTV estimation (Phase 8e — v2)
-- EM-style or direct output equation LTV identification
+- Unknown observation matrix estimation (joint H + dynamics)
+- Time-varying observation matrix H(k)
+- Model order selection (N4SID singular value analysis, BIC sweep)
 - Alternative regularization norms (non-squared L2, L1 total variation)
 - Alternative LTV algorithms (TVERA, TVOKID) — `'Algorithm'` parameter is ready
 - GCV lambda selection
