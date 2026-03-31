@@ -6,7 +6,7 @@
 
 ---
 
-> **Implementation status:** §1–5 (frequency-domain estimation), §6 (`sidFreqMap` BT + Welch), §7 (spectrograms), §8 base + §8.4 (`sidLTVdisc`, `sidLTVdiscTune`), §8.8 (variable-length trajectories), §8.9 (Bayesian uncertainty + `sidLTVdiscFrozen`), §8.11 (lambda tuning via frequency response), §9 (`sidFreqETFE`, `sidFreqBTFDR`), and §9a (multi-trajectory spectral) are implemented. §8.10 (online/recursive COSMIC), §8.12 (output-COSMIC), §13 (`sidDetrend`), §14 (`sidResidual`), and §15 (`sidCompare`) describe planned features not yet implemented.
+> **Implementation status:** §1–5 (frequency-domain estimation), §6 (`sidFreqMap` BT + Welch), §7 (spectrograms), §8 base + §8.4 (`sidLTVdisc`, `sidLTVdiscTune`), §8.8 (variable-length trajectories), §8.9 (Bayesian uncertainty + `sidLTVdiscFrozen`), §8.11 (lambda tuning via frequency response), §9 (`sidFreqETFE`, `sidFreqBTFDR`), §9a (multi-trajectory spectral), §13 (`sidDetrend`), §14 (`sidResidual`), and §15 (`sidCompare`) are implemented. §8.10 (online/recursive COSMIC) and §8.12 (output-COSMIC) describe planned features not yet implemented.
 
 ---
 
