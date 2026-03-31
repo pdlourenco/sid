@@ -66,9 +66,9 @@ $$
 J_{\text{init}}(\mathbf{X}, \mathbf{B}) = J(\mathbf{X}, \mathbf{C})\big|_{A(k)=I} = \sum_{l=1}^{L} \sum_{k=0}^{N} \|y_l(k) - H\,x_l(k)\|^2_{R^{-1}} + \sum_{l=1}^{L} \sum_{k=0}^{N-1} \|x_l(k+1) - x_l(k) - B(k)\,u_l(k)\|^2 + \lambda \sum_{k=1}^{N-1} \|B(k) - B(k-1)\|_F^2
 $$
 
-This is jointly convex in $\{x_l(k)\}$ and $\{B(k)\}$. All terms are quadratic with no bilinear coupling between the two sets of unknowns: $B(k)\,u_l(k)$ is linear in $B(k)$ since $u_l(k)$ is known data, and $x_l(k)$ appears linearly. The $B(k)$ matrices are shared across trajectories (same LTV dynamics), while each trajectory has its own state sequence. The minimiser is unique and can be obtained in a single linear solve.
+This is jointly convex in $\{x_l(k)\}$ and $\{B(k)\}$. All terms are quadratic with no bilinear coupling between the two sets of unknowns: $B(k)\,u_l(k)$ is linear in $B(k)$ since $u_l(k)$ is known data, and $x_l(k)$ appears linearly. The $B(k)$ matrices are shared across trajectories (same LTV dynamics), while each trajectory has its own state sequence. The minimiser is unique. See Appendix B for the solution algorithm.
 
-**Structure of the linear system.** The unknowns are the $n$-vectors $x_l(0), \ldots, x_l(N)$ for each trajectory $l$, and the $n \times q$ matrices $B(0), \ldots, B(N-1)$ shared across trajectories. The per-trajectory state unknowns are coupled temporally through the dynamics fidelity term and coupled to $B(k)$ through the input terms. The normal equations exhibit block-tridiagonal-plus-arrow structure.
+**Structure of the linear system.** The unknowns are the $n$-vectors $x_l(0), \ldots, x_l(N)$ for each trajectory $l$, and the $n \times q$ matrices $B(0), \ldots, B(N-1)$ shared across trajectories. The per-trajectory state unknowns are coupled temporally through the dynamics fidelity term and coupled to $B(k)$ through the input terms. The normal equations form a block tridiagonal system in time; see Appendix B for the explicit structure and solution algorithms.
 
 **Physical interpretation.** The initialisation models the autonomous state evolution as a random walk ($A = I$) with input-driven corrections. The smoothness prior on $B(k)$ prevents the input matrix from absorbing dynamics that should be attributed to $A(k)$. This provides a state estimate that is robust to ignorance of $A(k)$, at the cost of a weaker dynamical model. Crucially, since $J_{\text{init}} = J\big|_{A=I}$, the initialisation is not a separate heuristic — it is the exact minimisation of the global objective over a restricted subspace.
 
@@ -82,7 +82,7 @@ $$
 \min_{\mathbf{x}} \; \sum_{k=0}^{N} \|y(k) - H\,x(k)\|^2_{R^{-1}} + \sum_{k=0}^{N-1} \|x(k+1) - A(k)\,x(k) - B(k)\,u(k)\|^2
 $$
 
-This is a linear least-squares problem in $\{x(k)\}$. It is exactly the Rauch–Tung–Striebel (RTS) smoother with measurement noise covariance $R$ and process noise covariance $Q = I$, conditioned on the full observation sequence $\{y(k)\}_{k=0}^{N}$. The solution is unique and can be computed in $O(N\,n^3)$ time via the standard forward–backward recursion.
+This is a linear least-squares problem in $\{x(k)\}$. It is exactly the Rauch–Tung–Striebel (RTS) smoother with measurement noise covariance $R$ and process noise covariance $Q = I$, conditioned on the full observation sequence $\{y(k)\}_{k=0}^{N}$. The solution is unique and can be computed in $O(N\,n^3)$ time via the forward-backward recursion derived in Appendix A.
 
 For multi-trajectory: the state step decouples across trajectories (each trajectory has its own state sequence but uses the shared $\mathbf{C}$), so $L$ independent smoothers are run.
 
@@ -195,7 +195,7 @@ This ambiguity is inherent to all output-based system identification methods and
 
 ## 8. Computational Complexity
 
-- **Initialisation:** Single linear solve, block-structured, $O(N\,(n + n\,q)^2)$ per trajectory.
+- **Initialisation:** Alternating $x$–$B$ solve (Appendix B), $O(n_{\text{init}}\,(L\,N\,n^3 + N\,q^3))$ where $n_{\text{init}}$ is typically 3–10 iterations.
 - **State step:** RTS smoother, $O(N\,n^3)$ per trajectory, $O(L\,N\,n^3)$ total.
 - **COSMIC step:** Standard COSMIC tridiagonal solve, $O(N\,(n+q)^3)$, independent of $L$ (trajectories are pooled into the data matrices).
 - **Per outer iteration:** $O(L\,N\,n^3 + N\,(n+q)^3)$.
@@ -218,3 +218,186 @@ The linear scaling in $N$ — the hallmark of COSMIC — is preserved.
 **Subspace identification (N4SID, MOESP).** These methods can provide alternative initialisations by estimating a local LTI model within sliding windows. The $A = I$ initialisation proposed here avoids the stationarity assumption inherent in windowed subspace methods and is better suited for systems with continuous parameter variation.
 
 **Kalman smoother.** The state step is exactly an RTS smoother. Output-COSMIC can be viewed as wrapping a Kalman smoother with a COSMIC parameter estimator in an EM loop, with the COSMIC smoothness prior replacing the standard ML parameter update.
+
+## Appendix A. Forward-Backward Recursion for the State Step
+
+### A.1 Normal Equations
+
+Given $A(k)$, $B(k)$ for $k = 0, \ldots, N-1$, observation matrix $H$, noise covariance $R$, measurements $y(k)$ for $k = 0, \ldots, N$, and inputs $u(k)$ for $k = 0, \ldots, N-1$, the state step minimises:
+
+$$
+\min_{\{x(k)\}} \sum_{k=0}^{N} \|y(k) - H\,x(k)\|^2_{R^{-1}} + \sum_{k=0}^{N-1} \|x(k+1) - A(k)\,x(k) - B(k)\,u(k)\|^2
+$$
+
+Setting $\partial J / \partial x(k) = 0$ for each $k$ yields a block tridiagonal system in $x(0), \ldots, x(N)$ with $n \times n$ blocks. Define $b(k) = B(k)\,u(k)$ for notational convenience.
+
+**Diagonal blocks:**
+
+$$
+S_0 = H^\top R^{-1} H + A(0)^\top A(0)
+$$
+
+$$
+S_k = H^\top R^{-1} H + I + A(k)^\top A(k), \qquad k = 1, \ldots, N-1
+$$
+
+$$
+S_N = H^\top R^{-1} H + I
+$$
+
+**Off-diagonal blocks** (super-diagonal, coupling equation $k$ to unknown $x(k+1)$):
+
+$$
+U_k = -A(k)^\top, \qquad k = 0, \ldots, N-1
+$$
+
+By symmetry of the Hessian, the sub-diagonal block coupling equation $k$ to $x(k-1)$ is $L_k = U_{k-1}^\top = -A(k-1)$.
+
+**Right-hand side:**
+
+$$
+\Theta_0 = H^\top R^{-1} y(0) - A(0)^\top b(0)
+$$
+
+$$
+\Theta_k = H^\top R^{-1} y(k) + b(k-1) - A(k)^\top b(k), \qquad k = 1, \ldots, N-1
+$$
+
+$$
+\Theta_N = H^\top R^{-1} y(N) + b(N-1)
+$$
+
+### A.2 Forward-Backward Algorithm
+
+The block tridiagonal system is solved by Gaussian elimination in the forward direction, followed by back-substitution. This is algebraically equivalent to the Rauch–Tung–Striebel smoother.
+
+**Forward pass** ($k = 0$ to $N$):
+
+$$
+\Lambda_0 = S_0
+$$
+
+$$
+Y_0 = \Lambda_0^{-1}\,\Theta_0
+$$
+
+For $k = 1, \ldots, N$:
+
+$$
+\Lambda_k = S_k - A(k-1)\,\Lambda_{k-1}^{-1}\,A(k-1)^\top
+$$
+
+$$
+Y_k = \Lambda_k^{-1}\bigl(\Theta_k + A(k-1)\,Y_{k-1}\bigr)
+$$
+
+**Backward pass** ($k = N-1$ to $0$):
+
+$$
+x(N) = Y_N
+$$
+
+For $k = N-1, \ldots, 0$:
+
+$$
+x(k) = Y_k + \Lambda_k^{-1}\,A(k)^\top\,x(k+1)
+$$
+
+**Complexity:** $O(N\,n^3)$ per trajectory, $O(L\,N\,n^3)$ total. Each trajectory is independent.
+
+### A.3 Connection to COSMIC
+
+This recursion is structurally identical to the COSMIC forward-backward pass (Section 4.2, COSMIC Step). The correspondence is:
+
+| COSMIC (dynamics estimation) | State step (state estimation) |
+|---|---|
+| Off-diagonal: $\lambda_{k+1}\,I$ | Off-diagonal: $A(k)^\top$ |
+| Diagonal: $D(k)^\top D(k) + (\lambda_k + \lambda_{k+1})\,I$ | Diagonal: $H^\top R^{-1} H + I + A(k)^\top A(k)$ |
+| Unknown: $C(k) \in \mathbb{R}^{(n+q) \times n}$ | Unknown: $x(k) \in \mathbb{R}^n$ |
+| Backward: $C(k) = Y_k + \lambda_{k+1}\,\Lambda_k^{-1}\,C(k+1)$ | Backward: $x(k) = Y_k + \Lambda_k^{-1}\,A(k)^\top\,x(k+1)$ |
+
+The only structural difference is that the off-diagonal blocks in COSMIC are $\lambda_k\,I$ (scalar times identity), while in the state step they are $A(k)^\top$ (a general $n \times n$ matrix). The forward-backward pattern is identical.
+
+### A.4 Storage
+
+Store $\Lambda_k^{-1}$ and $Y_k$ for $k = 0, \ldots, N$ during the forward pass (total: $(N+1)$ matrices of size $n \times n$ each, plus $(N+1)$ vectors of size $n$). These are reused in the backward pass. The same stored $\Lambda_k^{-1}$ can be reused across EM iterations if $A(k)$ has not changed significantly (warm-starting), though for correctness they must be recomputed whenever $C$ changes.
+
+## Appendix B. Initialisation Solve
+
+### B.1 Problem Structure
+
+The initialisation minimises $J_{\text{init}} = J\big|_{A=I}$ jointly over $\{x_l(k)\}$ and $\{B(k)\}$. This is a single convex quadratic with a unique minimiser. However, the unknowns $x_l(k)$ and $B(k)$ are coupled: the dynamics term $\|x_l(k+1) - x_l(k) - B(k)\,u_l(k)\|^2$ involves both $x_l(k)$ and $B(k)$.
+
+Two solution strategies are available.
+
+### B.2 Strategy 1: Composite Block Tridiagonal Solve (Exact, Single Pass)
+
+Define the composite unknown at time $k$:
+
+$$
+w(k) = \begin{bmatrix} x_1(k) \\ \vdots \\ x_L(k) \\ \text{vec}(B(k)) \end{bmatrix} \in \mathbb{R}^{Ln + nq}, \qquad k = 0, \ldots, N-1
+$$
+
+$$
+w(N) = \begin{bmatrix} x_1(N) \\ \vdots \\ x_L(N) \end{bmatrix} \in \mathbb{R}^{Ln}
+$$
+
+The normal equations $\partial J_{\text{init}} / \partial w(k) = 0$ form a block tridiagonal system in $w(0), \ldots, w(N)$ with blocks of size $(Ln + nq)$ for $k < N$ and $Ln$ for $k = N$. The same forward-backward algorithm from Appendix A applies with these larger blocks.
+
+**Complexity:** $O(N\,(Ln + nq)^3)$. This is exact in a single pass but expensive when $L$ is large.
+
+### B.3 Strategy 2: Alternating $x$–$B$ Solve (Iterative, Reuses Existing Infrastructure)
+
+Since $J_{\text{init}}$ is jointly convex in $\{x_l(k)\}$ and $\{B(k)\}$, an alternating minimisation over the two blocks converges to the unique global minimum.
+
+**$x$-step.** Fix $\{B(k)\}$, solve for $\{x_l(k)\}$. With $A(k) = I$ for all $k$, this is the state step (Appendix A) with $A(k) = I$, run independently per trajectory. The recursion simplifies:
+
+$$
+S_0 = H^\top R^{-1} H + I, \qquad S_k = H^\top R^{-1} H + 2I \;(0 < k < N), \qquad S_N = H^\top R^{-1} H + I
+$$
+
+$$
+\Lambda_k = S_k - \Lambda_{k-1}^{-1}, \qquad Y_k = \Lambda_k^{-1}(\Theta_k + Y_{k-1})
+$$
+
+$$
+x_l(k) = Y_k + \Lambda_k^{-1}\,x_l(k+1)
+$$
+
+where $\Theta_k = H^\top R^{-1} y_l(k) + b_l(k-1) - b_l(k)$ with $b_l(k) = B(k)\,u_l(k)$.
+
+**$B$-step.** Fix $\{x_l(k)\}$, solve for $\{B(k)\}$. Define the residual target $\Delta x_l(k) = x_l(k+1) - x_l(k)$ and write the cost in terms of $B(k)$ alone:
+
+$$
+\min_{\{B(k)\}} \sum_{l=1}^{L} \sum_{k=0}^{N-1} \|\Delta x_l(k) - B(k)\,u_l(k)\|^2 + \lambda \sum_{k=1}^{N-1} \|B(k) - B(k-1)\|_F^2
+$$
+
+This is a standard COSMIC problem. The correspondence is:
+
+| COSMIC | $B$-step |
+|---|---|
+| Data vector $d_l(k) = [x_l(k);\; u_l(k)]$ | Data vector $d_l(k) = u_l(k) \in \mathbb{R}^q$ |
+| Target $X'_l(k) = x_l(k+1)$ | Target $\Delta x_l(k) = x_l(k+1) - x_l(k) \in \mathbb{R}^n$ |
+| Unknown $C(k) = [A^\top(k);\; B^\top(k)]$ | Unknown $B^\top(k) \in \mathbb{R}^{q \times n}$ |
+
+The $B$-step reuses the existing COSMIC forward-backward pass with data matrices $D(k) = [u_1(k), \ldots, u_L(k)]^\top \in \mathbb{R}^{L \times q}$ and targets $\Delta X(k) = [\Delta x_1(k), \ldots, \Delta x_L(k)]^\top \in \mathbb{R}^{L \times n}$. Solved in $O(N\,q^3)$.
+
+**Alternation loop:**
+
+1. Initialise $B^{(0)}(k) = 0$ for all $k$.
+2. $x$-step: solve for $\{x_l(k)\}$ given $\{B^{(s)}(k)\}$ using the state step with $A = I$. Cost: $O(L\,N\,n^3)$.
+3. $B$-step: solve for $\{B^{(s+1)}(k)\}$ given $\{x_l(k)\}$ using COSMIC. Cost: $O(N\,q^3)$.
+4. If $\|B^{(s+1)} - B^{(s)}\|_F / \|B^{(s+1)}\|_F < \varepsilon$, terminate. Otherwise return to step 2.
+
+**Convergence:** Since $J_{\text{init}}$ is strictly convex in each block, the alternation converges to the unique global minimiser. Convergence is typically fast (3–10 iterations) because the $x$–$B$ coupling is mediated only through the input terms $B(k)\,u_l(k)$, which is weak relative to the diagonal observation and smoothness terms.
+
+**Complexity per iteration:** $O(L\,N\,n^3 + N\,q^3)$.
+
+### B.4 Recommended Strategy
+
+Use Strategy 2 (alternating $x$–$B$) for implementation. It reuses the state-step and COSMIC infrastructure without new code, handles variable numbers of trajectories naturally, and converges in a small number of iterations. Strategy 1 is noted for theoretical completeness.
+
+### B.5 Transition to Main Loop
+
+After the initialisation converges, the estimated $\{x_l(k)\}$ and $\{B(k)\}$ are stored as $\mathbf{X}^{(0)}$ and $\mathbf{B}^{(0)}$, with $A^{(0)}(k) = I$ for all $k$. The main alternating loop (Section 4.2) begins with the COSMIC step, which estimates $A(k)$ and refines $B(k)$ using the full $C(k) = [A^\top(k);\; B^\top(k)]$ parameterisation.
+
