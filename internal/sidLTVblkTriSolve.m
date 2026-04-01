@@ -73,12 +73,7 @@ function [w, Lbd] = sidLTVblkTriSolve(S, U, Theta)
     for k = 2:K
         LbdInvU = Lbd{k-1} \ U{k-1};
         Lbd{k}  = S{k} - U{k-1}' * LbdInvU;
-
-        % Small unconditional ridge to prevent NaN from backslash on
-        % rank-deficient Schur complements (partial-observation case).
-        Lbd{k} = Lbd{k} + sqrt(eps) * eye(size(Lbd{k}, 1));
-
-        Y{k}   = Lbd{k} \ (Theta{k} - U{k-1}' * Y{k-1});
+        Y{k}    = Lbd{k} \ (Theta{k} - U{k-1}' * Y{k-1});
     end
 
     % ---- Backward pass ----

@@ -91,8 +91,10 @@ function X_hat = sidLTVStateEst(Y, U, A, B, H, varargin)
     Uc_blk = cell(K - 1, 1);
 
     % Diagonal blocks (spec k=0..N, MATLAB j=1..K)
-    % j=1 (spec k=0): S_0 = H'R^{-1}H + A(0)'Q^{-1}A(0)
-    S_blk{1} = HtRinvH + A(:,:,1)' * Qinv * A(:,:,1);
+    % j=1 (spec k=0): S_0 = H'R^{-1}H + A(0)'Q^{-1}A(0) + P_0^{-1}
+    % A weak initial-state prior P_0^{-1} = sqrt(eps)*I prevents singularity
+    % when H has rank < n and A(0) does not span the unobserved subspace.
+    S_blk{1} = HtRinvH + A(:,:,1)' * Qinv * A(:,:,1) + sqrt(eps) * eye(n);
 
     % j=2..N (spec k=1..N-1): S_k = H'R^{-1}H + Q^{-1} + A(k)'Q^{-1}A(k)
     for j = 2:N

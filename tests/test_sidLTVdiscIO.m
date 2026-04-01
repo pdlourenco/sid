@@ -82,7 +82,57 @@ assert(errA < 0.05, 'H=I: A mismatch with sidLTVdisc (errA=%.4f)', errA);
 assert(errB < 0.05, 'H=I: B mismatch with sidLTVdisc (errB=%.4f)', errB);
 fprintf('  Test 3 passed: H=I matches sidLTVdisc (errA=%.4f, errB=%.4f).\n', errA, errB);
 
-%% Test 4: Partial observation, known LTI recovery
+%% Test 4: State estimator with double integrator (position measured)
+% Direct test of sidLTVStateEst on a simple system where the answer is
+% obvious: a double integrator x = [position; velocity], only position
+% is measured.  Deterministic — no rng needed.
+n = 2; q = 1; py = 1; N = 50; L = 1;
+dt = 1;
+A_di = [1 dt; 0 1];       % double integrator
+B_di = [0.5*dt^2; dt];    % input = acceleration
+H_di = [1 0];             % measure position only
+
+X_true = zeros(N+1, n);
+U_di = zeros(N, q);
+Y_di = zeros(N+1, py);
+
+% Drive with a known deterministic input (constant acceleration then
+% coast then brake) — the state trajectory is easily predictable.
+for k = 1:N
+    if k <= 15
+        U_di(k) = 1.0;      % accelerate
+    elseif k <= 35
+        U_di(k) = 0.0;      % coast
+    else
+        U_di(k) = -1.0;     % brake
+    end
+end
+
+X_true(1, :) = [0, 0];  % start at rest
+for k = 1:N
+    X_true(k+1, :) = (A_di * X_true(k, :)' + B_di * U_di(k))';
+end
+Y_di = X_true * H_di';  % noiseless position measurements
+
+% Reshape for sidLTVStateEst (expects 3D arrays)
+A_rep = repmat(A_di, [1, 1, N]);
+B_rep = repmat(B_di, [1, 1, N]);
+
+X_est = sidLTVStateEst(reshape(Y_di, [], py, 1), ...
+    reshape(U_di, [], q, 1), A_rep, B_rep, H_di);
+
+% Position (observed) should match measurements closely
+pos_err = norm(X_est(:,1) - X_true(:,1)) / norm(X_true(:,1));
+assert(pos_err < 0.01, ...
+    'Double integrator position error too large (%.4f)', pos_err);
+
+% Velocity (unobserved) should be recovered via dynamics coupling
+vel_err = norm(X_est(:,2) - X_true(:,2)) / max(norm(X_true(:,2)), 1);
+assert(vel_err < 0.05, ...
+    'Double integrator velocity error too large (%.4f)', vel_err);
+fprintf('  Test 4 passed: double integrator (pos=%.4f, vel=%.4f).\n', pos_err, vel_err);
+
+%% Test 5: Partial observation, known LTI recovery
 % 3-state system, observe only 2 states.  Deterministic (no rng) to avoid
 % platform-dependent numerical issues in the RTS smoother.
 n = 3; q = 1; py = 2; N = 80; L = 20;
@@ -124,19 +174,19 @@ errB = norm(B_mean - B_true, 'fro') / norm(B_true, 'fro');
 % means the recovered state-space may differ by a coordinate transform
 assert(errA < 0.8, ...
     'Partial obs LTI: A recovery error too large (%.3f)', errA);
-fprintf('  Test 4 passed: partial obs LTI (errA=%.4f, errB=%.4f).\n', ...
+fprintf('  Test 5 passed: partial obs LTI (errA=%.4f, errB=%.4f).\n', ...
     errA, errB);
 
-%% Test 5: Monotone cost decrease
+%% Test 6: Monotone cost decrease
 % The cost should be non-increasing across alternating iterations.
 assert(length(result.Cost) >= 2, 'Need at least 2 cost evaluations');
 for i = 2:length(result.Cost)
     assert(result.Cost(i) <= result.Cost(i-1) + 1e-8 * abs(result.Cost(i-1)), ...
         'Cost increased at iteration %d: %.6f > %.6f', i, result.Cost(i), result.Cost(i-1));
 end
-fprintf('  Test 5 passed: monotone cost decrease verified (%d iterations).\n', result.Iterations);
+fprintf('  Test 6 passed: monotone cost decrease verified (%d iterations).\n', result.Iterations);
 
-%% Test 6: State recovery
+%% Test 7: State recovery
 % Compare estimated states to true states (for observed dimensions).
 % Deterministic data to avoid RNG-dependent singular blocks.
 n = 2; q = 1; py = 1; N = 40; L = 10;
@@ -174,9 +224,9 @@ for l = 1:min(L, 3)
         'State recovery: too far from measurements (traj %d, err=%.3f)', ...
         l, obs_err);
 end
-fprintf('  Test 6 passed: state recovery consistent with measurements.\n');
+fprintf('  Test 7 passed: state recovery consistent with measurements.\n');
 
-%% Test 7: Multi-trajectory improves estimates
+%% Test 8: Multi-trajectory improves estimates
 % Compare single-trajectory vs multi-trajectory recovery.
 rng(500);
 n = 2; q = 1; py = 2; N = 30; L = 10;
@@ -208,9 +258,9 @@ errL = norm(mean(resL.A, 3) - A_true, 'fro');
 % Multi should be at least as good (or close)
 assert(errL <= err1 * 1.5, ...
     'Multi-trajectory should improve: errL=%.4f > 1.5*err1=%.4f', errL, 1.5*err1);
-fprintf('  Test 7 passed: multi-trajectory (errL=%.4f vs err1=%.4f).\n', errL, err1);
+fprintf('  Test 8 passed: multi-trajectory (errL=%.4f vs err1=%.4f).\n', errL, err1);
 
-%% Test 8: R weighting
+%% Test 9: R weighting
 % With known R, estimates should improve over R = I when noise is anisotropic.
 rng(600);
 n = 2; q = 1; py = 2; N = 40; L = 10;
@@ -240,9 +290,9 @@ errR = norm(mean(resR.A, 3) - A_true, 'fro');
 % With correct R, estimates should be at least as good
 assert(errR <= errI * 1.5, ...
     'R weighting should help: errR=%.4f > 1.5*errI=%.4f', errR, 1.5*errI);
-fprintf('  Test 8 passed: R weighting (errR=%.4f vs errI=%.4f).\n', errR, errI);
+fprintf('  Test 9 passed: R weighting (errR=%.4f vs errI=%.4f).\n', errR, errI);
 
-%% Test 9: Input validation - mismatched H dimensions
+%% Test 10: Input validation - mismatched H dimensions
 passed = false;
 try
     H_bad = eye(3);  % 3x3 but py=2
@@ -253,9 +303,9 @@ catch e
     end
 end
 assert(passed, 'Should error on H dimension mismatch.');
-fprintf('  Test 9 passed: input validation rejects bad H.\n');
+fprintf('  Test 10 passed: input validation rejects bad H.\n');
 
-%% Test 10: Trust-region convergence
+%% Test 11: Trust-region convergence
 % Deterministic data to avoid RNG-dependent singular blocks.
 n = 2; q = 1; py = 1; N = 30; L = 8;
 A_true = [0.9 0.2; -0.2 0.85];
@@ -286,6 +336,6 @@ result_tr = sidLTVdiscIO(Y, U, H_obs, 'Lambda', 100, 'TrustRegion', 1);
 
 assert(isfield(result_tr, 'A'), 'Trust-region should return valid result');
 assert(result_tr.Iterations >= 1, 'Trust-region should iterate');
-fprintf('  Test 10 passed: trust-region converges (%d iterations).\n', result_tr.Iterations);
+fprintf('  Test 11 passed: trust-region converges (%d iterations).\n', result_tr.Iterations);
 
 fprintf('test_sidLTVdiscIO: all tests passed.\n');
