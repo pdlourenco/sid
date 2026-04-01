@@ -20,16 +20,19 @@ function varargout = sidBodePlot(result, varargin)
 %     'Axes'          - [ax_mag, ax_phase] axes handles. Creates new
 %                       figure if empty.
 %
-%   OUTPUT:
+%   OUTPUTS:
 %     h - Struct with fields .fig, .axMag, .axPhase, .lineMag, .linePhase.
 %
-%   See also: sidFreqBT, sidSpectrumPlot
-%
-%   Example:
+%   EXAMPLES:
 %     N = 1000; u = randn(N, 1);
 %     y = filter([1], [1 -0.9], u) + 0.1*randn(N, 1);
 %     result = sidFreqBT(y, u);
 %     sidBodePlot(result, 'Confidence', 3);
+%
+%   SPECIFICATION:
+%     SPEC.md §11.1 — sidBodePlot
+%
+%   See also: sidFreqBT, sidSpectrumPlot
 %
 %   Changelog:
 %   2026-03-24: First version by Pedro Lourenço.

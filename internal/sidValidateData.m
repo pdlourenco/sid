@@ -24,9 +24,14 @@ function [y, u, N, ny, nu, isTimeSeries, nTraj] = sidValidateData(y, u)
 %     isTimeSeries - Logical, true when u is empty
 %     nTraj        - Number of trajectories (1 for single-trajectory)
 %
-%   Example:
+%   EXAMPLES:
 %     y = randn(500, 1); u = randn(500, 1);
 %     [y, u, N, ny, nu, isTS] = sidValidateData(y, u);
+%
+%   SPECIFICATION:
+%     SPEC.md §10.1 — Input Validation
+%
+%   See also: sidValidate, sidFreqBT
 %
 %   Changelog:
 %   2026-03-24: First version by Pedro Lourenço.

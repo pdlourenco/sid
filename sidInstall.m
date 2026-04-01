@@ -8,6 +8,12 @@ function sidInstall()
 %
 %       run('/path/to/sid/sidInstall.m')
 %
+%   EXAMPLES:
+%     sidInstall
+%     result = sidFreqBT(y, u);
+%
+%   See also: sidFreqBT, sidFreqETFE, sidLTVdisc
+%
 %   Changelog:
 %   2026-03-24: First version by Pedro Lourenço.
 %

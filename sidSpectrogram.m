@@ -22,7 +22,7 @@ function result = sidSpectrogram(x, varargin)
 %                       or a numeric vector of length L.
 %     'SampleTime'    - Sample time in seconds. Default: 1.0.
 %
-%   OUTPUT:
+%   OUTPUTS:
 %     result - Struct with fields:
 %       .Time          - (K x 1) center time of each segment (seconds)
 %       .Frequency     - (n_bins x 1) frequency vector (Hz)
@@ -36,25 +36,28 @@ function result = sidSpectrogram(x, varargin)
 %       .NFFT          - FFT length
 %       .Method        - 'sidSpectrogram'
 %
-%   ALGORITHM:
-%     1. Divide signal into overlapping segments of length L
-%     2. Apply time-domain window to each segment
-%     3. Compute FFT of each windowed segment
-%     4. Compute one-sided power spectral density
-%
-%   REFERENCE:
-%     Oppenheim, A.V. and Schafer, R.W. "Discrete-Time Signal Processing",
-%     3rd ed., Prentice Hall, 2010.
-%
-%   See also: sidFreqMap, sidSpectrogramPlot
-%
-%   Example:
+%   EXAMPLES:
 %     % Spectrogram of a chirp signal
 %     Fs = 1000; Ts = 1/Fs; N = 5000;
 %     t = (0:N-1)' * Ts;
 %     x = cos(2*pi * (50 + 100*t/max(t)) .* t);
 %     result = sidSpectrogram(x, 'WindowLength', 256, 'SampleTime', Ts);
 %     sidSpectrogramPlot(result);
+%
+%   ALGORITHM:
+%     1. Divide signal into overlapping segments of length L
+%     2. Apply time-domain window to each segment
+%     3. Compute FFT of each windowed segment
+%     4. Compute one-sided power spectral density
+%
+%   REFERENCES:
+%     Oppenheim, A.V. and Schafer, R.W. "Discrete-Time Signal Processing",
+%     3rd ed., Prentice Hall, 2010.
+%
+%   SPECIFICATION:
+%     SPEC.md §7 — Short-Time Spectral Analysis
+%
+%   See also: sidFreqMap, sidSpectrogramPlot
 %
 %   Changelog:
 %   2026-03-28: First version by Pedro Lourenço.

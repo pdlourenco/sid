@@ -9,14 +9,19 @@ function W = sidHannWin(M)
 %
 %   W(0) = 1 and W(M) = 0.
 %
-%   INPUT:
+%   INPUTS:
 %     M - Window size (positive integer, M >= 2)
 %
-%   OUTPUT:
+%   OUTPUTS:
 %     W - (M+1 x 1) vector of window values for lags 0..M
 %
-%   Example:
+%   EXAMPLES:
 %     W = sidHannWin(30);  % Hann window for lags 0..30
+%
+%   SPECIFICATION:
+%     SPEC.md §3.1 — Window Norm
+%
+%   See also: sidCov, sidWindowedDFT, sidUncertainty
 %
 %   Changelog:
 %   2026-03-24: First version by Pedro Lourenço.

@@ -1,10 +1,47 @@
 function [D, Xl] = sidLTVbuildDataMatrices(X, U, N, p, q, L)
-% SIDLTVBUILDDATAMATRICES Construct D(k) and X'(k) for all k.
+% SIDLTVBUILDDATAMATRICES Construct COSMIC data matrices for uniform trajectories.
 %
-%   D(k)  = [X(k)' U(k)'] / sqrt(N)    size (L x p+q)
-%   Xl(k) = X(k+1)' / sqrt(N)           size (L x p)
+%   [D, Xl] = sidLTVbuildDataMatrices(X, U, N, p, q, L)
 %
-%   Stored as 3D arrays: D is (L x p+q x N), Xl is (L x p x N).
+%   Builds the data matrices D(k) and next-state matrices Xl(k) for the
+%   COSMIC algorithm. Each is normalized by 1/sqrt(N).
+%
+%     D(k)  = [X(k)' U(k)'] / sqrt(N)    size (L x p+q)
+%     Xl(k) = X(k+1)' / sqrt(N)           size (L x p)
+%
+%   INPUTS:
+%     X - (N+1 x p x L) state data.
+%     U - (N x q x L) input data.
+%     N - Number of time steps.
+%     p - State dimension.
+%     q - Input dimension.
+%     L - Number of trajectories.
+%
+%   OUTPUTS:
+%     D  - (L x p+q x N) data matrices.
+%     Xl - (L x p x N) next-state matrices.
+%
+%   EXAMPLES:
+%     [D, Xl] = sidLTVbuildDataMatrices(X, U, N, p, q, L);
+%
+%   SPECIFICATION:
+%     SPEC.md §8.2 — Inputs
+%
+%   See also: sidLTVbuildDataMatricesVarLen, sidLTVbuildBlockTerms, sidLTVdisc
+%
+%   Changelog:
+%   2026-04-01: First version by Pedro Lourenço.
+%
+%  -----------------------------------------------------------------------
+%   Copyright (c) 2026 Pedro Lourenço, All rights reserved.
+%   This code is released under the MIT License. See LICENSE file in the
+%   project root for full license information.
+%
+%   This function is part of the Open Source System Identification
+%   Toolbox (SID).
+%   For full documentation and examples, visit
+%   https://github.com/pdlourenco/sid-matlab
+%  -----------------------------------------------------------------------
 
     sqrtN = sqrt(N);
     D  = zeros(L, p + q, N);

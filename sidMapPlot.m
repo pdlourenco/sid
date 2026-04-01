@@ -22,17 +22,20 @@ function varargout = sidMapPlot(result, varargin)
 %     'CLim'          - Color axis limits [cmin cmax]. Default: [] (auto).
 %     'Axes'          - Axes handle. Creates new figure if empty.
 %
-%   OUTPUT:
+%   OUTPUTS:
 %     h - Struct with fields .fig, .ax, .surf.
 %
-%   See also: sidFreqMap, sidSpectrogramPlot, sidBodePlot
-%
-%   Example:
+%   EXAMPLES:
 %     % Time-varying magnitude map
 %     N = 4000; u = randn(N, 1);
 %     y = filter([1], [1 -0.9], u) + 0.1*randn(N, 1);
 %     result = sidFreqMap(y, u, 'SegmentLength', 512);
 %     sidMapPlot(result, 'PlotType', 'magnitude');
+%
+%   SPECIFICATION:
+%     SPEC.md §6.9 — Visualization: sidMapPlot
+%
+%   See also: sidFreqMap, sidSpectrogramPlot, sidBodePlot
 %
 %   Changelog:
 %   2026-03-28: First version by Pedro Lourenço.

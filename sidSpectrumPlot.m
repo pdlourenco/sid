@@ -17,15 +17,18 @@ function varargout = sidSpectrumPlot(result, varargin)
 %     'LineWidth'     - Line width. Default: 1.5.
 %     'Axes'          - Axes handle. Creates new figure if empty.
 %
-%   OUTPUT:
+%   OUTPUTS:
 %     h - Struct with fields .fig, .ax, .line.
 %
-%   See also: sidFreqBT, sidBodePlot
-%
-%   Example:
+%   EXAMPLES:
 %     y = randn(500, 1);
 %     result = sidFreqBT(y, []);
 %     sidSpectrumPlot(result, 'Confidence', 3);
+%
+%   SPECIFICATION:
+%     SPEC.md §11.2 — sidSpectrumPlot
+%
+%   See also: sidFreqBT, sidBodePlot
 %
 %   Changelog:
 %   2026-03-24: First version by Pedro Lourenço.

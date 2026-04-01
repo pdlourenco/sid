@@ -26,15 +26,20 @@ function Phi = sidWindowedDFT(R, W, freqs, useFFT, Rneg)
 %              When provided, Rneg(tau) is used for R(-tau) instead of
 %              conj(R(tau)). Required for cross-covariance estimation.
 %
-%   OUTPUT:
+%   OUTPUTS:
 %     Phi    - Spectral estimate at each frequency.
 %              Scalar signals: (n_f x 1) complex vector.
 %              Matrix signals: (n_f x p x q) complex array.
 %
-%   Example:
+%   EXAMPLES:
 %     R = sidCov(x, x, 30); W = sidHannWin(30);
 %     freqs = (1:128)' * pi / 128;
 %     Phi = sidWindowedDFT(R, W, freqs, true, R);
+%
+%   SPECIFICATION:
+%     SPEC.md §2.5 — Windowed Spectral Estimates
+%
+%   See also: sidCov, sidHannWin, sidDFT
 %
 %   Changelog:
 %   2026-03-24: First version by Pedro Lourenço.

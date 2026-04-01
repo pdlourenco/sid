@@ -28,7 +28,7 @@ function result = sidFreqBTFDR(y, u, varargin)
 %                       Default: 128 linearly spaced values.
 %     'SampleTime'    - Sample time in seconds. Default: 1.0.
 %
-%   OUTPUT:
+%   OUTPUTS:
 %     result - Struct with fields:
 %       .Frequency        - (n_f x 1) frequency vector, rad/sample
 %       .FrequencyHz      - (n_f x 1) frequency vector, Hz
@@ -42,6 +42,12 @@ function result = sidFreqBTFDR(y, u, varargin)
 %       .DataLength       - number of samples N
 %       .Method           - 'sidFreqBTFDR'
 %
+%   EXAMPLES:
+%     N = 1000; u = randn(N, 1);
+%     y = filter([1 0.5], [1 -0.8], u) + 0.1*randn(N, 1);
+%     result = sidFreqBTFDR(y, u, 'Resolution', 0.3);
+%     sidBodePlot(result);
+%
 %   ALGORITHM:
 %     For each frequency w_k:
 %       1. Determine local window size M_k = round(2*pi / R_k).
@@ -50,18 +56,14 @@ function result = sidFreqBTFDR(y, u, varargin)
 %       4. Form G(w_k) and Phi_v(w_k) as in sidFreqBT.
 %       5. Compute asymptotic uncertainty using local window norm.
 %
-%   REFERENCE:
+%   REFERENCES:
 %     Ljung, L. "System Identification: Theory for the User", 2nd ed.,
 %     Prentice Hall, 1999. Sections 6.3-6.4.
 %
-%   See also: sidFreqBT, sidFreqETFE, sidBodePlot, sidSpectrumPlot
-%   See also: sidFreqBT, sidFreqETFE
+%   SPECIFICATION:
+%     SPEC.md §5 — Frequency-Dependent Resolution
 %
-%   Example:
-%     N = 1000; u = randn(N, 1);
-%     y = filter([1 0.5], [1 -0.8], u) + 0.1*randn(N, 1);
-%     result = sidFreqBTFDR(y, u, 'Resolution', 0.3);
-%     sidBodePlot(result);
+%   See also: sidFreqBT, sidFreqETFE, sidBodePlot, sidSpectrumPlot
 %
 %   Changelog:
 %   2026-03-24: First version by Pedro Lourenço.

@@ -51,7 +51,7 @@ function result = sidLTVdisc(X, U, varargin)
 %                          'isotropic' — scalar * I_p
 %                        Ignored when 'NoiseCov' is a matrix.
 %
-%   OUTPUT:
+%   OUTPUTS:
 %     result - Struct with fields:
 %       .A              - (p x p x N) time-varying dynamics matrices
 %       .B              - (p x q x N) time-varying input matrices
@@ -100,12 +100,30 @@ function result = sidLTVdisc(X, U, varargin)
 %     stored Lbd_k, then Cov(vec(C(k))) = Sigma \otimes P(k).
 %     Complexity: O(N * (p+q)^3), linear in time steps.
 %
-%   REFERENCE:
+%   REFERENCES:
 %     Carvalho, Soares, Lourenco, Ventura. "COSMIC: fast closed-form
 %     identification from large-scale data for LTV systems."
 %     arXiv:2112.04355, 2022.
 %
+%   SPECIFICATION:
+%     SPEC.md §8 — Discrete-Time LTV State-Space Identification
+%
 %   See also: sidLTVdiscTune, sidLTVdiscFrozen, sidFreqMap
+%
+%   Changelog:
+%   2026-03-29: First version by Pedro Lourenço.
+%   2026-04-01: Refactored into modular internal functions.
+%
+%  -----------------------------------------------------------------------
+%   Copyright (c) 2026 Pedro Lourenço, All rights reserved.
+%   This code is released under the MIT License. See LICENSE file in the
+%   project root for full license information.
+%
+%   This function is part of the Open Source System Identification
+%   Toolbox (SID).
+%   For full documentation and examples, visit
+%   https://github.com/pdlourenco/sid-matlab
+%  -----------------------------------------------------------------------
 
     % ---- Parse inputs ----
     [X, U, lambda, doPrecondition, algorithm, doUncertainty, ...

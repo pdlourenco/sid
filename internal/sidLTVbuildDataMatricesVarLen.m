@@ -1,9 +1,49 @@
 function [D, Xl] = sidLTVbuildDataMatricesVarLen(X, U, N, p, q, L, horizons)
-% SIDLTVBUILDDATAMATRICESVARLEN Construct D(k) and Xl(k) for variable-length trajectories.
+% SIDLTVBUILDDATAMATRICESVARLEN Construct COSMIC data matrices for variable-length trajectories.
 %
-%   At each time step k, only trajectories with horizon > k contribute.
-%   D{k}  has size (|L(k)| x p+q), Xl{k} has size (|L(k)| x p).
-%   Each is normalized by 1/sqrt(|L(k)|) to keep the cost well-scaled.
+%   [D, Xl] = sidLTVbuildDataMatricesVarLen(X, U, N, p, q, L, horizons)
+%
+%   Like sidLTVbuildDataMatrices, but handles trajectories with different
+%   lengths. At each time step k, only trajectories with horizon > k
+%   contribute. Returns cell arrays instead of 3D arrays.
+%
+%     D{k}  has size (|L(k)| x p+q), normalized by 1/sqrt(|L(k)|)
+%     Xl{k} has size (|L(k)| x p),   normalized by 1/sqrt(|L(k)|)
+%
+%   INPUTS:
+%     X        - Cell array {X1, X2, ...} of L trajectories, (N_l+1 x p).
+%     U        - Cell array {U1, U2, ...} of L trajectories, (N_l x q).
+%     N        - Maximum horizon across all trajectories.
+%     p        - State dimension.
+%     q        - Input dimension.
+%     L        - Number of trajectories.
+%     horizons - (L x 1) horizon length of each trajectory.
+%
+%   OUTPUTS:
+%     D  - {N x 1} cell array, D{k} is (L_k x p+q).
+%     Xl - {N x 1} cell array, Xl{k} is (L_k x p).
+%
+%   EXAMPLES:
+%     [D, Xl] = sidLTVbuildDataMatricesVarLen(X, U, N, p, q, L, horizons);
+%
+%   SPECIFICATION:
+%     SPEC.md §8.8 — Variable-Length Trajectories
+%
+%   See also: sidLTVbuildDataMatrices, sidLTVbuildBlockTerms, sidLTVdisc
+%
+%   Changelog:
+%   2026-04-01: First version by Pedro Lourenço.
+%
+%  -----------------------------------------------------------------------
+%   Copyright (c) 2026 Pedro Lourenço, All rights reserved.
+%   This code is released under the MIT License. See LICENSE file in the
+%   project root for full license information.
+%
+%   This function is part of the Open Source System Identification
+%   Toolbox (SID).
+%   For full documentation and examples, visit
+%   https://github.com/pdlourenco/sid-matlab
+%  -----------------------------------------------------------------------
 
     D  = cell(N, 1);
     Xl = cell(N, 1);

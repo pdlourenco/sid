@@ -18,18 +18,21 @@ function varargout = sidSpectrogramPlot(result, varargin)
 %                        Default: [] (auto).
 %     'Axes'           - Axes handle. Creates new figure if empty.
 %
-%   OUTPUT:
+%   OUTPUTS:
 %     h - Struct with fields .fig, .ax, .surf.
 %
-%   See also: sidSpectrogram, sidMapPlot
-%
-%   Example:
+%   EXAMPLES:
 %     % Plot spectrogram of a chirp signal
 %     Fs = 1000; Ts = 1/Fs; N = 5000;
 %     t = (0:N-1)' * Ts;
 %     x = cos(2*pi * (50 + 100*t/max(t)) .* t);
 %     result = sidSpectrogram(x, 'WindowLength', 256, 'SampleTime', Ts);
 %     sidSpectrogramPlot(result);
+%
+%   SPECIFICATION:
+%     SPEC.md §7.5 — Visualization
+%
+%   See also: sidSpectrogram, sidMapPlot
 %
 %   Changelog:
 %   2026-03-28: First version by Pedro Lourenço.

@@ -16,13 +16,13 @@ function [bestResult, bestLambda, thirdOut] = sidLTVdiscTune(varargin)
 %   consistency scoring. It selects the largest lambda where the two
 %   estimates agree statistically at most (omega, t) grid points.
 %
-%   VALIDATION METHOD INPUTS:
+%   INPUTS (validation method):
 %     X_train - Training state data, (N+1 x p x L_train)
 %     U_train - Training input data, (N x q x L_train)
 %     X_val   - Validation state data, (N+1 x p x L_val)
 %     U_val   - Validation input data, (N x q x L_val)
 %
-%   FREQUENCY METHOD INPUTS:
+%   INPUTS (frequency method):
 %     X       - State data, (N+1 x p x L) or cell array
 %     U       - Input data, (N x q x L) or cell array
 %
@@ -56,11 +56,29 @@ function [bestResult, bestLambda, thirdOut] = sidLTVdiscTune(varargin)
 %     % Frequency-based (no validation data)
 %     [best, lam, info] = sidLTVdiscTune(X, U, 'Method', 'frequency');
 %
-%   REFERENCE:
+%   REFERENCES:
 %     Carvalho et al., "COSMIC", arXiv:2112.04355, 2022.
 %     Ljung, L. "System Identification", 2nd ed., Prentice Hall, 1999.
 %
+%   SPECIFICATION:
+%     SPEC.md §8.4 — Lambda Selection
+%     SPEC.md §8.11 — Lambda Tuning via Frequency Response
+%
 %   See also: sidLTVdisc, sidLTVdiscFrozen, sidFreqMap
+%
+%   Changelog:
+%   2026-03-29: First version by Pedro Lourenço.
+%
+%  -----------------------------------------------------------------------
+%   Copyright (c) 2026 Pedro Lourenço, All rights reserved.
+%   This code is released under the MIT License. See LICENSE file in the
+%   project root for full license information.
+%
+%   This function is part of the Open Source System Identification
+%   Toolbox (SID).
+%   For full documentation and examples, visit
+%   https://github.com/pdlourenco/sid-matlab
+%  -----------------------------------------------------------------------
 
     % ---- Detect method from varargin ----
     method = 'validation';

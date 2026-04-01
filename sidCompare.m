@@ -18,18 +18,43 @@ function result = sidCompare(model, y, u, varargin)
 %                      (default: first row of y)
 %     'Plot'         - Display comparison plot (default: true if nargout==0)
 %
-%   OUTPUT:
+%   OUTPUTS:
 %     result.Predicted - (N x ny) model-predicted output
 %     result.Measured  - (N x ny) measured output (copy)
 %     result.Fit       - (1 x ny) NRMSE fit percentage per channel
 %     result.Residual  - (N x ny) residual (y - y_pred)
 %     result.Method    - char, method of the source model
 %
+%   EXAMPLES:
+%     % Compare frequency-domain model to data
+%     G = sidFreqBT(y, u);
+%     result = sidCompare(G, y, u);
+%
+%     % Visual comparison with plot
+%     sidCompare(G, y, u, 'Plot', true);
+%
 %   FIT METRIC:
 %     fit = 100 * (1 - ||y - y_pred|| / ||y - mean(y)||)
 %     100% = perfect, 0% = no better than mean, negative = worse than mean.
 %
+%   SPECIFICATION:
+%     SPEC.md §15 — Model Output Comparison
+%
 %   See also: sidResidual, sidFreqBT, sidLTVdisc
+%
+%   Changelog:
+%   2026-03-29: First version by Pedro Lourenço.
+%
+%  -----------------------------------------------------------------------
+%   Copyright (c) 2026 Pedro Lourenço, All rights reserved.
+%   This code is released under the MIT License. See LICENSE file in the
+%   project root for full license information.
+%
+%   This function is part of the Open Source System Identification
+%   Toolbox (SID).
+%   For full documentation and examples, visit
+%   https://github.com/pdlourenco/sid-matlab
+%  -----------------------------------------------------------------------
 
     % ---- Parse options ----
     x0 = [];

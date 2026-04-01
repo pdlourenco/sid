@@ -53,9 +53,12 @@ function [n, sv] = sidModelOrder(result, varargin)
 %     H = [eye(p_y), zeros(p_y, n - p_y)];
 %     res = sidLTVdiscIO(y, u, H, 'Lambda', 1e5);
 %
-%   REFERENCE:
+%   REFERENCES:
 %     Kung, S.Y. "A new identification and model reduction algorithm via
 %     singular value decomposition." Proc. 12th Asilomar Conference, 1978.
+%
+%   SPECIFICATION:
+%     SPEC.md §8.12 — Output-COSMIC: Partial State Observation
 %
 %   See also: sidFreqBT, sidFreqETFE, sidLTVdiscIO
 %

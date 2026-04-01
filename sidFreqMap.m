@@ -38,7 +38,7 @@ function result = sidFreqMap(y, u, varargin)
 %     'Window'           - 'hann' (default), 'hamming', 'rect', or numeric vector.
 %     'NFFT'             - FFT length. Default: max(256, 2^nextpow2(SubSegmentLength)).
 %
-%   OUTPUT:
+%   OUTPUTS:
 %     result - Struct with fields:
 %       .Time             - (K x 1) center time of each segment (seconds)
 %       .Frequency        - (n_f x 1) frequency vector, rad/sample
@@ -54,6 +54,16 @@ function result = sidFreqMap(y, u, varargin)
 %       .WindowSize       - M (BT) or [] (Welch)
 %       .Algorithm        - 'bt' or 'welch'
 %       .Method           - 'sidFreqMap'
+%
+%   EXAMPLES:
+%     % Time-varying frequency map (Blackman-Tukey)
+%     N = 4000; u = randn(N, 1);
+%     y = filter([1], [1 -0.9], u) + 0.1*randn(N, 1);
+%     result = sidFreqMap(y, u, 'SegmentLength', 512);
+%     sidMapPlot(result);
+%
+%   SPECIFICATION:
+%     SPEC.md §6 — Time-Varying Frequency Response Map
 %
 %   See also: sidFreqBT, sidSpectrogram, sidMapPlot
 %

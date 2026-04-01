@@ -17,7 +17,7 @@ function result = sidResidual(model, y, u, varargin)
 %     'MaxLag' - Maximum lag for correlation tests (default: min(25, floor(N/5)))
 %     'Plot'   - Display diagnostic plot (default: true if nargout==0)
 %
-%   OUTPUT:
+%   OUTPUTS:
 %     result.Residual         - (N x ny) residual time series e(t)
 %     result.AutoCorr         - (M+1 x 1) normalised autocorrelation r_ee(tau)
 %     result.CrossCorr        - (2M+1 x 1) normalised cross-corr r_eu(tau), or []
@@ -26,7 +26,32 @@ function result = sidResidual(model, y, u, varargin)
 %     result.IndependencePass - logical, true if cross-correlation test passes
 %     result.DataLength       - N
 %
+%   EXAMPLES:
+%     % Residual analysis for a frequency-domain model
+%     G = sidFreqBT(y, u);
+%     result = sidResidual(G, y, u);
+%
+%     % Visual diagnostic plot
+%     sidResidual(G, y, u, 'Plot', true);
+%
+%   SPECIFICATION:
+%     SPEC.md §14 — Model Residual Analysis
+%
 %   See also: sidCompare, sidFreqBT, sidLTVdisc
+%
+%   Changelog:
+%   2026-03-29: First version by Pedro Lourenço.
+%
+%  -----------------------------------------------------------------------
+%   Copyright (c) 2026 Pedro Lourenço, All rights reserved.
+%   This code is released under the MIT License. See LICENSE file in the
+%   project root for full license information.
+%
+%   This function is part of the Open Source System Identification
+%   Toolbox (SID).
+%   For full documentation and examples, visit
+%   https://github.com/pdlourenco/sid-matlab
+%  -----------------------------------------------------------------------
 
     % ---- Parse options ----
     maxLag = [];

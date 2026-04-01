@@ -8,9 +8,29 @@ function [y, u, M, freqs, Ts, isTimeSeries, nTraj] = sidValidate(y, u, varargin)
 %     sidValidate(y, u, M, freqs)
 %     sidValidate(y, u, 'WindowSize', M, 'Frequencies', freqs)
 %
-%   Example:
+%   INPUTS:
+%     y        - Output data, (N x n_y) or (N x n_y x L) matrix.
+%     u        - Input data, (N x n_u) matrix, or [].
+%     varargin - Positional or name-value arguments: WindowSize, Frequencies,
+%                SampleTime.
+%
+%   OUTPUTS:
+%     y            - (N x ny x nTraj) validated output data
+%     u            - (N x nu x nTraj) validated input data, or []
+%     M            - Window size (integer)
+%     freqs        - (nf x 1) frequency vector, rad/sample
+%     Ts           - Sample time in seconds
+%     isTimeSeries - Logical, true when u is empty
+%     nTraj        - Number of trajectories
+%
+%   EXAMPLES:
 %     y = randn(500, 1); u = randn(500, 1);
 %     [y, u, M, freqs, Ts, isTS] = sidValidate(y, u, 'WindowSize', 20);
+%
+%   SPECIFICATION:
+%     SPEC.md §10.1 — Input Validation
+%
+%   See also: sidValidateData, sidFreqBT
 %
 %   Changelog:
 %   2026-03-24: First version by Pedro Lourenço.

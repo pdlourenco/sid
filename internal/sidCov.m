@@ -22,14 +22,19 @@ function R = sidCov(x, z, maxLag)
 %     z      - (N x q) or (N x q x L) matrix, second signal (can equal x)
 %     maxLag - maximum lag M (non-negative integer)
 %
-%   OUTPUT:
+%   OUTPUTS:
 %     R      - (maxLag+1 x p x q) array of covariance estimates.
 %              R(tau+1, :, :) is the covariance at lag tau.
 %              For scalar signals, R is (maxLag+1 x 1).
 %
-%   Example:
+%   EXAMPLES:
 %     x = randn(200, 1);
 %     R = sidCov(x, x, 30);  % auto-covariance for lags 0..30
+%
+%   SPECIFICATION:
+%     SPEC.md §2.3 — Covariance Estimation
+%
+%   See also: sidFreqBT, sidHannWin, sidWindowedDFT
 %
 %   Changelog:
 %   2026-03-24: First version by Pedro Lourenço.

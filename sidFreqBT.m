@@ -24,12 +24,7 @@ function result = sidFreqBT(y, u, varargin)
 %                       Default: 128 linearly spaced values.
 %     'SampleTime'    - Sample time in seconds. Default: 1.0.
 %
-%   POSITIONAL SYNTAX (for compatibility):
-%     sidFreqBT(y, u, M)        - specify window size only
-%     sidFreqBT(y, u, M, w)     - specify window size and frequencies
-%     sidFreqBT(y, u, [], w)    - default window size, custom frequencies
-%
-%   OUTPUT:
+%   OUTPUTS:
 %     result - Struct with fields:
 %       .Frequency        - (n_f x 1) frequency vector, rad/sample
 %       .FrequencyHz      - (n_f x 1) frequency vector, Hz
@@ -65,9 +60,12 @@ function result = sidFreqBT(y, u, varargin)
 %     3. Form G = Phi_yu / Phi_u and Phi_v = Phi_y - |Phi_yu|^2 / Phi_u
 %     4. Compute asymptotic standard deviations
 %
-%   REFERENCE:
+%   REFERENCES:
 %     Ljung, L. "System Identification: Theory for the User", 2nd ed.,
 %     Prentice Hall, 1999. Sections 2.3, 6.3-6.4.
+%
+%   SPECIFICATION:
+%     SPEC.md §2 — Blackman-Tukey Spectral Analysis
 %
 %   See also: sidFreqBTFDR, sidFreqETFE, sidBodePlot, sidSpectrumPlot
 %

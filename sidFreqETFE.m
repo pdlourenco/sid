@@ -25,13 +25,41 @@ function result = sidFreqETFE(y, u, varargin)
 %                       Default: 128 linearly spaced values.
 %     'SampleTime'    - Sample time in seconds. Default: 1.0.
 %
-%   See also: sidFreqBT, sidFreqBTFDR
+%   OUTPUTS:
+%     result - Struct with fields:
+%       .Frequency        - (n_f x 1) frequency vector, rad/sample
+%       .FrequencyHz      - (n_f x 1) frequency vector, Hz
+%       .Response         - (n_f x n_y x n_u) complex frequency response
+%       .ResponseStd      - (n_f x n_y x n_u) standard deviation (NaN)
+%       .NoiseSpectrum    - (n_f x n_y x n_y) noise spectrum
+%       .NoiseSpectrumStd - (n_f x n_y x n_y) standard deviation (NaN)
+%       .Coherence        - [] (not applicable for ETFE)
+%       .SampleTime       - sample time in seconds
+%       .WindowSize       - N (data length)
+%       .DataLength       - number of samples N
+%       .Method           - 'sidFreqETFE'
 %
-%   Example:
+%   EXAMPLES:
 %     N = 1000; u = randn(N, 1);
 %     y = filter([1], [1 -0.9], u) + 0.1*randn(N, 1);
 %     result = sidFreqETFE(y, u, 'Smoothing', 5);
 %     sidBodePlot(result);
+%
+%   ALGORITHM:
+%     1. Compute DFTs Y(w) and U(w) of the data signals.
+%     2. Form raw ETFE: G(w) = Y(w) / U(w) (SISO) or matrix division (MIMO).
+%     3. Optionally smooth G with a length-S boxcar window.
+%     4. Noise spectrum: Phi_v(w) = (1/N) * |Y(w) - G(w) * U(w)|^2.
+%     5. Time series mode: periodogram Phi_y(w) = (1/N) * |Y(w)|^2.
+%
+%   REFERENCES:
+%     Ljung, L. "System Identification: Theory for the User", 2nd ed.,
+%     Prentice Hall, 1999. Sections 2.3, 6.3.
+%
+%   SPECIFICATION:
+%     SPEC.md §4 — Empirical Transfer Function Estimate
+%
+%   See also: sidFreqBT, sidFreqBTFDR, sidBodePlot, sidSpectrumPlot
 %
 %   Changelog:
 %   2026-03-24: First version by Pedro Lourenço.
@@ -46,32 +74,6 @@ function result = sidFreqETFE(y, u, varargin)
 %   For full documentation and examples, visit
 %   https://github.com/pdlourenco/sid-matlab
 %  -----------------------------------------------------------------------
-%   OUTPUT:
-%     result - Struct with fields:
-%       .Frequency        - (n_f x 1) frequency vector, rad/sample
-%       .FrequencyHz      - (n_f x 1) frequency vector, Hz
-%       .Response         - (n_f x n_y x n_u) complex frequency response
-%       .ResponseStd      - (n_f x n_y x n_u) standard deviation (NaN)
-%       .NoiseSpectrum    - (n_f x n_y x n_y) noise spectrum
-%       .NoiseSpectrumStd - (n_f x n_y x n_y) standard deviation (NaN)
-%       .Coherence        - [] (not applicable for ETFE)
-%       .SampleTime       - sample time in seconds
-%       .WindowSize       - N (data length)
-%       .DataLength       - number of samples N
-%       .Method           - 'sidFreqETFE'
-%
-%   ALGORITHM:
-%     1. Compute DFTs Y(w) and U(w) of the data signals.
-%     2. Form raw ETFE: G(w) = Y(w) / U(w) (SISO) or matrix division (MIMO).
-%     3. Optionally smooth G with a length-S boxcar window.
-%     4. Noise spectrum: Phi_v(w) = (1/N) * |Y(w) - G(w) * U(w)|^2.
-%     5. Time series mode: periodogram Phi_y(w) = (1/N) * |Y(w)|^2.
-%
-%   REFERENCE:
-%     Ljung, L. "System Identification: Theory for the User", 2nd ed.,
-%     Prentice Hall, 1999. Sections 2.3, 6.3.
-%
-%   See also: sidFreqBT, sidFreqBTFDR, sidBodePlot, sidSpectrumPlot
 
     % ---- Parse inputs ----
     [y, u, N, ny, nu, isTimeSeries, nTraj] = sidValidateData(y, u);

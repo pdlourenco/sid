@@ -13,13 +13,18 @@ function X = sidDFT(x, freqs, useFFT)
 %     useFFT - Logical. If true, use FFT fast path (requires default
 %              linear grid of 128 points).
 %
-%   OUTPUT:
+%   OUTPUTS:
 %     X      - (nf x p) complex DFT values
 %
-%   Example:
+%   EXAMPLES:
 %     x = randn(500, 1);
 %     freqs = (1:128)' * pi / 128;
 %     X = sidDFT(x, freqs, true);
+%
+%   SPECIFICATION:
+%     SPEC.md §2.5 — Windowed Spectral Estimates
+%
+%   See also: sidWindowedDFT, sidFreqETFE
 %
 %   Changelog:
 %   2026-03-24: First version by Pedro Lourenço.

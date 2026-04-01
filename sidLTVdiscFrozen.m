@@ -25,7 +25,7 @@ function result = sidLTVdiscFrozen(ltvResult, varargin)
 %                     (1-based). Default: all 1:N.
 %     'SampleTime'  - Sample time in seconds. Default: 1.0.
 %
-%   OUTPUT:
+%   OUTPUTS:
 %     result - Struct with fields:
 %       .Frequency      - (nf x 1) rad/sample
 %       .FrequencyHz    - (nf x 1) Hz
@@ -44,7 +44,24 @@ function result = sidLTVdiscFrozen(ltvResult, varargin)
 %     w = logspace(-2, log10(pi), 200)';
 %     frz = sidLTVdiscFrozen(ltv, 'Frequencies', w, 'TimeSteps', [1 50 100]);
 %
+%   SPECIFICATION:
+%     SPEC.md §8.9 — Bayesian Uncertainty Estimation
+%
 %   See also: sidLTVdisc, sidBodePlot, sidMapPlot
+%
+%   Changelog:
+%   2026-03-29: First version by Pedro Lourenço.
+%
+%  -----------------------------------------------------------------------
+%   Copyright (c) 2026 Pedro Lourenço, All rights reserved.
+%   This code is released under the MIT License. See LICENSE file in the
+%   project root for full license information.
+%
+%   This function is part of the Open Source System Identification
+%   Toolbox (SID).
+%   For full documentation and examples, visit
+%   https://github.com/pdlourenco/sid-matlab
+%  -----------------------------------------------------------------------
 
     % ---- Parse inputs ----
     nf_default = 128;

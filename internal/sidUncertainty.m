@@ -23,9 +23,14 @@ function [GStd, PhiVStd] = sidUncertainty(G, PhiV, Coh, N, W, nTraj)
 %     GStd    - Standard deviation of G (n_f x 1), or [].
 %     PhiVStd - Standard deviation of PhiV (n_f x 1).
 %
-%   Example:
+%   EXAMPLES:
 %     W = sidHannWin(30);
 %     [GStd, PhiVStd] = sidUncertainty(G, PhiV, Coh, N, W);
+%
+%   SPECIFICATION:
+%     SPEC.md §3 — Uncertainty Estimation
+%
+%   See also: sidFreqBT, sidHannWin, sidCov
 %
 %   Changelog:
 %   2026-03-24: First version by Pedro Lourenço.
