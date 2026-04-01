@@ -234,17 +234,17 @@ function [n, sv] = sidModelOrder(result, varargin)
                     'All singular values near zero. Returning n = 1.');
             end
         else
-            maxK = nSigma - 1;
-            ratios = zeros(maxK, 1);
-            for ki = 1:maxK
-                if sigmas(ki+1) > eps
-                    ratios(ki) = sigmas(ki) / sigmas(ki+1);
-                else
-                    ratios(ki) = Inf;
-                end
-            end
+            % Only consider ratios among singular values above a noise
+            % floor to avoid spurious gaps in the numerical tail.
+            % The floor scales with sigma_1 and the matrix dimension.
+            noiseFloor = sigmas(1) * sqrt(nSigma) * eps;
+            lastSig = find(sigmas > noiseFloor, 1, 'last');
+            maxK = min(lastSig, floor(nSigma / 2));
+            maxK = max(maxK, 1);
 
-            % Find largest gap; if Inf, take first occurrence
+            ratios = sigmas(1:maxK) ./ sigmas(2:maxK+1);
+
+            % Find largest gap
             [~, n] = max(ratios);
         end
     end
@@ -256,7 +256,7 @@ function [n, sv] = sidModelOrder(result, varargin)
         hold on;
         % Mark the detected order with a vertical line
         if n < nSigma
-            xline(n + 0.5, 'r--', 'LineWidth', 1.5);
+            plot([n + 0.5, n + 0.5], ylim, 'r--', 'LineWidth', 1.5);
         end
         hold off;
         xlabel('Index');
