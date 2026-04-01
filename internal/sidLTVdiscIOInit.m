@@ -98,7 +98,13 @@ function [X_hat, A_hat, B_hat, cost] = sidLTVdiscIOInit(Y, U, H, Rinv, HtRinvH, 
     % j=2..N (spec k=1..N-1, interior):
     for j = 2:N
         Ediff = E{j} - E{j-1};
-        lam_sum = lambda(j-1) + lambda(j);
+        % B-block gets lambda from both adjacent smoothness terms, except
+        % at j=N (spec k=N-1) which has no right neighbour.
+        if j < N
+            lam_sum = lambda(j-1) + lambda(j);
+        else
+            lam_sum = lambda(j-1);
+        end
         S_blk{j} = [kron(eye(L), HRH_2I),  Ediff;
                      Ediff',                 P{j} + lam_sum * Inq];
     end
