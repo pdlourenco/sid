@@ -151,7 +151,9 @@ result = sidLTVdiscIO(Y, U, H_obs, 'Lambda', 1e4);
 for l = 1:min(L, 3)
     obs_states = squeeze(result.X(:, :, l)) * H_obs';  % (N+1 x py)
     obs_err = norm(obs_states - squeeze(Y(:, :, l)), 'fro') / norm(squeeze(Y(:, :, l)), 'fro');
-    assert(obs_err < 0.5, 'State recovery: observed states too far from measurements (traj %d, err=%.3f)', l, obs_err);
+    assert(obs_err < 0.5, ...
+        'State recovery: too far from measurements (traj %d, err=%.3f)', ...
+        l, obs_err);
 end
 fprintf('  Test 6 passed: state recovery consistent with measurements.\n');
 

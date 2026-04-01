@@ -193,7 +193,6 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
 
 end
 
-
 % ========================================================================
 %  LOCAL FUNCTIONS
 % ========================================================================
@@ -286,7 +285,9 @@ function [Y, U, H, lambda, R, maxIter, tol, mu, muTol, doTrustRegion, ...
         lambda = lambda * ones(N - 1, 1);
     end
     if length(lambda) ~= N - 1
-        error('sid:dimMismatch', 'Lambda must be scalar or (N-1 x 1), got length %d.', length(lambda));
+        error('sid:dimMismatch', ...
+            'Lambda must be scalar or (N-1 x 1), got length %d.', ...
+            length(lambda));
     end
     lambda = lambda(:);
 
@@ -295,7 +296,6 @@ function [Y, U, H, lambda, R, maxIter, tol, mu, muTol, doTrustRegion, ...
         error('sid:dimMismatch', 'R must be (%d x %d).', py, py);
     end
 end
-
 
 function [A, B] = cosmicStep(X_hat, U, lambda, N, n, q, L)
 % COSMICSTEP Standard COSMIC solve on estimated states.
@@ -309,7 +309,6 @@ function [A, B] = cosmicStep(X_hat, U, lambda, N, n, q, L)
     A = permute(C(1:n, :, :), [2 1 3]);       % (n x n x N)
     B = permute(C(n+1:end, :, :), [2 1 3]);   % (n x q x N)
 end
-
 
 function J = evaluateFullCost(X_hat, A, B, Y, U, H, Rinv, lambda, N, n, q, L)
 % EVALUATEFULLCOST Compute full Output-COSMIC objective.

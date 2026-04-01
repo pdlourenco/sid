@@ -1,4 +1,5 @@
-function [X_hat, A_hat, B_hat, cost] = sidLTVdiscIOInit(Y, U, H, Rinv, HtRinvH, HtRinv, lambda, N, n, py, q, L)
+function [X_hat, A_hat, B_hat, cost] = sidLTVdiscIOInit( ...
+    Y, U, H, Rinv, HtRinvH, HtRinv, lambda, N, n, py, q, L)
 % SIDLTVDISCIOINIT Initialisation for Output-COSMIC (solve J|_{A=I}).
 %
 %   [X_hat, A_hat, B_hat, cost] = sidLTVdiscIOInit(Y, U, H, Rinv, ...
@@ -92,7 +93,7 @@ function [X_hat, A_hat, B_hat, cost] = sidLTVdiscIOInit(Y, U, H, Rinv, HtRinvH, 
     % -- Diagonal blocks S{k} --
     % MATLAB index j=1..K corresponds to spec k=0..N
     % j=1 (spec k=0):
-    S_blk{1} = [kron(eye(L), HRH_I),  E{1};
+    S_blk{1} = [kron(eye(L), HRH_I),  E{1}
                 E{1}',                  P{1} + lambda(1) * Inq];
 
     % j=2..N (spec k=1..N-1, interior):
@@ -105,7 +106,7 @@ function [X_hat, A_hat, B_hat, cost] = sidLTVdiscIOInit(Y, U, H, Rinv, HtRinvH, 
         else
             lam_sum = lambda(j-1);
         end
-        S_blk{j} = [kron(eye(L), HRH_2I),  Ediff;
+        S_blk{j} = [kron(eye(L), HRH_2I),  Ediff
                      Ediff',                 P{j} + lam_sum * Inq];
     end
 
@@ -115,12 +116,12 @@ function [X_hat, A_hat, B_hat, cost] = sidLTVdiscIOInit(Y, U, H, Rinv, HtRinvH, 
     % -- Off-diagonal blocks U_blk{j} --
     % j=1..N-1 (spec k=0..N-2): size (Ln+nq) x (Ln+nq)
     for j = 1:N-1
-        U_blk{j} = [-ILn,      zeros(Ln, nq);
+        U_blk{j} = [-ILn,      zeros(Ln, nq)
                      -E{j}',    -lambda(j) * Inq];
     end
 
     % j=N (spec k=N-1): size (Ln+nq) x Ln (no B column at final step)
-    U_blk{N} = [-ILn;
+    U_blk{N} = [-ILn
                 -E{N}'];
 
     % -- Right-hand side Theta{j} --
@@ -169,7 +170,6 @@ function [X_hat, A_hat, B_hat, cost] = sidLTVdiscIOInit(Y, U, H, Rinv, HtRinvH, 
     cost = evaluateInitCost(X_hat, B_hat, Y, U, H, Rinv, lambda, N, n, q, L);
 
 end
-
 
 function cost = evaluateInitCost(X_hat, B_hat, Y, U, H, Rinv, lambda, N, n, q, L)
 % Evaluate full J at the initialisation (A = I).

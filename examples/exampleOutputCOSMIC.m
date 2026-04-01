@@ -21,15 +21,15 @@ q = 1;   % single input
 py = 2;  % two measured outputs
 
 % Stable dynamics: two pairs of complex poles
-A_true = [0.8  0.15  0    0;
-         -0.15 0.8   0    0;
-          0    0     0.6  0.2;
+A_true = [0.8  0.15  0    0
+         -0.15 0.8   0    0
+          0    0     0.6  0.2
           0    0    -0.2  0.6];
 
 B_true = [1; 0.3; 0.5; 0.1];
 
 % Observation matrix: measure states 1 and 3
-H_obs = [1 0 0 0;
+H_obs = [1 0 0 0
          0 0 1 0];
 
 %% Simulate trajectories
