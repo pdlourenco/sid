@@ -25,6 +25,7 @@ exampleFiles = {
     'exampleSpectrogram'
     'exampleLTVdisc'
     'exampleMultiTrajectory'
+    'exampleOutputCOSMIC'
 };
 
 nExamples = length(exampleFiles);

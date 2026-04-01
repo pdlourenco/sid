@@ -48,6 +48,8 @@ testFiles = {
     'test_sidDetrend'
     'test_sidResidual'
     'test_sidCompare'
+    'test_sidModelOrder'
+    'test_sidLTVdiscIO'
 };
 
 nTests = length(testFiles);
