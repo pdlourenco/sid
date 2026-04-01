@@ -125,6 +125,10 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
     nIter = 0;
     In = eye(n);
 
+    % For trust-region accept/reject: track converged cost and best state
+    J_converged_mu = J0;
+    X_best = X_hat;  A_best = A;  B_best = B;
+
     for iter = 1:maxIter
         % -- COSMIC step: fix states, solve for A(k), B(k) --
         [A, B] = cosmicStep(X_hat, U, lambda, N, n, q, L);
@@ -147,10 +151,22 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
 
         if relChange < tol
             if doTrustRegion && mu_current > muTol
-                % Reduce trust-region parameter
-                mu_current = mu_current / 2;
+                % Inner loop converged for current mu.
+                % Accept/reject: compare converged cost with previous mu.
+                if J <= J_converged_mu
+                    % Accept: this mu is better
+                    J_converged_mu = J;
+                    X_best = X_hat;  A_best = A;  B_best = B;
+                    mu_current = mu_current / 2;
+                else
+                    % Reject: revert to best and terminate trust-region
+                    X_hat = X_best;  A = A_best;  B = B_best;
+                    mu_current = 0;  % final pass at mu=0
+                end
             elseif doTrustRegion && mu_current > 0
-                % Final pass at mu = 0
+                % mu <= muTol: do final pass at mu = 0
+                J_converged_mu = J;
+                X_best = X_hat;  A_best = A;  B_best = B;
                 mu_current = 0;
             else
                 break;
