@@ -114,9 +114,9 @@ function result = sidLTVdisc(X, U, varargin)
 
     % ---- Build data matrices ----
     if isVarLen
-        [D, Xl] = buildDataMatricesVarLen(X, U, N, p, q, L, horizons);
+        [D, Xl] = sidLTVbuildDataMatricesVarLen(X, U, N, p, q, L, horizons);
     else
-        [D, Xl] = buildDataMatrices(X, U, N, p, q, L);
+        [D, Xl] = sidLTVbuildDataMatrices(X, U, N, p, q, L);
     end
 
     % ---- Lambda selection ----
@@ -129,7 +129,7 @@ function result = sidLTVdisc(X, U, varargin)
     end
 
     % ---- Build block diagonal terms ----
-    [S, T] = buildBlockTerms(D, Xl, lambda, N, p, q);
+    [S, T] = sidLTVbuildBlockTerms(D, Xl, lambda, N, p, q);
 
     % ---- Preconditioning ----
     if doPrecondition
@@ -137,14 +137,14 @@ function result = sidLTVdisc(X, U, varargin)
     end
 
     % ---- COSMIC forward-backward pass ----
-    [C, Lbd] = cosmicSolve(S, T, lambda, N, p, q);
+    [C, Lbd] = sidLTVcosmicSolve(S, T, lambda, N, p, q);
 
     % ---- Extract A(k), B(k) ----
     A = permute(C(1:p, :, :), [2 1 3]);       % (p x p x N)
     B = permute(C(p+1:end, :, :), [2 1 3]);   % (p x q x N)
 
     % ---- Evaluate cost ----
-    [cost, fidelity, reg] = evaluateCost(A, B, D, Xl, lambda, N, p, q);
+    [cost, fidelity, reg] = sidLTVevaluateCost(A, B, D, Xl, lambda, N, p, q);
 
     % ---- Pack result ----
     result.A               = A;
@@ -167,7 +167,7 @@ function result = sidLTVdisc(X, U, varargin)
         % COSMIC normalizes data by 1/sqrt(N), so the scaled Hessian uses
         % D_s'D_s = D'D/N. The posterior Cov(vec(C(k))) = Sigma x P(k)
         % requires the unscaled Hessian where D'D appears without the 1/N.
-        P = uncertaintyBackwardPass(S, lambda, N, d);
+        P = sidLTVuncertaintyBackwardPass(S, lambda, N, d);
 
         % Noise covariance
         noiseCovProvided = ~ischar(noiseCov);
@@ -386,92 +386,6 @@ function [X, U, lambda, doPrecondition, algorithm, doUncertainty, ...
     covMode = lower(covMode);
 end
 
-function [D, Xl] = buildDataMatrices(X, U, N, p, q, L)
-% BUILDDATAMATRICES Construct D(k) and X'(k) for all k.
-%
-%   D(k)  = [X(k)' U(k)'] / sqrt(N)    size (L x p+q)
-%   Xl(k) = X(k+1)' / sqrt(N)           size (L x p)
-%
-%   Stored as 3D arrays: D is (L x p+q x N), Xl is (L x p x N).
-
-    sqrtN = sqrt(N);
-    D  = zeros(L, p + q, N);
-    Xl = zeros(L, p, N);
-
-    for k = 0:N-1
-        D(:, :, k+1)  = [reshape(X(k+1, :, :), p, L)', ...
-                          reshape(U(k+1, :, :), q, L)'] / sqrtN;
-        Xl(:, :, k+1) = reshape(X(k+2, :, :), p, L)' / sqrtN;
-    end
-end
-
-function [D, Xl] = buildDataMatricesVarLen(X, U, N, p, q, L, horizons)
-% BUILDDATAMATRICESVARLEN Construct D(k) and Xl(k) for variable-length trajectories.
-%
-%   At each time step k, only trajectories with horizon > k contribute.
-%   D{k}  has size (|L(k)| x p+q), Xl{k} has size (|L(k)| x p).
-%   Each is normalized by 1/sqrt(|L(k)|) to keep the cost well-scaled.
-
-    D  = cell(N, 1);
-    Xl = cell(N, 1);
-
-    for k = 0:N-1
-        % Active trajectories at step k: those with horizon > k
-        active = find(horizons > k);
-        Lk = length(active);
-
-        if Lk == 0
-            % No trajectories active — empty matrices
-            D{k+1}  = zeros(0, p + q);
-            Xl{k+1} = zeros(0, p);
-            continue;
-        end
-
-        sqrtLk = sqrt(Lk);
-        Dk  = zeros(Lk, p + q);
-        Xlk = zeros(Lk, p);
-
-        for ii = 1:Lk
-            l = active(ii);
-            Dk(ii, :)  = [X{l}(k+1, :), U{l}(k+1, :)] / sqrtLk;
-            Xlk(ii, :) = X{l}(k+2, :) / sqrtLk;
-        end
-
-        D{k+1}  = Dk;
-        Xl{k+1} = Xlk;
-    end
-end
-
-function [S, T] = buildBlockTerms(D, Xl, lambda, N, p, q)
-% BUILDBLOCKTERMS Compute the block diagonal S_kk and right-hand side T_k.
-%   Handles both 3D array D (uniform) and cell array D (variable-length).
-
-    d = p + q;
-    S = zeros(d, d, N);
-    T = zeros(d, p, N);
-    useCell = iscell(D);
-
-    for k = 1:N
-        if useCell
-            Dk  = D{k};
-            Xlk = Xl{k};
-        else
-            Dk  = D(:, :, k);
-            Xlk = Xl(:, :, k);
-        end
-        S(:, :, k) = Dk' * Dk;
-        T(:, :, k) = Dk' * Xlk;
-    end
-
-    % Add regularization to diagonal
-    I = eye(d);
-    S(:, :, 1)   = S(:, :, 1)   + lambda(1) * I;
-    S(:, :, N)   = S(:, :, N)   + lambda(N-1) * I;
-    for k = 2:N-1
-        S(:, :, k) = S(:, :, k) + (lambda(k-1) + lambda(k)) * I;
-    end
-end
-
 function [S, T, lambda] = precondition(S, T, lambda, N, p, q)
 % PRECONDITION Apply block-diagonal preconditioning.
 %
@@ -501,77 +415,7 @@ function [S, T, lambda] = precondition(S, T, lambda, N, p, q)
     % Note: after this transformation, the forward-backward pass operates on
     % the preconditioned system. The lambda values remain unchanged as they
     % appear in the off-diagonal blocks which are handled separately in
-    % cosmicSolve. The preconditioned S_kk = I means Lbd_k is easier to invert.
-end
-
-function [C, Lbd] = cosmicSolve(S, T, lambda, N, p, q)
-% COSMICSOLVE COSMIC forward-backward pass.
-%
-%   Solves the block tridiagonal system arising from the regularized
-%   least squares formulation.
-%
-%   Forward pass: compute Lbd_k and Y_k for k = 0..N-1
-%   Backward pass: recover C(k) for k = N-2..0
-%
-%   Returns Lbd (the forward Schur complements) for use in uncertainty
-%   computation.
-
-    d = p + q;
-    Lbd = zeros(d, d, N);
-    Y   = zeros(d, p, N);
-    C   = zeros(d, p, N);
-    I   = eye(d);
-
-    % Forward pass
-    Lbd(:, :, 1) = S(:, :, 1);
-    Y(:, :, 1)   = Lbd(:, :, 1) \ T(:, :, 1);
-
-    for k = 2:N
-        Lbd(:, :, k) = S(:, :, k) - lambda(k-1)^2 * (Lbd(:, :, k-1) \ I);
-        Y(:, :, k)   = Lbd(:, :, k) \ (T(:, :, k) + lambda(k-1) * Y(:, :, k-1));
-    end
-
-    % Backward pass
-    C(:, :, N) = Y(:, :, N);
-
-    for k = N-1:-1:1
-        C(:, :, k) = Y(:, :, k) + lambda(k) * (Lbd(:, :, k) \ C(:, :, k+1));
-    end
-end
-
-function [cost, fidelity, reg] = evaluateCost(A, B, D, Xl, lambda, N, p, q)
-% EVALUATECOST Compute COSMIC cost function value.
-%
-%   cost      = fidelity + reg
-%   fidelity  = (1/2) Σ_k ||D(k) C(k) - X'(k)||²_F
-%   reg       = (1/2) Σ_k λ_k ||C(k) - C(k-1)||²_F
-%   Handles both 3D array D (uniform) and cell array D (variable-length).
-
-    fidelity = 0;
-    priorVec = zeros(N - 1, 1);
-    useCell = iscell(D);
-
-    for k = 1:N
-        % Data fidelity: ||D(k)*C(k) - X'(k)||²_F
-        % C(k) = [A(k)'; B(k)'] so D(k)*C(k) = D(k)*[A'; B']
-        Ck = [A(:, :, k)'; B(:, :, k)'];
-        if useCell
-            residual = D{k} * Ck - Xl{k};
-        else
-            residual = D(:, :, k) * Ck - Xl(:, :, k);
-        end
-        fidelity = fidelity + norm(residual, 'fro')^2;
-
-        % Regularization: ||C(k) - C(k-1)||²_F
-        if k < N
-            Ck1 = [A(:, :, k+1)'; B(:, :, k+1)'];
-            priorVec(k) = norm(Ck - Ck1, 'fro')^2;
-        end
-    end
-
-    fidelity = 0.5 * fidelity;
-    reg      = 0.5 * lambda' * priorVec;
-    cost     = fidelity + reg;
+    % sidLTVcosmicSolve. The preconditioned S_kk = I means Lbd_k is easier to invert.
 end
 
 function bestLambda = lcurveLambda(D, Xl, N, p, q, doPrecondition)
@@ -588,15 +432,15 @@ function bestLambda = lcurveLambda(D, Xl, N, p, q, doPrecondition)
 
     for j = 1:nGrid
         lam = grid(j) * ones(N - 1, 1);
-        [S, T] = buildBlockTerms(D, Xl, lam, N, p, q);
+        [S, T] = sidLTVbuildBlockTerms(D, Xl, lam, N, p, q);
         if doPrecondition
             [S, T, lam] = precondition(S, T, lam, N, p, q);
         end
-        [C, ~] = cosmicSolve(S, T, lam, N, p, q);
+        [C, ~] = sidLTVcosmicSolve(S, T, lam, N, p, q);
 
         A = permute(C(1:p, :, :), [2 1 3]);
         B = permute(C(p+1:end, :, :), [2 1 3]);
-        [~, F(j), R(j)] = evaluateCost(A, B, D, Xl, lam, N, p, q);
+        [~, F(j), R(j)] = sidLTVevaluateCost(A, B, D, Xl, lam, N, p, q);
     end
 
     % L-curve: find corner of maximum curvature in log-log space
@@ -624,57 +468,6 @@ function bestLambda = lcurveLambda(D, Xl, N, p, q, doPrecondition)
 
     [~, idx] = max(kappa);
     bestLambda = grid(idx);
-end
-
-function P = uncertaintyBackwardPass(S_scaled, lambda, N, d)
-% UNCERTAINTYBACKWARDPASS Compute P(k) = [A_unscaled^{-1}]_{kk}.
-%
-%   The COSMIC algorithm normalizes data by 1/sqrt(N), so S_scaled contains
-%   D_s'D_s + regularization. The posterior covariance requires the UNSCALED
-%   Hessian where D'D = N * D_s'D_s appears. This function reconstructs the
-%   unscaled diagonal blocks, then computes left and right Schur complements
-%   to obtain the diagonal blocks of the inverse.
-%
-%   P(k) = (Lbd_k^L + Lbd_k^R - S_kk)^{-1}
-%
-%   Complexity: O(N * d^3).
-
-    I = eye(d);
-
-    % ---- Reconstruct unscaled diagonal blocks S_u(k) = N*DtD(k) + reg(k) ----
-    S = zeros(d, d, N);
-    for k = 1:N
-        if k == 1
-            reg = lambda(1) * I;
-        elseif k == N
-            reg = lambda(N-1) * I;
-        else
-            reg = (lambda(k-1) + lambda(k)) * I;
-        end
-        DtD_scaled = S_scaled(:, :, k) - reg;
-        S(:, :, k) = N * DtD_scaled + reg;
-    end
-
-    % ---- Left Schur complements (forward) ----
-    LbdL = zeros(d, d, N);
-    LbdL(:, :, 1) = S(:, :, 1);
-    for k = 2:N
-        LbdL(:, :, k) = S(:, :, k) - lambda(k-1)^2 * (LbdL(:, :, k-1) \ I);
-    end
-
-    % ---- Right Schur complements (backward) ----
-    LbdR = zeros(d, d, N);
-    LbdR(:, :, N) = S(:, :, N);
-    for k = N-1:-1:1
-        LbdR(:, :, k) = S(:, :, k) - lambda(k)^2 * (LbdR(:, :, k+1) \ I);
-    end
-
-    % ---- Combine: P(k) = (LbdL(k) + LbdR(k) - S(k))^{-1} ----
-    P = zeros(d, d, N);
-    for k = 1:N
-        M = LbdL(:, :, k) + LbdR(:, :, k) - S(:, :, k);
-        P(:, :, k) = M \ I;
-    end
 end
 
 function [Sigma, dof] = estimateNoiseCov(C, D, Xl, P, covMode, N, p, q, isVarLen, horizons)
