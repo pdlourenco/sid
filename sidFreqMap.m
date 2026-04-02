@@ -16,7 +16,10 @@ function result = sidFreqMap(y, u, varargin)
 %
 %   INPUTS:
 %     y - Output data, (N x n_y) matrix. Column vector for SISO.
+%         For multiple trajectories: (N x n_y x L) array or cell array.
+%         Spectral estimates within each segment are ensemble-averaged.
 %     u - Input data, (N x n_u) matrix, or [] for time series mode.
+%         For multiple trajectories: (N x n_u x L) or cell array.
 %
 %   NAME-VALUE OPTIONS (common):
 %     'SegmentLength'  - Number of samples per segment L.
@@ -53,6 +56,7 @@ function result = sidFreqMap(y, u, varargin)
 %       .Overlap          - P
 %       .WindowSize       - M (BT) or [] (Welch)
 %       .Algorithm        - 'bt' or 'welch'
+%       .NumTrajectories  - number of trajectories L
 %       .Method           - 'sidFreqMap'
 %
 %   EXAMPLES:

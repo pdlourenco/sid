@@ -17,7 +17,11 @@ function result = sidFreqBTFDR(y, u, varargin)
 %
 %   INPUTS:
 %     y    - Output data, (N x n_y) matrix. Column vector for SISO.
+%            For multiple trajectories: (N x n_y x L) array or cell array
+%            {y1, y2, ...} for variable-length data. Spectral estimates
+%            are ensemble-averaged across trajectories.
 %     u    - Input data, (N x n_u) matrix. Column vector for SISO.
+%            For multiple trajectories: (N x n_u x L) or cell array.
 %            Use [] for time series (output spectrum only).
 %
 %   NAME-VALUE OPTIONS:
@@ -40,6 +44,7 @@ function result = sidFreqBTFDR(y, u, varargin)
 %       .SampleTime       - sample time in seconds
 %       .WindowSize       - (n_f x 1) vector of window sizes M_k
 %       .DataLength       - number of samples N
+%       .NumTrajectories  - number of trajectories L
 %       .Method           - 'sidFreqBTFDR'
 %
 %   EXAMPLES:

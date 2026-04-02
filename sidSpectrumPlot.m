@@ -5,7 +5,8 @@ function varargout = sidSpectrumPlot(result, varargin)
 %   sidSpectrumPlot(result, 'Confidence', 3)
 %   h = sidSpectrumPlot(...)
 %
-%   Plots the noise spectrum (or output spectrum for time series) in dB.
+%   Plots the noise spectrum (or output spectrum in time-series mode) in dB
+%   with shaded confidence bands (default: +/-3sigma).
 %
 %   INPUTS:
 %     result - Struct returned by sidFreqBT, sidFreqBTFDR, or sidFreqETFE.

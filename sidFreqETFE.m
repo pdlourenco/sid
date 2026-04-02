@@ -15,7 +15,11 @@ function result = sidFreqETFE(y, u, varargin)
 %
 %   INPUTS:
 %     y    - Output data, (N x n_y) matrix. Column vector for SISO.
+%            For multiple trajectories: (N x n_y x L) array or cell array
+%            {y1, y2, ...} for variable-length data. Cross-periodograms
+%            are ensemble-averaged across trajectories.
 %     u    - Input data, (N x n_u) matrix. Column vector for SISO.
+%            For multiple trajectories: (N x n_u x L) or cell array.
 %            Use [] for time series (periodogram).
 %
 %   NAME-VALUE OPTIONS:
@@ -37,6 +41,7 @@ function result = sidFreqETFE(y, u, varargin)
 %       .SampleTime       - sample time in seconds
 %       .WindowSize       - N (data length)
 %       .DataLength       - number of samples N
+%       .NumTrajectories  - number of trajectories L
 %       .Method           - 'sidFreqETFE'
 %
 %   EXAMPLES:

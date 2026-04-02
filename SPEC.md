@@ -957,7 +957,7 @@ where `x̂` is the state predicted by propagating the identified model from init
 | `U_train` | `(N × q × L_train)` | required |
 | `X_val` | `(N+1 × p × L_val)` | required |
 | `U_val` | `(N × q × L_val)` | required |
-| `'LambdaGrid'` | vector | `logspace(-3, 15, 50)` |
+| `'LambdaGrid'` | vector | `logspace(-3, 15, 50)` (validation), `logspace(0, 10, 25)` (frequency) |
 | `'Algorithm'` | char | `'cosmic'` |
 
 **Outputs:**
@@ -976,8 +976,11 @@ where `x̂` is the state predicted by propagating the identified model from init
 | `B` | `(p × q × N)` | Time-varying input matrices B(0), ..., B(N-1) |
 | `AStd` | `(p × p × N)` | Standard deviation of A(k) elements (requires uncertainty) |
 | `BStd` | `(p × q × N)` | Standard deviation of B(k) elements (requires uncertainty) |
-| `Covariance` | `(p+q × p+q × N)` | Posterior covariance Σ_kk per step (requires uncertainty) |
-| `NoiseVariance` | scalar | Estimated σ̂² (requires uncertainty) |
+| `P` | `(p+q × p+q × N)` | Posterior covariance Σ_kk per step (requires uncertainty) |
+| `NoiseCov` | `(p × p)` | Noise covariance matrix (provided or estimated; requires uncertainty) |
+| `NoiseCovEstimated` | logical | Whether `NoiseCov` was estimated from residuals (`true`) or user-supplied (`false`) |
+| `NoiseVariance` | scalar | Estimated σ̂² = trace(NoiseCov)/p (requires uncertainty) |
+| `DegreesOfFreedom` | scalar | Effective degrees of freedom for uncertainty estimation |
 | `Lambda` | scalar or `(N-1 × 1)` | Regularization values used |
 | `Cost` | `(1 × 3)` | `[total, data_fidelity, regularization]` |
 | `DataLength` | scalar | N (number of time steps) |
@@ -1119,7 +1122,7 @@ where `h(C*)` is the data fidelity term evaluated at the optimal solution. This 
 |-------|------|-------------|
 | `AStd` | `(p × p × N)` | Standard deviation of each A(k) element |
 | `BStd` | `(p × q × N)` | Standard deviation of each B(k) element |
-| `Covariance` | `(p+q × p+q × N)` | Posterior covariance `Σ_kk` at each step |
+| `P` | `(p+q × p+q × N)` | Posterior covariance `Σ_kk` at each step |
 | `NoiseVariance` | scalar | Estimated `σ̂²` |
 
 The standard deviations are extracted from the diagonal of `Σ_kk`:
@@ -1597,7 +1600,7 @@ All `sidFreq*` functions return a struct with these fields:
 | `WindowSize` | scalar or vector | Window size `M` (scalar for BT, vector for BTFDR) |
 | `DataLength` | scalar | Number of samples `N` |
 | `NumTrajectories` | scalar | Number of trajectories `L` used in estimation |
-| `Method` | char | `'sidFreqBT'`, `'sidFreqBTFDR'`, or `'sidFreqETFE'` |
+| `Method` | char | `'sidFreqBT'`, `'sidFreqBTFDR'`, `'sidFreqETFE'`, `'sidFreqMap'`, or `'welch'` |
 
 **Dimension conventions:**
 - SISO: `Response` is `(n_f × 1)`, `NoiseSpectrum` is `(n_f × 1)`.

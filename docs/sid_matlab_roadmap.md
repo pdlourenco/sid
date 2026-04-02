@@ -29,6 +29,7 @@ sid  [Domain]  [Method/Variant]
 | **`sidLTVdiscSmooth`** | — | Backward pass over window (smoothed estimates) | ⬜ |
 | **`sidLTVdiscIO`** | — | Partial-observation LTV identification (alternating COSMIC + RTS smoother) | ✅ |
 | **`sidLTVStateEst`** | — | Batch LTV state estimation (RTS smoother given A, B, H, R, Q) | ✅ |
+| **`sidLTIfreqIO`** | — | LTI realization from I/O frequency response (Ho-Kalman) | ✅ |
 | **`sidModelOrder`** | — | Model order estimation from frequency response (Hankel SVD) | ✅ |
 | **`sidDetrend`** | `detrend` | Polynomial detrending (preprocessing) | ✅ |
 | **`sidResidual`** | `resid` | Residual analysis (whiteness + independence tests) | ✅ |
@@ -95,7 +96,14 @@ sid-matlab/
 │   ├── sidValidate.m        % Input parsing and validation
 │   ├── sidValidateData.m    % Data validation helper
 │   ├── sidLTVblkTriSolve.m  % Generic block tridiagonal forward-backward solver
-│   └── sidLTVdiscIOInit.m   % Output-COSMIC initialisation (J|_{A=I} solve)
+│   ├── sidLTVbuildBlockTerms.m      % Build S_kk, Theta_k block terms for COSMIC
+│   ├── sidLTVbuildDataMatrices.m    % Build D(k), X'(k) data matrices
+│   ├── sidLTVbuildDataMatricesVarLen.m % Variable-length trajectory data matrices
+│   ├── sidLTVcosmicSolve.m  % COSMIC forward-backward solver
+│   ├── sidLTVdiscIOInit.m   % Output-COSMIC initialisation (J|_{A=I} solve)
+│   ├── sidLTVevaluateCost.m % Evaluate COSMIC cost function
+│   ├── sidLTVuncertaintyBackwardPass.m % Bayesian uncertainty backward pass
+│   └── sidTestMSD.m         % Test helper: mass-spring-damper system generator
 ├── tests/
 │   ├── runAllTests.m        % Master test runner
 │   ├── test_sidFreqBT.m     % SISO + time series + MIMO
@@ -129,6 +137,8 @@ sid-matlab/
 │   ├── test_sidResidual.m
 │   ├── test_sidCompare.m
 │   ├── test_sidModelOrder.m
+│   ├── test_sidLTIfreqIO.m
+│   ├── test_sidLTVStateEst.m
 │   └── test_sidLTVdiscIO.m
 ├── examples/
 │   ├── README.md
@@ -150,10 +160,15 @@ sid-matlab/
 │   ├── cosmic_online_recursion.md
 │   ├── cosmic_automatic_tuning.md
 │   ├── multi_trajectory_spectral_theory.md
-│   └── cosmic_output.md
+│   ├── cosmic_output.md
+│   └── TODO.md
+├── .editorconfig              % Editor settings (indentation, line endings)
+├── .github/                   % CI workflows, scripts
+├── CONTRIBUTING.md            % Contribution guidelines
 ├── SPEC.md
 ├── LICENSE                    % MIT
 ├── README.md
+├── miss_hit.cfg               % MISS_HIT linter configuration
 └── sidInstall.m               % Adds sid to MATLAB/Octave path
 ```
 
@@ -196,7 +211,8 @@ result.Coherence          % (n_freq x 1) squared coherence (SISO only, [] for MI
 result.SampleTime         % scalar (seconds)
 result.WindowSize         % scalar integer (or vector for BTFDR)
 result.DataLength         % N (number of samples used)
-result.Method             % 'sidFreqBT', 'sidFreqBTFDR', 'sidFreqETFE', or 'sidFreqMap'
+result.NumTrajectories    % scalar (number of trajectories used)
+result.Method             % 'sidFreqBT', 'sidFreqBTFDR', 'sidFreqETFE', 'sidFreqMap', or 'welch'
 ```
 
 ---
