@@ -6,7 +6,7 @@ function varargout = sidBodePlot(result, varargin)
 %   h = sidBodePlot(...)
 %
 %   Plots the magnitude (dB) and phase (degrees) of the estimated
-%   frequency response from a sidFreq* result struct.
+%   frequency response with shaded confidence bands (default: +/-3sigma).
 %
 %   INPUTS:
 %     result     - Struct returned by sidFreqBT, sidFreqBTFDR, or sidFreqETFE.

@@ -15,7 +15,11 @@ function result = sidFreqBT(y, u, varargin)
 %
 %   INPUTS:
 %     y    - Output data, (N x n_y) matrix. Column vector for SISO.
+%            For multiple trajectories: (N x n_y x L) array or cell array
+%            {y1, y2, ...} for variable-length data. Spectral estimates
+%            are ensemble-averaged across trajectories.
 %     u    - Input data, (N x n_u) matrix. Column vector for SISO.
+%            For multiple trajectories: (N x n_u x L) or cell array.
 %            Use [] for time series (output spectrum only).
 %
 %   NAME-VALUE OPTIONS:
@@ -36,6 +40,7 @@ function result = sidFreqBT(y, u, varargin)
 %       .SampleTime       - sample time in seconds
 %       .WindowSize       - window size M used
 %       .DataLength       - number of samples N
+%       .NumTrajectories  - number of trajectories L
 %       .Method           - 'sidFreqBT'
 %
 %   EXAMPLES:
@@ -53,6 +58,15 @@ function result = sidFreqBT(y, u, varargin)
 %     % Custom window size and frequencies
 %     w = linspace(0.01, pi, 256)';
 %     result = sidFreqBT(y, u, 'WindowSize', 50, 'Frequencies', w);
+%
+%     % Multi-trajectory: average 5 independent experiments
+%     L = 5; N = 1000;
+%     y3d = zeros(N, 1, L); u3d = zeros(N, 1, L);
+%     for l = 1:L
+%         u3d(:,1,l) = randn(N, 1);
+%         y3d(:,1,l) = filter([1], [1 -0.9], u3d(:,1,l)) + 0.1*randn(N,1);
+%     end
+%     result = sidFreqBT(y3d, u3d);
 %
 %   ALGORITHM:
 %     1. Compute biased sample covariances R_y, R_u, R_yu for lags 0..M

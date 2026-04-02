@@ -12,6 +12,8 @@ function result = sidSpectrogram(x, varargin)
 %   INPUTS:
 %     x - Signal data, (N x n_ch) real matrix. Column vector for single
 %         channel. Each column is treated as a separate channel.
+%         For multiple trajectories: (N x n_ch x L) array. Power spectral
+%         density is ensemble-averaged across trajectories within each segment.
 %
 %   NAME-VALUE OPTIONS:
 %     'WindowLength'  - Segment length L. Default: 256.
@@ -49,6 +51,7 @@ function result = sidSpectrogram(x, varargin)
 %     2. Apply time-domain window to each segment
 %     3. Compute FFT of each windowed segment
 %     4. Compute one-sided power spectral density
+%     5. If L trajectories: ensemble-average PSD across realizations
 %
 %   REFERENCES:
 %     Oppenheim, A.V. and Schafer, R.W. "Discrete-Time Signal Processing",

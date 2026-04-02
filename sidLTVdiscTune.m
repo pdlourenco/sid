@@ -16,15 +16,16 @@ function [bestResult, bestLambda, thirdOut] = sidLTVdiscTune(varargin)
 %   consistency scoring. It selects the largest lambda where the two
 %   estimates agree statistically at most (omega, t) grid points.
 %
-%   INPUTS (validation method):
-%     X_train - Training state data, (N+1 x p x L_train)
-%     U_train - Training input data, (N x q x L_train)
-%     X_val   - Validation state data, (N+1 x p x L_val)
-%     U_val   - Validation input data, (N x q x L_val)
+%   INPUTS:
+%     Validation method:
+%       X_train - Training state data, (N+1 x p x L_train)
+%       U_train - Training input data, (N x q x L_train)
+%       X_val   - Validation state data, (N+1 x p x L_val)
+%       U_val   - Validation input data, (N x q x L_val)
 %
-%   INPUTS (frequency method):
-%     X       - State data, (N+1 x p x L) or cell array
-%     U       - Input data, (N x q x L) or cell array
+%     Frequency method:
+%       X       - State data, (N+1 x p x L) or cell array
+%       U       - Input data, (N x q x L) or cell array
 %
 %   NAME-VALUE OPTIONS (both methods):
 %     'Method'       - 'validation' (default) or 'frequency'.
