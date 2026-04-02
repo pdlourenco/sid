@@ -1275,7 +1275,9 @@ The three terms are: observation fidelity (weighted by the measurement informati
 
 The joint objective is non-convex (bilinear coupling `A(k) x(k)`) but strictly convex in each block given the other. The algorithm alternates two steps after an initialisation.
 
-**Initialisation.** Evaluate `J` at `A(k) = I` for all `k` and jointly solve for `{x_l(k)}` and `{B(k)}`:
+**Initialisation.** The initialisation strategy depends on whether `H` has full column rank.
+
+**Case 1: `H` has full column rank (`p_y ≥ n`, includes `H = I`).** Evaluate `J` at `A(k) = I` for all `k` and jointly solve for `{x_l(k)}` and `{B(k)}`:
 
 ```
 J_init(X, B) = J(X, C)|_{A=I}
@@ -1287,6 +1289,14 @@ J_init(X, B) = J(X, C)|_{A=I}
 This is jointly convex in `{x_l(k)}` and `{B(k)}` (no bilinear terms — `B(k) u_l(k)` is linear in `B(k)` since `u_l(k)` is known data). The `B(k)` are shared across trajectories (same LTV dynamics); each trajectory has its own state sequence. The minimiser is unique and obtained in a single forward-backward pass over composite blocks `w(k) = [x_1(k); ...; x_L(k); vec(B(k))]`; see Appendix B of the theory document for the explicit recursion. The autonomous state evolution is modelled as a random walk (`A = I`) with input-driven corrections; the smoothness prior on `B(k)` prevents the input matrix from absorbing dynamics attributable to `A(k)`.
 
 Since `J_init = J|_{A=I}`, the initialisation is the exact minimisation of the global objective over a restricted subspace, not a separate heuristic.
+
+**Case 2: `H` is rank-deficient (`p_y < n`).** The composite `A = I` initialisation cannot be used because the observability matrix `O = [H; HA; HA²; ...]` with `A = I` has rank `p_y < n` — the unobserved state components are free parameters and the composite block tridiagonal system is structurally singular. Instead, a two-step pseudo-inverse initialisation is used:
+
+1. **Pseudo-inverse state estimate:** Set `x̂_l(k) = H⁺ y_l(k) = Hᵀ(HHᵀ)⁻¹ y_l(k)` for all `k` and `l`. This pins observed components to the measurements and sets unobserved components to zero. Set `B(k) = 0` for all `k`.
+
+2. **First COSMIC step:** Run standard COSMIC on these pseudo-inverse states to obtain initial `A(k)` and `B(k)`. The resulting `A(k) ≠ I` couples observed and unobserved state components, making the system observable for the subsequent RTS smoother.
+
+This sacrifices the "exact minimisation of `J|_{A=I}`" property but provides a numerically stable starting point. After the first COSMIC step, the dynamics `A(k)` mix the state components, so the RTS smoother in the main loop can resolve the full state from partial observations.
 
 **COSMIC step.** Fix state estimates `X̂`, solve for `C = [A; B]` using standard COSMIC (§8.3.4) with the estimated states as data. The observation fidelity term is constant w.r.t. `C` and drops out. Multi-trajectory pooling into the data matrices proceeds exactly as in §8.3.2.
 
@@ -1330,7 +1340,7 @@ When disabled (`μ = 0` from iteration 2 onward), the trust-region adds no compu
 
 #### 8.12.6 Computational Complexity
 
-- **Initialisation:** Single forward-backward pass with composite blocks, `O(N (Ln + nq)³)`.
+- **Initialisation:** When `p_y ≥ n`, single forward-backward pass with composite blocks, `O(N (Ln + nq)³)`. When `p_y < n`, pseudo-inverse state estimate `O(N p_y)` followed by one COSMIC step `O(N (n+q)³)`.
 - **State step:** RTS smoother, `O(N n³)` per trajectory, `O(L N n³)` total.
 - **COSMIC step:** Standard COSMIC tridiagonal solve, `O(N (n+q)³)`, independent of `L`.
 - **Per iteration:** `O(L N n³ + N (n+q)³)`.

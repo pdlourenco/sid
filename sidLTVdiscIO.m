@@ -109,9 +109,29 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
     HtRinvH = H' * Rinv * H;
     HtRinv  = H' * Rinv;
 
-    % ---- Initialisation: solve J|_{A=I} ----
-    [X_hat, A, B, J0] = sidLTVdiscIOInit(Y, U, H, Rinv, HtRinvH, HtRinv, ...
-        lambda, N, n, py, q, L);
+    % ---- Initialisation ----
+    if py >= n
+        % H has full column rank: composite forward-backward initialisation
+        % solves J|_{A=I} exactly (Appendix B of docs/cosmic_output.md).
+        [X_hat, A, B, J0] = sidLTVdiscIOInit(Y, U, H, Rinv, HtRinvH, ...
+            HtRinv, lambda, N, n, py, q, L);
+    else
+        % H is rank-deficient (py < n): the A=I composite system is
+        % unobservable because O = [H; H; ...] has rank py < n.
+        % Use pseudo-inverse state initialisation followed by one COSMIC
+        % step to obtain an initial A that couples observed and unobserved
+        % state components.
+        Hpinv = H' * ((H * H') \ eye(py));  % (n x py) right pseudo-inverse
+        X_hat = zeros(N + 1, n, L);
+        for l = 1:L
+            for j = 1:N+1
+                X_hat(j, :, l) = (Hpinv * Y(j, :, l)')';
+            end
+        end
+        B = zeros(n, q, N);
+        [A, B] = cosmicStep(X_hat, U, lambda, N, n, q, L);
+        J0 = evaluateFullCost(X_hat, A, B, Y, U, H, Rinv, lambda, N, n, q, L);
+    end
 
     costHistory = J0;
 

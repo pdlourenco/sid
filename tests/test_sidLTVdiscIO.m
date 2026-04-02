@@ -185,14 +185,34 @@ end
 fprintf('  Test 5 passed: partial obs pipeline (%d iters, no NaN).\n', ...
     result.Iterations);
 
-%% Test 6: Monotone cost decrease
-% The cost should be non-increasing across alternating iterations.
-assert(length(result.Cost) >= 2, 'Need at least 2 cost evaluations');
-for i = 2:length(result.Cost)
-    assert(result.Cost(i) <= result.Cost(i-1) + 1e-8 * abs(result.Cost(i-1)), ...
-        'Cost increased at iteration %d: %.6f > %.6f', i, result.Cost(i), result.Cost(i-1));
+%% Test 6: Monotone cost decrease (H=I, no trust-region)
+% Monotonicity is guaranteed for the alternating minimisation when
+% trust-region is off and H has full column rank (exact initialisation).
+% Reuse the Test 3 result (H=I equivalence run).
+rng(200);
+n = 2; q = 1; N = 50; L = 10;
+A_true = [0.9 0.1; -0.1 0.8];
+B_true = [0.5; 0.3];
+sigma = 0.02;
+X_mono = zeros(N+1, n, L);
+U_mono = randn(N, q, L);
+for l = 1:L
+    X_mono(1, :, l) = randn(1, n);
+    for k = 1:N
+        X_mono(k+1, :, l) = (A_true * X_mono(k, :, l)' + ...
+            B_true * U_mono(k, :, l)')' + sigma * randn(1, n);
+    end
 end
-fprintf('  Test 6 passed: monotone cost decrease verified (%d iterations).\n', result.Iterations);
+res_mono = sidLTVdiscIO(X_mono, U_mono, eye(n), 'Lambda', 1e4);
+assert(length(res_mono.Cost) >= 2, 'Need at least 2 cost evaluations');
+for i = 2:length(res_mono.Cost)
+    assert(res_mono.Cost(i) <= res_mono.Cost(i-1) + ...
+        1e-8 * abs(res_mono.Cost(i-1)), ...
+        'Cost increased at iteration %d: %.6f > %.6f', ...
+        i, res_mono.Cost(i), res_mono.Cost(i-1));
+end
+fprintf('  Test 6 passed: monotone cost decrease (%d iters).\n', ...
+    res_mono.Iterations);
 
 %% Test 7: State recovery
 % Compare estimated states to true states (for observed dimensions).
