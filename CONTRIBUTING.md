@@ -159,6 +159,69 @@ Internal helper functions live in the `internal/` directory and use the same
 
 See `.editorconfig` and `miss_hit.cfg` for automated enforcement.
 
+### Inline Comments
+
+Code comments within function bodies should make the mathematical intent
+clear and link back to the specification. Follow these guidelines:
+
+**Section separators.** Use `% ---- Name ----` to mark major computational
+phases. These should correspond to steps in the function's ALGORITHM header
+section:
+
+```matlab
+% ---- Build data matrices (SPEC.md §8.3.2) ----
+[D, Xp] = sidLTVbuildDataMatrices(X, U);
+```
+
+**SPEC.md cross-references.** When a code block implements a specific
+equation or algorithm step from SPEC.md, cite the section number:
+
+```matlab
+% Schur complement forward pass (SPEC.md §8.3.4, Eq. 8.3):
+%   Lambda(k) = S(k) - lambda(k-1)^2 * Lambda(k-1)^{-1}
+Lbd(:,:,k) = S(:,:,k) - lambda(k-1)^2 * (Lbd(:,:,k-1) \ I);
+```
+
+**Mathematical steps.** Annotate non-obvious operations — matrix
+inversions, Schur complements, spectral transformations, and
+regularization terms. Write the formula in comment notation before
+the code that implements it:
+
+```matlab
+% G(w) = Phi_yu(w) / Phi_u(w)  — transfer function estimate
+G = Phi_yu ./ Phi_u;
+
+% Phi_v(w) = Phi_y(w) - |Phi_yu(w)|^2 / Phi_u(w)  — noise spectrum
+Phi_v = Phi_y - abs(Phi_yu).^2 ./ Phi_u;
+```
+
+**Variable-to-notation mapping.** When a variable name differs from the
+mathematical notation in SPEC.md, state the correspondence on first use:
+
+```matlab
+% Lbd corresponds to Lambda_k in SPEC.md §8.3 (forward Schur complement)
+Lbd = zeros(d, d, N);
+```
+
+**Dimensions.** Annotate array dimensions on the line that creates or
+returns them, using trailing comments:
+
+```matlab
+Ryy = sidCov(y, y, M);   % (M+1 x ny x ny) biased auto-covariance
+```
+
+**What not to comment.** Do not comment self-explanatory operations
+(loop counters, standard input parsing, trivial assignments). Focus
+comments on *why*, not *what*:
+
+```matlab
+% Bad: increment k by 1
+k = k + 1;
+
+% Good: skip the first segment (it has incomplete overlap)
+k = k + 1;
+```
+
 ---
 
 ## Testing

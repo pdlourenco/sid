@@ -4,7 +4,7 @@
 - ~~Revise roadmap for the current status~~
 - ~~Revise readme~~ 
 - ~~Review headers to comply with implementation and spec (example, non-parametric frequency domain is multi-trajectory but headers do not reveal this~~
-- add instruction on comments to contributing.md
+- ~~add instruction on comments to contributing.md~~
 
 ## Tests / examples
 - Adapt tests to confirm with the SPEC
