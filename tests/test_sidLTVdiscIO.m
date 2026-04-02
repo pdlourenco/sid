@@ -366,4 +366,161 @@ assert(isfield(result_tr, 'A'), 'Trust-region should return valid result');
 assert(result_tr.Iterations >= 1, 'Trust-region should iterate');
 fprintf('  Test 11 passed: trust-region converges (%d iterations).\n', result_tr.Iterations);
 
+%% Test 12: Mass-spring-damper LTI, full observation
+% Full pipeline on 6-state MSD with all states measured.
+rng(1200);
+[Ad, Bd] = sidTestMSD( ...
+    [1.0; 1.5; 1.0], [100; 80; 60], [2; 1.5; 1], ...
+    [1; 0; 0], 0.01);
+n = 6; q = 1; py = 6; N = 200; L = 10;
+H_full = eye(n);
+
+X = zeros(N + 1, n, L);
+U = randn(N, q, L);
+Y = zeros(N + 1, py, L);
+sigma = 0.001;
+for l = 1:L
+    X(1, :, l) = 0.1 * randn(1, n);
+    Y(1, :, l) = (H_full * X(1, :, l)')' ...
+        + sigma * randn(1, py);
+    for k = 1:N
+        X(k + 1, :, l) = (Ad * X(k, :, l)' ...
+            + Bd * U(k, :, l)')' + sigma * randn(1, n);
+        Y(k + 1, :, l) = (H_full * X(k + 1, :, l)')' ...
+            + sigma * randn(1, py);
+    end
+end
+
+result = sidLTVdiscIO(Y, U, H_full, 'Lambda', 1e6);
+
+assert(~any(isnan(result.A(:))), 'MSD full obs: NaN in A');
+assert(result.Iterations >= 1, 'MSD full obs: no iterations');
+
+% Check eigenvalue recovery of the mean A (similarity-invariant)
+eig_true = sort(abs(eig(Ad)));
+eig_est = sort(abs(eig(mean(result.A, 3))));
+eig_err = norm(eig_true - eig_est) / norm(eig_true);
+assert(eig_err < 1.0, ...
+    'MSD full obs: eigenvalue error too large (%.4f)', eig_err);
+fprintf('  Test 12 passed: MSD full obs (eig_err=%.4f, %d iters).\n', ...
+    eig_err, result.Iterations);
+
+%% Test 13: Mass-spring-damper LTI, partial obs (positions only)
+% py=3, n=6. Use trust-region for this harder problem.
+H_pos = [eye(3), zeros(3, 3)];
+Y_pos = zeros(N + 1, 3, L);
+for l = 1:L
+    for k = 1:N + 1
+        Y_pos(k, :, l) = (H_pos * X(k, :, l)')' ...
+            + sigma * randn(1, 3);
+    end
+end
+
+result = sidLTVdiscIO( ...
+    Y_pos, U, H_pos, 'Lambda', 1e4, 'TrustRegion', 1);
+
+assert(~any(isnan(result.A(:))), 'MSD partial: NaN in A');
+assert(~any(isnan(result.X(:))), 'MSD partial: NaN in X');
+assert(result.Iterations >= 1, 'MSD partial: no iterations');
+
+% Observed states should be consistent with measurements
+for l = 1:min(L, 3)
+    obs = squeeze(result.X(:, :, l)) * H_pos';
+    obs_err = norm(obs - squeeze(Y_pos(:, :, l)), 'fro') / ...
+        norm(squeeze(Y_pos(:, :, l)), 'fro');
+    assert(obs_err < 1.0, ...
+        'MSD partial: obs mismatch traj %d (%.3f)', l, obs_err);
+end
+fprintf('  Test 13 passed: MSD partial obs (%d iters).\n', ...
+    result.Iterations);
+
+%% Test 14: Time-varying double integrator, partial obs
+% Gain varies linearly: alpha(k) = 1 + 0.5*k/N.
+n = 2; q = 1; py = 1; N = 80; L = 8;
+dt = 1;
+A_tv = zeros(n, n, N);
+B_tv = zeros(n, q, N);
+for k = 1:N
+    alpha = 1.0 + 0.5 * (k - 1) / (N - 1);
+    A_tv(:, :, k) = [1, alpha * dt; 0, 1];
+    B_tv(:, :, k) = [0.5 * alpha * dt^2; alpha * dt];
+end
+
+X = zeros(N + 1, n, L);
+U = zeros(N, q, L);
+Y = zeros(N + 1, py, L);
+H_pos = [1 0];
+for l = 1:L
+    freq = l / (3 * N);
+    for k = 1:N
+        U(k, 1, l) = sin(2 * pi * freq * k) + 0.5 * l;
+    end
+    X(1, :, l) = [0, 0.1 * l / L];
+    Y(1, :, l) = H_pos * X(1, :, l)';
+    for k = 1:N
+        X(k + 1, :, l) = (A_tv(:, :, k) * X(k, :, l)' ...
+            + B_tv(:, :, k) * U(k, :, l)')';
+        Y(k + 1, :, l) = H_pos * X(k + 1, :, l)';
+    end
+end
+
+result = sidLTVdiscIO( ...
+    Y, U, H_pos, 'Lambda', 100, 'TrustRegion', 1);
+
+assert(~any(isnan(result.A(:))), 'TV DI: NaN in A');
+assert(result.Iterations >= 1, 'TV DI: no iterations');
+
+% Verify state estimates reproduce measurements
+for l = 1:min(L, 3)
+    obs = squeeze(result.X(:, :, l)) * H_pos';
+    obs_err = norm(obs - squeeze(Y(:, :, l)), 'fro') / ...
+        norm(squeeze(Y(:, :, l)), 'fro');
+    assert(obs_err < 0.5, ...
+        'TV DI: obs mismatch traj %d (%.3f)', l, obs_err);
+end
+fprintf('  Test 14 passed: TV DI partial obs (%d iters).\n', ...
+    result.Iterations);
+
+%% Test 15: Time-varying mass-spring-damper, partial obs
+% Stiffness k1 varies sinusoidally. Check pipeline convergence.
+rng(1500);
+n = 6; q = 1; py = 3; N = 100; L = 5;
+H_pos = [eye(3), zeros(3, 3)];
+Ts = 0.01;
+m_vec = [1.0; 1.5; 1.0];
+c_vec = [2; 1.5; 1];
+F_vec = [1; 0; 0];
+
+A_tv = zeros(n, n, N);
+B_tv = zeros(n, q, N);
+for k = 1:N
+    k1 = 100 * (1 + 0.3 * sin(2 * pi * k / N));
+    [Adk, Bdk] = sidTestMSD( ...
+        m_vec, [k1; 80; 60], c_vec, F_vec, Ts);
+    A_tv(:, :, k) = Adk;
+    B_tv(:, :, k) = Bdk;
+end
+
+X = zeros(N + 1, n, L);
+U = randn(N, q, L);
+Y = zeros(N + 1, py, L);
+for l = 1:L
+    X(1, :, l) = 0.05 * randn(1, n);
+    Y(1, :, l) = (H_pos * X(1, :, l)')';
+    for k = 1:N
+        X(k + 1, :, l) = (A_tv(:, :, k) * X(k, :, l)' ...
+            + B_tv(:, :, k) * U(k, :, l)')';
+        Y(k + 1, :, l) = (H_pos * X(k + 1, :, l)')';
+    end
+end
+
+result = sidLTVdiscIO( ...
+    Y, U, H_pos, 'Lambda', 1e3, 'TrustRegion', 1);
+
+assert(~any(isnan(result.A(:))), 'TV MSD: NaN in A');
+assert(~any(isnan(result.X(:))), 'TV MSD: NaN in X');
+assert(result.Iterations >= 1, 'TV MSD: no iterations');
+fprintf('  Test 15 passed: TV MSD partial obs (%d iters).\n', ...
+    result.Iterations);
+
 fprintf('test_sidLTVdiscIO: all tests passed.\n');

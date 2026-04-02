@@ -207,4 +207,75 @@ assert(all(isfinite(A0_h20(:))), 'Horizon=20 produced non-finite A');
 assert(all(isfinite(A0_h40(:))), 'Horizon=40 produced non-finite A');
 fprintf('  Test 7 passed: custom horizon works.\n');
 
+%% Test 8: Mass-spring-damper, full observation, LTI
+% n=6 system with all states measured. The LTI estimator should
+% recover eigenvalues accurately from noiseless data.
+rng(800);
+[Ad, Bd] = sidTestMSD( ...
+    [1.0; 1.5; 1.0], [100; 80; 60], [2; 1.5; 1], ...
+    [1; 0; 0], 0.01);
+n = 6; q = 1; py = 6; N = 500; L = 5;
+H_full = eye(n);
+
+X = zeros(N + 1, n, L);
+U = randn(N, q, L);
+Y = zeros(N + 1, py, L);
+for l = 1:L
+    X(1, :, l) = 0.1 * randn(1, n);
+    Y(1, :, l) = (H_full * X(1, :, l)')';
+    for k = 1:N
+        X(k + 1, :, l) = (Ad * X(k, :, l)' ...
+            + Bd * U(k, :, l)')';
+        Y(k + 1, :, l) = (H_full * X(k + 1, :, l)')';
+    end
+end
+
+[A0, B0] = sidLTIfreqIO(Y, U, H_full);
+
+eig_true = sort(abs(eig(Ad)));
+eig_est = sort(abs(eig(A0)));
+eig_err = norm(eig_true - eig_est) / norm(eig_true);
+assert(eig_err < 0.15, ...
+    'MSD full obs: eigenvalue error %.4f', eig_err);
+fprintf('  Test 8 passed: MSD full obs LTI (eig_err=%.4f).\n', ...
+    eig_err);
+
+%% Test 9: Mass-spring-damper, partial obs (positions only), LTI
+% n=6, py=3. Only positions measured, velocities hidden.
+% With 3 outputs and 1 input, the Ho-Kalman realization must
+% recover 6 modes from the 3x1 transfer function. Use long data
+% for accurate spectral estimation.
+rng(900);
+N9 = 2000; L9 = 10;
+X9 = zeros(N9 + 1, n, L9);
+U9 = randn(N9, q, L9);
+H_pos = [eye(3), zeros(3, 3)];
+Y9 = zeros(N9 + 1, 3, L9);
+for l = 1:L9
+    X9(1, :, l) = 0.1 * randn(1, n);
+    Y9(1, :, l) = (H_pos * X9(1, :, l)')';
+    for k = 1:N9
+        X9(k + 1, :, l) = (Ad * X9(k, :, l)' ...
+            + Bd * U9(k, :, l)')';
+        Y9(k + 1, :, l) = (H_pos * X9(k + 1, :, l)')';
+    end
+end
+
+[A0p, B0p] = sidLTIfreqIO(Y9, U9, H_pos);
+
+% Compare first 10 Markov parameters (short horizon
+% avoids amplifying small eigenvalue errors).
+g_est_vec = zeros(10, 3);
+g_true_vec = zeros(10, 3);
+for k = 1:10
+    g_est_vec(k, :) = (H_pos * A0p^(k - 1) * B0p)';
+    g_true_vec(k, :) = (H_pos * Ad^(k - 1) * Bd)';
+end
+mp_err = norm(g_est_vec - g_true_vec, 'fro') / ...
+    norm(g_true_vec, 'fro');
+assert(mp_err < 0.5, ...
+    'MSD partial obs LTI: Markov param error %.4f', mp_err);
+fprintf('  Test 9 passed: MSD partial obs LTI (mp_err=%.4f).\n', ...
+    mp_err);
+
 fprintf('test_sidLTIfreqIO: all tests passed.\n');
