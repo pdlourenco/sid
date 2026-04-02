@@ -1,7 +1,7 @@
 # Next steps within v1.0
 ## Documentation
-- Revise SPEC and theory documents to confirm implementation is in accordance. Analyse function by function, on some the SPEC is the normative, on others the implementation is ahead
-- Revise roadmap for the current status
+- ~~Revise SPEC and theory documents to confirm implementation is in accordance. Analyse function by function, on some the SPEC is the normative, on others the implementation is ahead~~
+- ~~Revise roadmap for the current status~~
 - Revise readme 
 - Review headers to comply with implementation and spec (example, non-parametric frequency domain is multi-trajectory but headers do not reveal this
 - add instruction on comments to contributing.md
