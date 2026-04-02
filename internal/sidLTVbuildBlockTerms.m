@@ -51,10 +51,12 @@ function [S, T] = sidLTVbuildBlockTerms(D, Xl, lambda, N, p, q)
 %  -----------------------------------------------------------------------
 
     d = p + q;
-    S = zeros(d, d, N);
-    T = zeros(d, p, N);
+    S = zeros(d, d, N);  % (d x d x N) diagonal blocks of normal equations
+    T = zeros(d, p, N);  % (d x p x N) right-hand side
     useCell = iscell(D);
 
+    % S(k) = D(k)'D(k), T(k) = D(k)'X'(k) (SPEC.md §8.3.3)
+    % Regularization lambda*I is added later in sidLTVcosmicSolve.
     for k = 1:N
         if useCell
             Dk  = D{k};

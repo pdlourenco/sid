@@ -61,15 +61,15 @@ function R = sidCov(x, z, maxLag)
         L = 1;
     end
 
-    R = zeros(maxLag + 1, p, q);
+    R = zeros(maxLag + 1, p, q);  % (maxLag+1 x p x q)
 
     if L == 1
-        % Single trajectory (original path)
+        % R-hat_xz(tau) = (1/N) * sum_{t=tau+1}^{N} x(t) z(t-tau)' (SPEC.md §2.3)
         for tau = 0:maxLag
             R(tau + 1, :, :) = (x(tau + 1:N, :)' * z(1:N - tau, :)) / N;
         end
     else
-        % Multi-trajectory: ensemble-average per-trajectory covariances
+        % Ensemble average: R-hat = (1/L) sum_l R-hat^{(l)} (SPEC.md §2.3)
         for tau = 0:maxLag
             Rsum = zeros(p, q);
             for l = 1:L

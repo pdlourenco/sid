@@ -162,11 +162,12 @@ end
 % ========================================================================
 
 function [bestResult, bestLambda, info] = frequencyTune(X, U, varargin)
-% FREQUENCYTUNE Select lambda via frequency-response consistency scoring.
+% FREQUENCYTUNE Select lambda via frequency-response consistency (SPEC.md §8.11).
 %
 %   Compares COSMIC frozen TF against non-parametric sidFreqMap estimate.
+%   Mahalanobis-like test: d^2 = |G_frozen - G_data|^2 / (sigma_frozen^2 + sigma_data^2)
 %   Selects the largest lambda where >=threshold fraction of (omega, t)
-%   grid points are consistent at 95% confidence.
+%   grid points are consistent at 95% confidence (chi^2(2) threshold).
 
     % ---- Parse options ----
     lambdaGrid = logspace(0, 10, 25);

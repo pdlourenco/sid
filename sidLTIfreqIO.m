@@ -76,12 +76,13 @@ function [A0, B0] = sidLTIfreqIO(Y, U, H, varargin)
     [Y_trim, U, H, horizon, maxStab, py, n, q] = parseInputs( ...
         Y, U, H, varargin{:});
 
-    % ---- Step 1: Frequency response estimation ----
+    % ---- Step 1: Frequency response estimation (SPEC.md §8.13) ----
     G_result = sidFreqBT(Y_trim, U);
     G = G_result.Response;  % (nf x py x q) complex
     nf = size(G, 1);
 
-    % ---- Step 2: Impulse response via IFFT ----
+    % ---- Step 2: Impulse response via IFFT (SPEC.md §8.13) ----
+    % Markov parameters: g(k) = H A^{k-1} B
     g = freqToImpulse(G, nf, py, q);  % (N_imp x py x q)
     N_imp = size(g, 1);
 
@@ -115,10 +116,11 @@ function [A0, B0] = sidLTIfreqIO(Y, U, H, varargin)
             r, py, r, q, n);
     end
 
-    % ---- Step 4: Build Hankel matrices ----
+    % ---- Step 4: Build block Hankel matrices (SPEC.md §8.13) ----
+    % H_0{i,j} = g(i+j-1), H_1{i,j} = g(i+j)
     [H0, H1] = buildHankel(g, r, py, q, N_imp);
 
-    % ---- Step 5: Ho-Kalman realization ----
+    % ---- Step 5: Ho-Kalman SVD realization (SPEC.md §8.13) ----
     [A_r, B_r, C_r] = hoKalman(H0, H1, n, py, q);
 
     % ---- Step 6: Transform to H-basis ----

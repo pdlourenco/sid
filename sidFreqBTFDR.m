@@ -156,22 +156,23 @@ function result = sidFreqBTFDR(y, u, varargin)
         end
     end
 
-    % ---- Resolution to window size ----
+    % ---- Resolution to window size (SPEC.md §5.1) ----
+    % M_k = round(2*pi / R_k) — local window size at frequency k
     Mk = round(2 * pi ./ R);
     Mk = max(Mk, 2);                   % M >= 2
     Mk = min(Mk, floor(N / 2));        % M <= N/2
 
-    % ---- Pre-compute covariances up to max(M_k) ----
+    % ---- Pre-compute biased covariances up to max(M_k) (SPEC.md §2.3) ----
     Mmax = max(Mk);
-    Ryy = sidCov(y, y, Mmax);          % (Mmax+1) cells, ny x ny per lag
+    Ryy = sidCov(y, y, Mmax);          % (Mmax+1 x ny x ny)
 
     if ~isTimeSeries
-        Ruu = sidCov(u, u, Mmax);
-        Ryu = sidCov(y, u, Mmax);
-        Ruy = sidCov(u, y, Mmax);              % for negative lags of cross-cov
+        Ruu = sidCov(u, u, Mmax);      % (Mmax+1 x nu x nu)
+        Ryu = sidCov(y, u, Mmax);      % (Mmax+1 x ny x nu)
+        Ruy = sidCov(u, y, Mmax);      % (Mmax+1 x nu x ny) negative lags
     end
 
-    % ---- Per-frequency computation ----
+    % ---- Per-frequency spectral estimation (SPEC.md §5.2) ----
     % Determine signal dimensions for output pre-allocation
     isSISO = (ny == 1 && nu == 1 && ~isTimeSeries);
 
@@ -193,7 +194,7 @@ function result = sidFreqBTFDR(y, u, varargin)
             PhiY_k = singleFreqDFT(Ryy_k, W, freqs(kk), ny, ny);
             PhiV(kk, :, :) = real(PhiY_k);
 
-            % Uncertainty: Var{Phi_y} = (2*C_W/N) * Phi_y^2
+            % Var{Phi_y} = (2*C_W/N) * Phi_y^2 (SPEC.md §5.3)
             CW = W(1)^2 + 2 * sum(W(2:end).^2);
             PhiVStd(kk, :, :) = sqrt(2 * CW / Neff) * abs(PhiY_k);
         end
@@ -236,7 +237,7 @@ function result = sidFreqBTFDR(y, u, varargin)
             PhiU_k = PhiUall(kk);
             PhiYU_k = PhiYUall(kk);
 
-            % Transfer function
+            % G(w_k) = Phi_yu(w_k) / Phi_u(w_k) (SPEC.md §5.2)
             if abs(PhiU_k) < epsReg * PhiUmax
                 G(kk) = NaN + 1j*NaN;
                 PhiV(kk) = real(PhiY_k);
@@ -247,7 +248,7 @@ function result = sidFreqBTFDR(y, u, varargin)
                 PhiV(kk) = max(real(PhiY_k) - abs(PhiYU_k)^2 / real(PhiU_k), 0);
                 Coh(kk) = min(max(abs(PhiYU_k)^2 / (real(PhiY_k) * real(PhiU_k)), 0), 1);
 
-                % Uncertainty with local window norm
+                % Uncertainty with local window norm (SPEC.md §5.3)
                 CW = W(1)^2 + 2 * sum(W(2:end).^2);
                 cohSafe = max(Coh(kk), epsReg);
                 GStd(kk) = sqrt((CW / Neff) * abs(G(kk))^2 * (1 - cohSafe) / cohSafe);
@@ -259,9 +260,9 @@ function result = sidFreqBTFDR(y, u, varargin)
         end
 
     else
-        % MIMO
-        G = zeros(nf, ny, nu);
-        PhiV = zeros(nf, ny, ny);
+        % MIMO: G(w_k) = Phi_yu(w_k) * Phi_u(w_k)^{-1} (SPEC.md §5.2)
+        G = zeros(nf, ny, nu);          % (nf x ny x nu) complex
+        PhiV = zeros(nf, ny, ny);       % (nf x ny x ny) noise spectrum
         GStd = nan(nf, ny, nu);
         PhiVStd = zeros(nf, ny, ny);
         Coh = [];
@@ -280,10 +281,11 @@ function result = sidFreqBTFDR(y, u, varargin)
             PhiYU_k = singleFreqDFT(Ryu_k, W, freqs(kk), ny, nu, Ruy_k);
 
             G(kk, :, :) = PhiYU_k / PhiU_k;
+            % Phi_v = Phi_y - Phi_yu * Phi_u^{-1} * Phi_uy
             PhiV_k = PhiY_k - PhiYU_k / PhiU_k * PhiYU_k';
             PhiV(kk, :, :) = real(PhiV_k);
 
-            % Noise uncertainty
+            % Noise uncertainty (SPEC.md §5.3)
             CW = W(1)^2 + 2 * sum(W(2:end).^2);
             PhiVStd(kk, :, :) = sqrt(2 * CW / Neff) * abs(PhiV_k);
         end

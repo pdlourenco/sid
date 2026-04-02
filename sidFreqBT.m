@@ -105,20 +105,22 @@ function result = sidFreqBT(y, u, varargin)
     nf = length(freqs);
     useFFT = isempty(varargin) || isDefaultFreqs(freqs, nf);
 
-    % ---- Compute covariances ----
-    Ryy = sidCov(y, y, M);                       % (M+1) x ny x ny
+    % ---- Compute biased sample covariances (SPEC.md §2.3) ----
+    % Ryy corresponds to R-hat_yy(tau) for lags tau = 0..M
+    Ryy = sidCov(y, y, M);                       % (M+1 x ny x ny)
 
     if ~isTimeSeries
         nu = size(u, 2);
-        Ruu = sidCov(u, u, M);                   % (M+1) x nu x nu
-        Ryu = sidCov(y, u, M);                   % (M+1) x ny x nu
-        Ruy = sidCov(u, y, M);                   % (M+1) x nu x ny — for negative lags
+        Ruu = sidCov(u, u, M);                   % (M+1 x nu x nu)
+        Ryu = sidCov(y, u, M);                   % (M+1 x ny x nu)
+        Ruy = sidCov(u, y, M);                   % (M+1 x nu x ny) negative lags
     end
 
-    % ---- Window ----
-    W = sidHannWin(M);                            % (M+1) x 1, for lags 0..M
+    % ---- Hann lag window (SPEC.md §2.2) ----
+    W = sidHannWin(M);                            % (M+1 x 1) for lags 0..M
 
-    % ---- Spectral estimates ----
+    % ---- Windowed DFT: covariances -> spectral estimates (SPEC.md §2.4) ----
+    % Phi_y(w) = sum_{tau} W(tau) * R_yy(tau) * e^{-jw*tau}
     PhiY = sidWindowedDFT(Ryy, W, freqs, useFFT, Ryy); % (nf x ny x ny)
 
     if ~isTimeSeries
@@ -126,20 +128,22 @@ function result = sidFreqBT(y, u, varargin)
         PhiYU = sidWindowedDFT(Ryu, W, freqs, useFFT, Ruy); % (nf x ny x nu)
     end
 
-    % ---- Form transfer function and noise spectrum ----
+    % ---- Form transfer function and noise spectrum (SPEC.md §2.4) ----
     if isTimeSeries
         G = [];
         PhiV = real(PhiY);
         Coh = [];
     elseif ny == 1 && nu == 1
-        % SISO
+        % SISO: G(w) = Phi_yu(w) / Phi_u(w)
         G = PhiYU ./ PhiU;
+        % Phi_v(w) = Phi_y(w) - |Phi_yu(w)|^2 / Phi_u(w)
         PhiV = real(PhiY) - abs(PhiYU).^2 ./ real(PhiU);
         PhiV = max(PhiV, 0);
+        % gamma^2(w) = |Phi_yu|^2 / (Phi_y * Phi_u) — squared coherence
         Coh = abs(PhiYU).^2 ./ (real(PhiY) .* real(PhiU));
         Coh = min(max(Coh, 0), 1);
     else
-        % MIMO
+        % MIMO: G(w) = Phi_yu(w) * Phi_u(w)^{-1} (SPEC.md §3.2)
         G = zeros(nf, ny, nu);
         PhiV = zeros(nf, ny, ny);
         for k = 1:nf
@@ -147,13 +151,14 @@ function result = sidFreqBT(y, u, varargin)
             PhiYU_k = reshape(PhiYU(k, :, :), ny, nu);
             PhiY_k = reshape(PhiY(k, :, :), ny, ny);
             G(k, :, :) = PhiYU_k / PhiU_k;
+            % Phi_v(w) = Phi_y(w) - Phi_yu(w) * Phi_u(w)^{-1} * Phi_uy(w)
             PhiV(k, :, :) = PhiY_k - PhiYU_k / PhiU_k * PhiYU_k';
         end
         PhiV = real(PhiV);
         Coh = [];
     end
 
-    % ---- Uncertainty ----
+    % ---- Asymptotic uncertainty (SPEC.md §3) ----
     if isTimeSeries
         [~, PhiVStd] = sidUncertainty([], PhiV, [], N, W, nTraj);
         GStd = [];

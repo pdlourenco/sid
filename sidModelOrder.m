@@ -142,10 +142,9 @@ function [n, sv] = sidModelOrder(result, varargin)
     freqs = result.Frequency;
     nf = size(G, 1);
 
-    % ---- Compute impulse response via IFFT ----
-    % The Response is evaluated at nf frequencies in (0, pi].
+    % ---- Compute impulse response via IFFT (SPEC.md §8.13) ----
+    % Markov parameters g(k) = H A^{k-1} B from inverse FFT of G(w).
     % Build conjugate-symmetric full-circle spectrum for real impulse response.
-    % Assume linearly spaced frequencies: w = (1:nf) * pi/nf.
 
     % Construct full-circle spectrum: [G(0); G(w1); ...; G(pi); conj(G(pi-1)); ...; conj(G(w1))]
     % Approximate G(0) = real(G(w1)) (DC gain approximation)
@@ -192,9 +191,8 @@ function [n, sv] = sidModelOrder(result, varargin)
 
     r = horizon;
 
-    % ---- Build block Hankel matrix ----
-    % H_hankel is (r*ny) x (r*nu)
-    % H_hankel(i,j) block = g(i+j-1), for block indices i,j = 1..r
+    % ---- Build block Hankel matrix (SPEC.md §8.13) ----
+    % H{i,j} = g(i+j-1) for block indices i,j = 1..r, size (r*ny x r*nu)
     H_hankel = zeros(r * ny, r * nu);
 
     for bi = 1:r
@@ -214,7 +212,7 @@ function [n, sv] = sidModelOrder(result, varargin)
     % Remove near-zero singular values that are just numerical noise
     nSigma = length(sigmas);
 
-    % ---- Detect model order ----
+    % ---- Detect model order via gap/threshold method (SPEC.md §8.13) ----
     if ~isempty(threshold)
         % Threshold method: count sigma_k / sigma_1 > tau
         if sigmas(1) < eps

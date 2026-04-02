@@ -59,7 +59,9 @@ function [C, Lbd] = sidLTVcosmicSolve(S, T, lambda, N, p, q)
     C   = zeros(d, p, N);
     I   = eye(d);
 
-    % Forward pass
+    % ---- Forward pass: Schur complement recursion (SPEC.md §8.3.4) ----
+    % Lbd(k) = S(k) - lambda(k-1)^2 * Lbd(k-1)^{-1}
+    % Y(k) = Lbd(k)^{-1} * (T(k) + lambda(k-1) * Y(k-1))
     Lbd(:, :, 1) = S(:, :, 1);
     Y(:, :, 1)   = Lbd(:, :, 1) \ T(:, :, 1);
 
@@ -68,7 +70,8 @@ function [C, Lbd] = sidLTVcosmicSolve(S, T, lambda, N, p, q)
         Y(:, :, k)   = Lbd(:, :, k) \ (T(:, :, k) + lambda(k-1) * Y(:, :, k-1));
     end
 
-    % Backward pass
+    % ---- Backward pass (SPEC.md §8.3.4) ----
+    % C(k) = Y(k) + lambda(k) * Lbd(k)^{-1} * C(k+1)
     C(:, :, N) = Y(:, :, N);
 
     for k = N-1:-1:1

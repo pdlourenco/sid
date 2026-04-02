@@ -109,11 +109,10 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
      N, n, py, q, L] = parseInputs(Y, U, H, varargin{:});
 
     % ---- Precompute ----
-    Rinv = R \ eye(py);
+    Rinv = R \ eye(py);               % (py x py) observation precision
 
-    % ---- Full-rank fast path ----
-    % When H has full column rank the state is exactly recoverable
-    % via weighted least squares, so the EM loop is unnecessary.
+    % ---- Full-rank fast path (SPEC.md §8.12.2) ----
+    % When rank(H) = n, state is recoverable via weighted LS — no EM needed.
     if rank(H) == n
         Hpinv = (H' * Rinv * H) \ (H' * Rinv);
         X_hat = zeros(N + 1, n, L);
@@ -132,7 +131,7 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
         return;
     end
 
-    % ---- LTI Initialisation ----
+    % ---- LTI Initialisation (SPEC.md §8.12.4) ----
     % Estimate constant dynamics (A0, B0) from the I/O transfer function
     % via Ho-Kalman realization. This gives an observable initialisation
     % for any H (including py < n).
@@ -141,7 +140,7 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
     B = repmat(B0, [1, 1, N]);
     A0_rep = repmat(A0, [1, 1, N]);  % trust-region target
 
-    % ---- Alternating minimisation (E-step first) ----
+    % ---- Alternating state-COSMIC loop (SPEC.md §8.12.3) ----
     mu_current = doTrustRegion * mu;
     costHistory = [];
     nIter = 0;

@@ -84,9 +84,9 @@ function X_hat = sidLTVStateEst(Y, U, A, B, H, varargin)
         end
     end
 
-    % ---- Build block tridiagonal system (shared across trajectories) ----
-    % Diagonal blocks S{k} and off-diagonal blocks Uc{k} are the same
-    % for all trajectories. Only the RHS differs per trajectory.
+    % ---- Build block tridiagonal system (SPEC.md §8.14) ----
+    % Diagonal blocks S_k and off-diagonal U_k define the RTS smoother
+    % equations. Shared across trajectories — only the RHS differs.
     S_blk  = cell(K, 1);
     Uc_blk = cell(K - 1, 1);
 

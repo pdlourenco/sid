@@ -130,14 +130,14 @@ function result = sidLTVdisc(X, U, varargin)
      noiseCov, covMode, N, p, q, L, isVarLen, horizons] = ...
         parseInputs(X, U, varargin{:});
 
-    % ---- Build data matrices ----
+    % ---- Build data matrices (SPEC.md §8.3.2) ----
     if isVarLen
         [D, Xl] = sidLTVbuildDataMatricesVarLen(X, U, N, p, q, L, horizons);
     else
         [D, Xl] = sidLTVbuildDataMatrices(X, U, N, p, q, L);
     end
 
-    % ---- Lambda selection ----
+    % ---- Lambda selection (SPEC.md §8.4) ----
     if ischar(lambda) && strcmpi(lambda, 'auto')
         lambda = lcurveLambda(D, Xl, N, p, q, doPrecondition);
     end
@@ -146,7 +146,7 @@ function result = sidLTVdisc(X, U, varargin)
         lambda = lambda * ones(N - 1, 1);
     end
 
-    % ---- Build block diagonal terms ----
+    % ---- Build block tridiagonal terms S_kk, Theta_k (SPEC.md §8.3.3) ----
     [S, T] = sidLTVbuildBlockTerms(D, Xl, lambda, N, p, q);
 
     % ---- Preconditioning ----
@@ -154,10 +154,10 @@ function result = sidLTVdisc(X, U, varargin)
         [S, T, lambda] = precondition(S, T, lambda, N, p, q);
     end
 
-    % ---- COSMIC forward-backward pass ----
+    % ---- COSMIC forward-backward pass (SPEC.md §8.3.4) ----
     [C, Lbd] = sidLTVcosmicSolve(S, T, lambda, N, p, q);
 
-    % ---- Extract A(k), B(k) ----
+    % ---- Extract A(k), B(k) from C(k) = [A(k)'; B(k)'] (SPEC.md §8.3) ----
     A = permute(C(1:p, :, :), [2 1 3]);       % (p x p x N)
     B = permute(C(p+1:end, :, :), [2 1 3]);   % (p x q x N)
 
@@ -177,14 +177,13 @@ function result = sidLTVdisc(X, U, varargin)
     result.Preconditioned  = doPrecondition;
     result.Method          = 'sidLTVdisc';
 
-    % ---- Uncertainty (Phase 8b) ----
+    % ---- Bayesian uncertainty estimation (SPEC.md §8.9) ----
     if doUncertainty
         d = p + q;
 
-        % Compute P(k) = [A_unscaled^{-1}]_{kk} using the unscaled Hessian.
-        % COSMIC normalizes data by 1/sqrt(N), so the scaled Hessian uses
-        % D_s'D_s = D'D/N. The posterior Cov(vec(C(k))) = Sigma x P(k)
-        % requires the unscaled Hessian where D'D appears without the 1/N.
+        % P(k) = diagonal block of H^{-1} where H is the unscaled Hessian.
+        % Cov(vec(C(k))) = Sigma kron P(k) (SPEC.md §8.9.2)
+        % COSMIC scales data by 1/sqrt(N), so we use the unscaled Hessian.
         P = sidLTVuncertaintyBackwardPass(S, lambda, N, d);
 
         % Noise covariance

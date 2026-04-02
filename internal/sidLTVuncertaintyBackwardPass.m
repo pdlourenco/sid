@@ -61,7 +61,8 @@ function P = sidLTVuncertaintyBackwardPass(S_scaled, lambda, N, d)
 
     I = eye(d);
 
-    % ---- Reconstruct unscaled diagonal blocks S_u(k) = N*DtD(k) + reg(k) ----
+    % ---- Reconstruct unscaled Hessian diagonal blocks (SPEC.md §8.9.2) ----
+    % S_u(k) = N * D'D(k) + reg(k), undoing the 1/sqrt(N) data scaling
     S = zeros(d, d, N);
     for k = 1:N
         if k == 1
@@ -75,21 +76,21 @@ function P = sidLTVuncertaintyBackwardPass(S_scaled, lambda, N, d)
         S(:, :, k) = N * DtD_scaled + reg;
     end
 
-    % ---- Left Schur complements (forward) ----
+    % ---- Left Schur complements — forward pass (SPEC.md §8.9.3) ----
     LbdL = zeros(d, d, N);
     LbdL(:, :, 1) = S(:, :, 1);
     for k = 2:N
         LbdL(:, :, k) = S(:, :, k) - lambda(k-1)^2 * (LbdL(:, :, k-1) \ I);
     end
 
-    % ---- Right Schur complements (backward) ----
+    % ---- Right Schur complements — backward pass (SPEC.md §8.9.3) ----
     LbdR = zeros(d, d, N);
     LbdR(:, :, N) = S(:, :, N);
     for k = N-1:-1:1
         LbdR(:, :, k) = S(:, :, k) - lambda(k)^2 * (LbdR(:, :, k+1) \ I);
     end
 
-    % ---- Combine: P(k) = (LbdL(k) + LbdR(k) - S(k))^{-1} ----
+    % ---- Combine: P(k) = (LbdL(k) + LbdR(k) - S(k))^{-1} (SPEC.md §8.9.3) ----
     P = zeros(d, d, N);
     for k = 1:N
         M = LbdL(:, :, k) + LbdR(:, :, k) - S(:, :, k);

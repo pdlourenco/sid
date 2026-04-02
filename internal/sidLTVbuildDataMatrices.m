@@ -43,9 +43,11 @@ function [D, Xl] = sidLTVbuildDataMatrices(X, U, N, p, q, L)
 %   https://github.com/pdlourenco/sid-matlab
 %  -----------------------------------------------------------------------
 
+    % D(k) = [X(k); U(k)]' / sqrt(N), Xl(k) = X(k+1)' / sqrt(N) (SPEC.md §8.3.2)
+    % The 1/sqrt(N) scaling makes the normal equations independent of N.
     sqrtN = sqrt(N);
-    D  = zeros(L, p + q, N);
-    Xl = zeros(L, p, N);
+    D  = zeros(L, p + q, N);  % (L x d x N) data matrices
+    Xl = zeros(L, p, N);      % (L x p x N) next-state matrices
 
     for k = 0:N-1
         D(:, :, k+1)  = [reshape(X(k+1, :, :), p, L)', ...

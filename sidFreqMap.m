@@ -191,7 +191,8 @@ function result = sidFreqMap(y, u, varargin)
         M = [];  % not applicable for Welch
     end
 
-    % ---- Outer segmentation ----
+    % ---- Outer segmentation (SPEC.md §6.2) ----
+    % K = floor((N - L) / step) + 1 segments, stride = L - P
     step = L - P;
     K = floor((N - L) / step) + 1;
     if K < 1
@@ -250,7 +251,7 @@ function result = sidFreqMap(y, u, varargin)
     % ---- Store first segment ----
     storeSegment(1, r1);
 
-    % ---- Loop over remaining segments ----
+    % ---- Loop over remaining segments (SPEC.md §6.3) ----
     for k = 2:K
         startIdx = (k - 1) * step + 1;
         endIdx   = startIdx + L - 1;
@@ -277,7 +278,8 @@ function result = sidFreqMap(y, u, varargin)
         storeSegment(k, rk);
     end
 
-    % ---- Time vector ----
+    % ---- Time vector (SPEC.md §6.2) ----
+    % t_k = (k * step + L/2) * Ts — center of each segment
     timeVec = ((0:K-1)' * step + L / 2) * Ts;
 
     % ---- Pack result ----

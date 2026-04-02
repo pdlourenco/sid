@@ -135,14 +135,15 @@ function result = sidFreqETFE(y, u, varargin)
         error('sid:badFreqs', 'Frequencies must be in the range (0, pi] rad/sample.');
     end
 
-    % ---- Compute DFTs and ensemble-average cross-periodograms ----
+    % ---- Compute DFTs (SPEC.md §4.1) ----
+    % Y(w) = sum_{n=1}^{N} y(n) e^{-jwn}, U(w) analogously
     if nTraj == 1
         Ydft = sidDFT(y, freqs, useFFT);    % (nf x ny)
         if ~isTimeSeries
-            Udft = sidDFT(u, freqs, useFFT);  % (nf x nu)
+            Udft = sidDFT(u, freqs, useFFT); % (nf x nu)
         end
     else
-        % Multi-trajectory: average cross-periodograms before forming ratios
+        % Multi-trajectory H1 estimator: G = sum_l Y_l / sum_l U_l
         Ydft = sidDFT(y(:, :, 1), freqs, useFFT);
         if ~isTimeSeries
             Udft = sidDFT(u(:, :, 1), freqs, useFFT);
@@ -158,10 +159,9 @@ function result = sidFreqETFE(y, u, varargin)
         % The periodogram scaling (1/N) is applied per original convention.
     end
 
-    % ---- Form transfer function and noise spectrum ----
+    % ---- Form transfer function and noise spectrum (SPEC.md §4.2-4.3) ----
     if isTimeSeries
-        % Periodogram: Phi_y(w) = (1/(N*L)) * |sum_l Y_l(w)|^2 / L
-        % Ensemble average of per-trajectory periodograms:
+        % Periodogram: Phi_y(w) = (1/L) * sum_l (1/N) |Y_l(w)|^2
         G = [];
         if nTraj == 1
             if ny == 1
@@ -198,7 +198,7 @@ function result = sidFreqETFE(y, u, varargin)
         Coh = [];
 
     elseif ny == 1 && nu == 1
-        % SISO ETFE
+        % SISO: G(w) = Y(w) / U(w) (SPEC.md §4.2)
         epsReg = 1e-10;
         Uabs = abs(Udft);
         Umax = max(Uabs);
@@ -224,7 +224,7 @@ function result = sidFreqETFE(y, u, varargin)
         Coh = [];
 
     else
-        % MIMO ETFE
+        % MIMO: G(w) = Y(w) * U(w)^H * (U(w)^H * U(w))^{-1} (SPEC.md §4.2)
         G = zeros(nf, ny, nu);
         PhiV = zeros(nf, ny, ny);
         epsReg = 1e-10;
@@ -278,9 +278,8 @@ function result = sidFreqETFE(y, u, varargin)
         Coh = [];
     end
 
-    % ---- Uncertainty ----
-    % ETFE has no simple asymptotic uncertainty formula.
-    % Return NaN arrays to indicate uncertainty is not available.
+    % ---- Uncertainty (SPEC.md §4.4) ----
+    % ETFE has no closed-form asymptotic variance — return NaN.
     if isTimeSeries
         GStd = [];
         PhiVStd = nan(size(PhiV));

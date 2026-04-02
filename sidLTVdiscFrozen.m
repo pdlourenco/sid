@@ -113,7 +113,8 @@ function result = sidLTVdiscFrozen(ltvResult, varargin)
             'TimeSteps must be in range [1, %d].', N);
     end
 
-    % ---- Compute frozen transfer function ----
+    % ---- Compute frozen transfer function (SPEC.md §8.6) ----
+    % G(w, k) = (e^{jw} I - A(k))^{-1} B(k)
     G    = zeros(nf, p, q, nk);
     GStd = [];
     if hasUncertainty
@@ -129,7 +130,8 @@ function result = sidLTVdiscFrozen(ltvResult, varargin)
 
         for iw = 1:nf
             z = exp(1i * w(iw));
-            R = (z * Ip - Ak) \ Ip;   % (zI - A)^{-1}, size (p x p)
+            % R = (zI - A(k))^{-1}
+            R = (z * Ip - Ak) \ Ip;   % (p x p)
             Gk = R * Bk;              % (p x q)
             G(iw, :, :, ik) = Gk;
         end
@@ -145,18 +147,12 @@ function result = sidLTVdiscFrozen(ltvResult, varargin)
                 R = (z * Ip - Ak) \ Ip;    % (p x p)
                 Gk = R * Bk;               % (p x q)
 
-                % First-order uncertainty propagation:
-                % dG/dA_{ij} = R * E_{ij} * R * B  (where E_{ij} is unit matrix)
-                % dG/dB_{ij} = R * E_{ij}
+                % First-order uncertainty propagation (SPEC.md §8.6):
+                % Cov(vec(C(k))) = Sigma kron P(k), so
+                % Var(G_{ab}) = sum_{r,j} |dG_{ab}/dC_{rj}|^2 * Sigma_{jj} * P_{rr}
                 %
-                % Var(G_{ab}) = sum over source entries via Kronecker structure.
-                % For each output b (column of C(k)):
-                %   Var(G_{ab}) = sum_j Sigma_{jj} * [sum over row-covariance terms]
-                %
-                % Using the Kronecker structure Cov(vec(C(k))) = Sigma x P(k):
-                %   Var(G_{ab}) ~ sum_j sigma_j^2 * sum_r P_{rr} * |J_{ab,rj}|^2
-                %
-                % For computational efficiency, use the diagonal approximation:
+                % Jacobians: dG_{ab}/dA_{ji} = R_{aj} * (R*B)_{ib}
+                %            dG_{ab}/dB_{ji} = R_{aj} * delta_{ib}
                 varG = zeros(p, q);
                 for b = 1:q
                     for a = 1:p

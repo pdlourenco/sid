@@ -141,7 +141,8 @@ function result = sidSpectrogram(x, varargin)
     % ---- Build window vector ----
     w = buildWindow(opts.Window, L);
 
-    % ---- Segmentation ----
+    % ---- Segmentation (SPEC.md §7.2) ----
+    % K = floor((N - L) / step) + 1 segments, stride = L - P
     step = L - P;
     K = floor((N - L) / step) + 1;
     if K < 1
@@ -151,13 +152,14 @@ function result = sidSpectrogram(x, varargin)
 
     Fs = 1 / Ts;
     nBins = floor(nfft / 2) + 1;
-    S1 = sum(w .^ 2);  % window power normalization
+    % S1 = sum(w^2) — window power normalization for PSD scaling
+    S1 = sum(w .^ 2);
 
     % ---- Pre-allocate ----
-    stftCoeffs = zeros(nBins, K, nCh);
-    Pxx = zeros(nBins, K, nCh);
+    stftCoeffs = zeros(nBins, K, nCh);  % (nBins x K x nCh) complex STFT
+    Pxx = zeros(nBins, K, nCh);         % (nBins x K x nCh) one-sided PSD
 
-    % ---- Compute STFT ----
+    % ---- Compute STFT (SPEC.md §7.2-7.3) ----
     for ch = 1:nCh
         for k = 1:K
             startIdx = (k - 1) * step + 1;
@@ -174,9 +176,9 @@ function result = sidSpectrogram(x, varargin)
                 X = X(1:nBins);
                 XSum = XSum + X;
 
-                % One-sided PSD for this trajectory
+                % One-sided PSD: P(w) = (1 / (Fs * S1)) * |X(w)|^2
                 Pk = (1 / (Fs * S1)) * abs(X) .^ 2;
-                % Double positive-frequency bins (not DC or Nyquist)
+                % Double positive-frequency bins for one-sided spectrum
                 if mod(nfft, 2) == 0
                     Pk(2:end-1) = 2 * Pk(2:end-1);
                 else
@@ -185,6 +187,7 @@ function result = sidSpectrogram(x, varargin)
                 PkSum = PkSum + Pk;
             end
 
+            % Ensemble-average across trajectories
             stftCoeffs(:, k, ch) = XSum / nTrajS;
             Pxx(:, k, ch) = PkSum / nTrajS;
         end
