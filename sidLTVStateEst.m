@@ -15,8 +15,11 @@ function X_hat = sidLTVStateEst(Y, U, A, B, H, varargin)
 %   O(N n^3) per trajectory.
 %
 %   INPUTS:
-%     Y - Output data, (N+1 x py) or (N+1 x py x L).
-%     U - Input data, (N x q) or (N x q x L).
+%     Y - Output data, (N+1 x py), (N+1 x py x L), or cell array {L x 1}
+%         where Y{l} is (N_l+1 x py). Cell arrays allow variable-length
+%         trajectories.
+%     U - Input data, (N x q), (N x q x L), or cell array {L x 1}
+%         where U{l} is (N_l x q). Must match Y format.
 %     A - Dynamics matrices, (n x n x N).
 %     B - Input matrices, (n x q x N).
 %     H - Observation matrix, (py x n).
@@ -26,7 +29,8 @@ function X_hat = sidLTVStateEst(Y, U, A, B, H, varargin)
 %     'Q' - Process noise covariance, (n x n) SPD. Default: eye(n).
 %
 %   OUTPUTS:
-%     X_hat - Estimated states, (N+1 x n x L).
+%     X_hat - Estimated states, (N+1 x n x L) or cell {L x 1} where
+%             X_hat{l} is (N_l+1 x n). Cell output when Y is a cell.
 %
 %   EXAMPLES:
 %     % State estimation with known dynamics
@@ -62,7 +66,8 @@ function X_hat = sidLTVStateEst(Y, U, A, B, H, varargin)
 %  -----------------------------------------------------------------------
 
     % ---- Parse inputs ----
-    [Y, U, A, B, H, R, Q, N, n, py, q, L] = parseInputs(Y, U, A, B, H, varargin{:});
+    [Y, U, A, B, H, R, Q, N, n, py, q, L, isVarLen, horizons] = ...
+        parseInputs(Y, U, A, B, H, varargin{:});
 
     % ---- Precompute ----
     Rinv = R \ eye(py);
@@ -73,68 +78,91 @@ function X_hat = sidLTVStateEst(Y, U, A, B, H, varargin)
     % Number of blocks: K = N+1 (spec indices 0..N)
     K = N + 1;
 
-    % ---- Precompute b(k) = B(k) u_l(k) for each trajectory ----
-    % b{j, l} = B(:,:,j) * U(j,:,l)', j=1..N, l=1..L
-    % (store in 3D array for efficiency)
-    b_all = zeros(n, L, N);
-    for j = 1:N
-        Bj = B(:, :, j);
-        for l = 1:L
-            b_all(:, l, j) = Bj * U(j, :, l)';
-        end
-    end
-
     % ---- Build block tridiagonal system (SPEC.md §8.14) ----
     % Diagonal blocks S_k and off-diagonal U_k define the RTS smoother
     % equations. Shared across trajectories — only the RHS differs.
+    % For variable-length trajectories, precompute all K blocks; each
+    % trajectory uses only its first N_l+1 blocks.
     S_blk  = cell(K, 1);
     Uc_blk = cell(K - 1, 1);
 
-    % Diagonal blocks (spec k=0..N, MATLAB j=1..K)
-    % j=1 (spec k=0): S_0 = H'R^{-1}H + A(0)'Q^{-1}A(0)
-    S_blk{1} = HtRinvH + A(:,:,1)' * Qinv * A(:,:,1);
-
-    % j=2..N (spec k=1..N-1): S_k = H'R^{-1}H + Q^{-1} + A(k)'Q^{-1}A(k)
-    for j = 2:N
-        S_blk{j} = HtRinvH + Qinv + A(:,:,j)' * Qinv * A(:,:,j);
+    AtQinv = zeros(n, n, N);
+    for j = 1:N
+        AtQinv(:, :, j) = A(:,:,j)' * Qinv;
     end
 
-    % j=K (spec k=N): S_N = H'R^{-1}H + Q^{-1}
+    % Diagonal blocks (spec k=0..N, MATLAB j=1..K)
+    S_blk{1} = HtRinvH + AtQinv(:,:,1) * A(:,:,1);
+    for j = 2:N
+        S_blk{j} = HtRinvH + Qinv + AtQinv(:,:,j) * A(:,:,j);
+    end
     S_blk{K} = HtRinvH + Qinv;
 
     % Off-diagonal blocks (spec k=0..N-1, MATLAB j=1..N)
-    % U_k = -A(k)' Q^{-1}
     for j = 1:N
-        Uc_blk{j} = -A(:,:,j)' * Qinv;
+        Uc_blk{j} = -AtQinv(:,:,j);
     end
 
     % ---- Solve per trajectory ----
-    X_hat = zeros(K, n, L);
+    if isVarLen
+        X_hat = cell(L, 1);
+    else
+        X_hat = zeros(K, n, L);
+    end
 
     for l = 1:L
-        % Build RHS Theta{k} for trajectory l
-        Theta = cell(K, 1);
-
-        % j=1 (spec k=0): Theta_0 = H'R^{-1}y(0) - A(0)'Q^{-1}b(0)
-        Theta{1} = HtRinv * Y(1, :, l)' - A(:,:,1)' * Qinv * b_all(:, l, 1);
-
-        % j=2..N (spec k=1..N-1):
-        % Theta_k = H'R^{-1}y(k) + Q^{-1}b(k-1) - A(k)'Q^{-1}b(k)
-        for j = 2:N
-            Theta{j} = HtRinv * Y(j, :, l)' ...
-                + Qinv * b_all(:, l, j-1) ...
-                - A(:,:,j)' * Qinv * b_all(:, l, j);
+        if isVarLen
+            Nl = horizons(l);
+            Kl = Nl + 1;
+            Yl = Y{l};
+            Ul = U{l};
+        else
+            Nl = N;
+            Kl = K;
+            Yl = Y(:, :, l);
+            Ul = U(:, :, l);
         end
 
-        % j=K (spec k=N): Theta_N = H'R^{-1}y(N) + Q^{-1}b(N-1)
-        Theta{K} = HtRinv * Y(K, :, l)' + Qinv * b_all(:, l, N);
+        % Build RHS Theta{k} for trajectory l
+        Theta = cell(Kl, 1);
 
-        % Solve
-        [w, ~] = sidLTVblkTriSolve(S_blk, Uc_blk, Theta);
+        % Precompute b(j) = B(j) * u_l(j) for j=1..Nl
+        b_prev = [];
+        b_curr = B(:,:,1) * Ul(1, :)';
+
+        % j=1 (spec k=0): Theta_0 = H'R^{-1}y(0) - A(0)'Q^{-1}b(0)
+        Theta{1} = HtRinv * Yl(1, :)' - AtQinv(:,:,1) * b_curr;
+
+        % j=2..Nl (spec k=1..Nl-1)
+        for j = 2:Nl
+            b_prev = b_curr;
+            b_curr = B(:,:,j) * Ul(j, :)';
+            Theta{j} = HtRinv * Yl(j, :)' ...
+                + Qinv * b_prev ...
+                - AtQinv(:,:,j) * b_curr;
+        end
+
+        % j=Kl (spec k=Nl): Theta_Nl = H'R^{-1}y(Nl) + Q^{-1}b(Nl-1)
+        Theta{Kl} = HtRinv * Yl(Kl, :)' + Qinv * b_curr;
+
+        % Solve (slice shared blocks to trajectory horizon)
+        if Kl == K
+            [w, ~] = sidLTVblkTriSolve(S_blk, Uc_blk, Theta);
+        else
+            [w, ~] = sidLTVblkTriSolve( ...
+                S_blk(1:Kl), Uc_blk(1:Nl), Theta);
+        end
 
         % Extract states
-        for j = 1:K
-            X_hat(j, :, l) = w{j}';
+        if isVarLen
+            X_hat{l} = zeros(Kl, n);
+            for j = 1:Kl
+                X_hat{l}(j, :) = w{j}';
+            end
+        else
+            for j = 1:Kl
+                X_hat(j, :, l) = w{j}';
+            end
         end
     end
 
@@ -144,46 +172,100 @@ end
 %  LOCAL FUNCTIONS
 % ========================================================================
 
-function [Y, U, A, B, H, R, Q, N, n, py, q, L] = parseInputs(Y, U, A, B, H, varargin)
+function [Y, U, A, B, H, R, Q, N, n, py, q, L, isVarLen, horizons] = ...
+    parseInputs(Y, U, A, B, H, varargin)
 % PARSEINPUTS Validate and parse inputs for sidLTVStateEst.
+%   Supports both 3D array input (uniform horizon) and cell array input
+%   (variable-length trajectories).
 
     py = size(H, 1);
     n  = size(H, 2);
     q  = size(B, 2);
     N  = size(A, 3);
 
-    % Ensure 3D
-    if ndims(Y) == 2  %#ok<ISMAT>
-        Y = reshape(Y, size(Y,1), size(Y,2), 1);
-    end
-    if ndims(U) == 2  %#ok<ISMAT>
-        U = reshape(U, size(U,1), size(U,2), 1);
-    end
-
-    L = size(Y, 3);
-
-    % Validate dimensions
-    if size(Y, 1) ~= N + 1
-        error('sid:dimMismatch', 'Y must have N+1=%d rows, got %d.', N+1, size(Y,1));
-    end
-    if size(Y, 2) ~= py
-        error('sid:dimMismatch', 'Y has %d columns but H has %d rows.', size(Y,2), py);
-    end
-    if size(U, 1) ~= N
-        error('sid:dimMismatch', 'U must have N=%d rows, got %d.', N, size(U,1));
-    end
-    if size(U, 2) ~= q
-        error('sid:dimMismatch', 'U has %d columns but B has %d columns.', size(U,2), q);
-    end
-    if size(U, 3) ~= L
-        error('sid:dimMismatch', 'U has %d trajectories but Y has %d.', size(U,3), L);
-    end
     if size(A, 1) ~= n || size(A, 2) ~= n
         error('sid:dimMismatch', 'A must be (%d x %d x N), got (%d x %d x %d).', ...
             n, n, size(A,1), size(A,2), size(A,3));
     end
     if size(B, 1) ~= n
         error('sid:dimMismatch', 'B must have %d rows (state dim), got %d.', n, size(B,1));
+    end
+
+    isVarLen = iscell(Y);
+
+    if isVarLen
+        % ---- Variable-length trajectory mode ----
+        if ~iscell(U)
+            error('sid:badInput', ...
+                'When Y is a cell array, U must also be a cell array.');
+        end
+        L = numel(Y);
+        if numel(U) ~= L
+            error('sid:dimMismatch', ...
+                'Y has %d trajectories but U has %d.', L, numel(U));
+        end
+        if L == 0
+            error('sid:badInput', 'Cell arrays must not be empty.');
+        end
+
+        horizons = zeros(L, 1);
+        for l = 1:L
+            if size(Y{l}, 2) ~= py
+                error('sid:dimMismatch', ...
+                    'Y{%d} has %d columns but H has %d rows.', ...
+                    l, size(Y{l}, 2), py);
+            end
+            if size(U{l}, 2) ~= q
+                error('sid:dimMismatch', ...
+                    'U{%d} has %d columns but B has %d.', ...
+                    l, size(U{l}, 2), q);
+            end
+            Nl = size(U{l}, 1);
+            if size(Y{l}, 1) ~= Nl + 1
+                error('sid:dimMismatch', ...
+                    'Y{%d} has %d rows but U{%d} has %d (need N_l+1 and N_l).', ...
+                    l, size(Y{l}, 1), l, Nl);
+            end
+            if Nl > N
+                error('sid:dimMismatch', ...
+                    'Trajectory %d has horizon %d > size(A,3)=%d.', ...
+                    l, Nl, N);
+            end
+            horizons(l) = Nl;
+        end
+    else
+        % ---- Uniform-horizon mode ----
+        horizons = [];
+
+        if ndims(Y) == 2  %#ok<ISMAT>
+            Y = reshape(Y, size(Y,1), size(Y,2), 1);
+        end
+        if ndims(U) == 2  %#ok<ISMAT>
+            U = reshape(U, size(U,1), size(U,2), 1);
+        end
+
+        L = size(Y, 3);
+
+        if size(Y, 1) ~= N + 1
+            error('sid:dimMismatch', ...
+                'Y must have N+1=%d rows, got %d.', N+1, size(Y,1));
+        end
+        if size(Y, 2) ~= py
+            error('sid:dimMismatch', ...
+                'Y has %d columns but H has %d rows.', size(Y,2), py);
+        end
+        if size(U, 1) ~= N
+            error('sid:dimMismatch', ...
+                'U must have N=%d rows, got %d.', N, size(U,1));
+        end
+        if size(U, 2) ~= q
+            error('sid:dimMismatch', ...
+                'U has %d columns but B has %d columns.', size(U,2), q);
+        end
+        if size(U, 3) ~= L
+            error('sid:dimMismatch', ...
+                'U has %d trajectories but Y has %d.', size(U,3), L);
+        end
     end
 
     % Parse name-value options

@@ -658,4 +658,177 @@ assert(errA < 0.01, ...
 fprintf('  Test 18 passed: tall H fast path (errA=%.4f, errX=%.2e).\n', ...
     errA, errX);
 
+%% Test 19: Cell input matches 3D for equal-length trajectories
+rng(1900);
+n = 2; q = 1; N = 40; L = 3;
+A_true = [0.9 0.1; -0.1 0.8];
+B_true = [0.5; 0.3];
+H_19 = eye(n);
+
+X19 = zeros(N + 1, n, L);
+U19 = randn(N, q, L);
+Y19 = zeros(N + 1, n, L);
+for l = 1:L
+    X19(1, :, l) = randn(1, n);
+    Y19(1, :, l) = X19(1, :, l);
+    for k = 1:N
+        X19(k + 1, :, l) = (A_true * X19(k, :, l)' ...
+            + B_true * U19(k, :, l)')';
+        Y19(k + 1, :, l) = X19(k + 1, :, l);
+    end
+end
+
+res_3d = sidLTVdiscIO(Y19, U19, H_19, 'Lambda', 1e4);
+
+% Build cell arrays with same data
+Y_cell = cell(L, 1);
+U_cell = cell(L, 1);
+for l = 1:L
+    Y_cell{l} = Y19(:, :, l);
+    U_cell{l} = U19(:, :, l);
+end
+res_cell = sidLTVdiscIO(Y_cell, U_cell, H_19, 'Lambda', 1e4);
+
+% Results should be identical
+errA = norm(res_cell.A(:) - res_3d.A(:));
+errB = norm(res_cell.B(:) - res_3d.B(:));
+assert(errA < 1e-8, 'Cell vs 3D: A mismatch %.2e', errA);
+assert(errB < 1e-8, 'Cell vs 3D: B mismatch %.2e', errB);
+assert(res_cell.Iterations == res_3d.Iterations, ...
+    'Cell vs 3D: iteration count mismatch');
+
+% X should be cell output matching 3D content
+assert(iscell(res_cell.X), 'Cell input should produce cell X output');
+for l = 1:L
+    errXl = norm(res_cell.X{l} - res_3d.X(:, :, l));
+    assert(errXl < 1e-8, 'Cell vs 3D: X{%d} mismatch %.2e', l, errXl);
+end
+fprintf('  Test 19 passed: cell input matches 3D (errA=%.2e).\n', errA);
+
+%% Test 20: Variable-length trajectories — fast path (rank(H) = n)
+rng(2000);
+n = 2; q = 1;
+A_true = [0.9 0.1; -0.1 0.8];
+B_true = [0.5; 0.3];
+H_20 = eye(n);
+horizons_20 = [60; 40; 50; 30];
+L = length(horizons_20);
+N = max(horizons_20);
+
+Y_cell = cell(L, 1);
+U_cell = cell(L, 1);
+X_cell = cell(L, 1);
+for l = 1:L
+    Nl = horizons_20(l);
+    U_cell{l} = randn(Nl, q);
+    X_cell{l} = zeros(Nl + 1, n);
+    X_cell{l}(1, :) = randn(1, n);
+    for k = 1:Nl
+        X_cell{l}(k + 1, :) = (A_true * X_cell{l}(k, :)' ...
+            + B_true * U_cell{l}(k, :)')';
+    end
+    Y_cell{l} = X_cell{l};  % H = I, noiseless
+end
+
+res_vl = sidLTVdiscIO(Y_cell, U_cell, H_20, 'Lambda', 1e4);
+
+assert(res_vl.Iterations == 0, ...
+    'VarLen fast path should have 0 iters, got %d', res_vl.Iterations);
+assert(iscell(res_vl.X), 'VarLen should return cell X');
+assert(isfield(res_vl, 'Horizons'), 'VarLen should have Horizons field');
+
+% State recovery should be exact for each trajectory
+for l = 1:L
+    errXl = norm(res_vl.X{l}(:) - X_cell{l}(:)) ...
+        / norm(X_cell{l}(:));
+    assert(errXl < 1e-10, ...
+        'VarLen fast path: X{%d} error %.2e', l, errXl);
+end
+
+A_mean = mean(res_vl.A, 3);
+errA = norm(A_mean - A_true, 'fro') / norm(A_true, 'fro');
+assert(errA < 0.01, 'VarLen fast path: A error %.4f', errA);
+fprintf('  Test 20 passed: varlen fast path (errA=%.4f).\n', errA);
+
+%% Test 21: Variable-length trajectories — EM path (rank(H) < n)
+rng(2100);
+n = 2; q = 1;
+A_true = [0.9 0.1; -0.1 0.8];
+B_true = [0.5; 0.3];
+H_21 = [1 0];  % partial obs: py=1 < n=2
+horizons_21 = [60; 40; 50; 30];
+L = length(horizons_21);
+N = max(horizons_21);
+
+Y_cell = cell(L, 1);
+U_cell = cell(L, 1);
+X_cell = cell(L, 1);
+for l = 1:L
+    Nl = horizons_21(l);
+    U_cell{l} = randn(Nl, q);
+    X_cell{l} = zeros(Nl + 1, n);
+    X_cell{l}(1, :) = randn(1, n);
+    for k = 1:Nl
+        X_cell{l}(k + 1, :) = (A_true * X_cell{l}(k, :)' ...
+            + B_true * U_cell{l}(k, :)')';
+    end
+    Y_cell{l} = X_cell{l} * H_21';
+end
+
+res_vl = sidLTVdiscIO(Y_cell, U_cell, H_21, 'Lambda', 1e4);
+
+assert(res_vl.Iterations > 0, 'EM path should iterate');
+assert(iscell(res_vl.X), 'VarLen should return cell X');
+
+% Cost should generally decrease (small numerical increases tolerated)
+costs = res_vl.Cost;
+assert(costs(end) < costs(1), ...
+    'Final cost %.4f should be less than initial %.4f', ...
+    costs(end), costs(1));
+
+% Measurements should be consistent with estimated states
+for l = 1:L
+    Nl = horizons_21(l);
+    Y_recon = res_vl.X{l} * H_21';
+    errY = norm(Y_recon - Y_cell{l}) / norm(Y_cell{l});
+    assert(errY < 0.1, ...
+        'VarLen EM: Y reconstruction error %.4f for traj %d', errY, l);
+end
+fprintf('  Test 21 passed: varlen EM path (%d iters, %d traj).\n', ...
+    res_vl.Iterations, L);
+
+%% Test 22: Trajectory trimming in sidLTIfreqIO
+rng(2200);
+n = 2; q = 1;
+A_true = [0.9 0.1; -0.1 0.8];
+B_true = [0.5; 0.3];
+H_22 = eye(n);
+horizons_22 = [100; 90; 80; 20; 95];
+L = length(horizons_22);
+
+Y_cell = cell(L, 1);
+U_cell = cell(L, 1);
+for l = 1:L
+    Nl = horizons_22(l);
+    U_cell{l} = randn(Nl, q);
+    x = zeros(Nl + 1, n);
+    x(1, :) = randn(1, n);
+    for k = 1:Nl
+        x(k + 1, :) = (A_true * x(k, :)' + B_true * U_cell{l}(k, :)')';
+    end
+    Y_cell{l} = x * H_22';
+end
+
+% Traj 4 (horizon=20) is < 2/3*100=67, should be discarded
+[A0, B0] = sidLTIfreqIO(Y_cell, U_cell, H_22);
+
+assert(isequal(size(A0), [n, n]), 'A0 should be %dx%d', n, n);
+assert(isequal(size(B0), [n, q]), 'B0 should be %dx%d', n, q);
+
+% Check that the LTI estimate is reasonable
+eig_err = max(abs(sort(abs(eig(A0))) - sort(abs(eig(A_true)))));
+assert(eig_err < 0.3, ...
+    'LTI trimmed: eigenvalue error %.4f', eig_err);
+fprintf('  Test 22 passed: LTI trimming (eig_err=%.4f).\n', eig_err);
+
 fprintf('test_sidLTVdiscIO: all tests passed.\n');
