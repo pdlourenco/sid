@@ -17,9 +17,12 @@ function [A0, B0] = sidLTIfreqIO(Y, U, H, varargin)
 %   exactly with the returned (A0, B0).
 %
 %   INPUTS:
-%     Y - Output data, (N+1 x py) or (N+1 x py x L).
-%         First N rows are used for frequency response estimation.
-%     U - Input data, (N x q) or (N x q x L).
+%     Y - Output data, (N+1 x py), (N+1 x py x L), or cell array {L x 1}
+%         where Y{l} is (N_l+1 x py). For cells, trajectories shorter
+%         than 2/3 of max horizon are discarded; the rest are trimmed
+%         to a common length for spectral estimation.
+%     U - Input data, (N x q), (N x q x L), or cell array {L x 1}
+%         where U{l} is (N_l x q). Must match Y format.
 %     H - Observation matrix, (py x n).
 %
 %   NAME-VALUE OPTIONS:
@@ -138,36 +141,95 @@ end
 function [Y_trim, U, H, horizon, maxStab, py, n, q] = parseInputs( ...
     Y, U, H, varargin)
 % PARSEINPUTS Validate and parse inputs for sidLTIfreqIO.
+%   For cell array inputs, trajectories shorter than 2/3 of the maximum
+%   horizon are discarded and the rest are trimmed to a common length.
 
     py = size(H, 1);
     n  = size(H, 2);
 
-    % Ensure 3D
-    if ndims(Y) == 2  %#ok<ISMAT>
-        Y = reshape(Y, size(Y, 1), size(Y, 2), 1);
-    end
-    if ndims(U) == 2  %#ok<ISMAT>
-        U = reshape(U, size(U, 1), size(U, 2), 1);
-    end
+    if iscell(Y)
+        % ---- Variable-length: trim and stack into 3D ----
+        if ~iscell(U)
+            error('sid:badInput', ...
+                'When Y is a cell array, U must also be a cell array.');
+        end
+        L = numel(Y);
+        if numel(U) ~= L
+            error('sid:dimMismatch', ...
+                'Y has %d trajectories but U has %d.', L, numel(U));
+        end
+        if L == 0
+            error('sid:badInput', 'Cell arrays must not be empty.');
+        end
 
-    N = size(U, 1);
-    q = size(U, 2);
+        q = size(U{1}, 2);
+        horizons = zeros(L, 1);
+        for l = 1:L
+            if size(Y{l}, 2) ~= py
+                error('sid:dimMismatch', ...
+                    'Y{%d} has %d columns but H has %d rows.', ...
+                    l, size(Y{l}, 2), py);
+            end
+            if size(U{l}, 2) ~= q
+                error('sid:dimMismatch', ...
+                    'U{%d} has %d columns, expected %d.', ...
+                    l, size(U{l}, 2), q);
+            end
+            horizons(l) = size(U{l}, 1);
+        end
 
-    if size(Y, 1) < N
-        error('sid:dimMismatch', ...
-            'Y must have at least N=%d rows, got %d.', N, size(Y, 1));
-    end
-    if size(Y, 2) ~= py
-        error('sid:dimMismatch', ...
-            'Y has %d columns but H has %d rows.', size(Y, 2), py);
-    end
-    if size(U, 3) ~= size(Y, 3)
-        error('sid:dimMismatch', ...
-            'U has %d trajectories but Y has %d.', size(U, 3), size(Y, 3));
-    end
+        % Keep trajectories with horizon >= ceil(2/3 * max)
+        maxH = max(horizons);
+        threshold = ceil(2 * maxH / 3);
+        keep = find(horizons >= threshold);
+        if isempty(keep)
+            error('sid:tooShort', ...
+                'No trajectories long enough for spectral estimation.');
+        end
 
-    % Trim Y to first N rows to match U
-    Y_trim = Y(1:N, :, :);
+        N_common = min(horizons(keep));
+        L_kept = length(keep);
+
+        % Stack into 3D arrays, trimmed to common length
+        Y_trim = zeros(N_common, py, L_kept);
+        U_out  = zeros(N_common, q, L_kept);
+        for ii = 1:L_kept
+            l = keep(ii);
+            Y_trim(:, :, ii) = Y{l}(1:N_common, :);
+            U_out(:, :, ii)  = U{l}(1:N_common, :);
+        end
+        U = U_out;
+    else
+        % ---- Uniform-horizon: existing path ----
+        if ndims(Y) == 2  %#ok<ISMAT>
+            Y = reshape(Y, size(Y, 1), size(Y, 2), 1);
+        end
+        if ndims(U) == 2  %#ok<ISMAT>
+            U = reshape(U, size(U, 1), size(U, 2), 1);
+        end
+
+        N = size(U, 1);
+        q = size(U, 2);
+
+        if size(Y, 1) < N
+            error('sid:dimMismatch', ...
+                'Y must have at least N=%d rows, got %d.', ...
+                N, size(Y, 1));
+        end
+        if size(Y, 2) ~= py
+            error('sid:dimMismatch', ...
+                'Y has %d columns but H has %d rows.', ...
+                size(Y, 2), py);
+        end
+        if size(U, 3) ~= size(Y, 3)
+            error('sid:dimMismatch', ...
+                'U has %d trajectories but Y has %d.', ...
+                size(U, 3), size(Y, 3));
+        end
+
+        % Trim Y to first N rows to match U
+        Y_trim = Y(1:N, :, :);
+    end
 
     % Defaults
     horizon = [];

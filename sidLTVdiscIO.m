@@ -21,8 +21,11 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
 %   COSMIC algorithm (sidLTVdisc).
 %
 %   INPUTS:
-%     Y - Output data, (N+1 x py) or (N+1 x py x L).
-%     U - Input data, (N x q) or (N x q x L).
+%     Y - Output data, (N+1 x py), (N+1 x py x L), or cell array {L x 1}
+%         where Y{l} is (N_l+1 x py). Cell arrays allow variable-length
+%         trajectories.
+%     U - Input data, (N x q), (N x q x L), or cell array {L x 1}
+%         where U{l} is (N_l x q). Must match Y format.
 %     H - Observation matrix, (py x n). When rank(H) = n (including
 %         py >= n), states are recovered exactly via weighted least
 %         squares and no EM iterations are needed.
@@ -43,7 +46,7 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
 %     result - Struct with fields:
 %       .A               - (n x n x N) estimated dynamics matrices
 %       .B               - (n x q x N) estimated input matrices
-%       .X               - (N+1 x n x L) estimated state trajectories
+%       .X               - (N+1 x n x L) or cell {L x 1} estimated states
 %       .H               - (py x n) observation matrix (copy)
 %       .R               - (py x py) noise covariance used
 %       .Cost            - (n_iter x 1) cost J at each iteration
@@ -106,7 +109,8 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
 
     % ---- Parse inputs ----
     [Y, U, H, lambda, R, maxIter, tol, mu, muTol, doTrustRegion, ...
-     N, n, py, q, L] = parseInputs(Y, U, H, varargin{:});
+     N, n, py, q, L, isVarLen, horizons] = ...
+        parseInputs(Y, U, H, varargin{:});
 
     % ---- Precompute ----
     Rinv = R \ eye(py);               % (py x py) observation precision
@@ -115,19 +119,27 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
     % When rank(H) = n, state is recoverable via weighted LS — no EM needed.
     if rank(H) == n
         Hpinv = (H' * Rinv * H) \ (H' * Rinv);
-        X_hat = zeros(N + 1, n, L);
-        for l = 1:L
-            X_hat(:, :, l) = squeeze(Y(:, :, l)) * Hpinv';
+        if isVarLen
+            X_hat = cell(L, 1);
+            for l = 1:L
+                X_hat{l} = Y{l} * Hpinv';
+            end
+        else
+            X_hat = zeros(N + 1, n, L);
+            for l = 1:L
+                X_hat(:, :, l) = squeeze(Y(:, :, l)) * Hpinv';
+            end
         end
 
-        [A, B] = cosmicStep(X_hat, U, lambda, N, n, q, L);
+        [A, B] = cosmicStep( ...
+            X_hat, U, lambda, N, n, q, L, isVarLen, horizons);
 
         J = evaluateFullCost( ...
             X_hat, A, B, Y, U, H, Rinv, ...
-            lambda, N, n, q, L);
+            lambda, N, n, q, L, isVarLen, horizons);
         result = packResult( ...
             A, B, X_hat, H, R, J, 0, lambda, ...
-            N, n, py, q, L);
+            N, n, py, q, L, isVarLen, horizons);
         return;
     end
 
@@ -159,10 +171,13 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
         X_hat = sidLTVStateEst(Y, U, A_use, B, H, 'R', R);
 
         % -- M-step: COSMIC solve --
-        [A, B] = cosmicStep(X_hat, U, lambda, N, n, q, L);
+        [A, B] = cosmicStep( ...
+            X_hat, U, lambda, N, n, q, L, isVarLen, horizons);
 
         % -- Evaluate cost and check convergence --
-        J = evaluateFullCost(X_hat, A, B, Y, U, H, Rinv, lambda, N, n, q, L);
+        J = evaluateFullCost( ...
+            X_hat, A, B, Y, U, H, Rinv, ...
+            lambda, N, n, q, L, isVarLen, horizons);
         costHistory(end + 1) = J;  %#ok<AGROW>
         nIter = nIter + 1;
 
@@ -194,7 +209,7 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
     % ---- Pack result struct ----
     result = packResult( ...
         A, B, X_hat, H, R, costHistory(:), nIter, lambda, ...
-        N, n, py, q, L);
+        N, n, py, q, L, isVarLen, horizons);
 
 end
 
@@ -204,7 +219,7 @@ end
 
 function result = packResult( ...
     A, B, X, H, R, cost, nIter, lambda, ...
-    N, n, py, q, L)
+    N, n, py, q, L, isVarLen, horizons)
 % PACKRESULT Build the output struct (shared by both code paths).
 
     result.A               = A;
@@ -222,36 +237,91 @@ function result = packResult( ...
     result.NumTrajectories = L;
     result.Algorithm       = 'cosmic';
     result.Method          = 'sidLTVdiscIO';
+    if isVarLen
+        result.Horizons    = horizons;
+    end
 end
 
 function [Y, U, H, lambda, R, maxIter, tol, mu, muTol, doTrustRegion, ...
-          N, n, py, q, L] = parseInputs(Y, U, H, varargin)
+          N, n, py, q, L, isVarLen, horizons] = parseInputs(Y, U, H, varargin)
 % PARSEINPUTS Validate and parse inputs for sidLTVdiscIO.
+%   Supports both 3D array input (uniform horizon) and cell array input
+%   (variable-length trajectories).
 
     py = size(H, 1);
     n  = size(H, 2);
 
-    % Ensure 3D
-    if ndims(Y) == 2  %#ok<ISMAT>
-        Y = reshape(Y, size(Y,1), size(Y,2), 1);
-    end
-    if ndims(U) == 2  %#ok<ISMAT>
-        U = reshape(U, size(U,1), size(U,2), 1);
-    end
+    isVarLen = iscell(Y);
 
-    N = size(U, 1);
-    q = size(U, 2);
-    L = size(Y, 3);
+    if isVarLen
+        % ---- Variable-length trajectory mode ----
+        if ~iscell(U)
+            error('sid:badInput', ...
+                'When Y is a cell array, U must also be a cell array.');
+        end
+        L = numel(Y);
+        if numel(U) ~= L
+            error('sid:dimMismatch', ...
+                'Y has %d trajectories but U has %d.', L, numel(U));
+        end
+        if L == 0
+            error('sid:badInput', 'Cell arrays must not be empty.');
+        end
 
-    % Validate dimensions
-    if size(Y, 1) ~= N + 1
-        error('sid:dimMismatch', 'Y must have N+1=%d rows, got %d.', N+1, size(Y,1));
-    end
-    if size(Y, 2) ~= py
-        error('sid:dimMismatch', 'Y has %d columns but H has %d rows.', size(Y,2), py);
-    end
-    if size(U, 3) ~= L
-        error('sid:dimMismatch', 'U has %d trajectories but Y has %d.', size(U,3), L);
+        q = size(U{1}, 2);
+        horizons = zeros(L, 1);
+        for l = 1:L
+            if size(Y{l}, 2) ~= py
+                error('sid:dimMismatch', ...
+                    'Y{%d} has %d columns but H has %d rows.', ...
+                    l, size(Y{l}, 2), py);
+            end
+            if size(U{l}, 2) ~= q
+                error('sid:dimMismatch', ...
+                    'U{%d} has %d columns, expected %d.', ...
+                    l, size(U{l}, 2), q);
+            end
+            Nl = size(U{l}, 1);
+            if size(Y{l}, 1) ~= Nl + 1
+                error('sid:dimMismatch', ...
+                    'Y{%d} has %d rows but U{%d} has %d (need N_l+1 and N_l).', ...
+                    l, size(Y{l}, 1), l, Nl);
+            end
+            if Nl < 2
+                error('sid:tooShort', ...
+                    'Trajectory %d has fewer than 3 measurements.', l);
+            end
+            horizons(l) = Nl;
+        end
+
+        N = max(horizons);
+    else
+        % ---- Uniform-horizon mode ----
+        horizons = [];
+
+        if ndims(Y) == 2  %#ok<ISMAT>
+            Y = reshape(Y, size(Y,1), size(Y,2), 1);
+        end
+        if ndims(U) == 2  %#ok<ISMAT>
+            U = reshape(U, size(U,1), size(U,2), 1);
+        end
+
+        N = size(U, 1);
+        q = size(U, 2);
+        L = size(Y, 3);
+
+        if size(Y, 1) ~= N + 1
+            error('sid:dimMismatch', ...
+                'Y must have N+1=%d rows, got %d.', N+1, size(Y,1));
+        end
+        if size(Y, 2) ~= py
+            error('sid:dimMismatch', ...
+                'Y has %d columns but H has %d rows.', size(Y,2), py);
+        end
+        if size(U, 3) ~= L
+            error('sid:dimMismatch', ...
+                'U has %d trajectories but Y has %d.', size(U,3), L);
+        end
     end
 
     % Defaults
@@ -320,12 +390,18 @@ function [Y, U, H, lambda, R, maxIter, tol, mu, muTol, doTrustRegion, ...
     end
 end
 
-function [A, B] = cosmicStep(X_hat, U, lambda, N, n, q, L)
+function [A, B] = cosmicStep( ...
+    X_hat, U, lambda, N, n, q, L, isVarLen, horizons)
 % COSMICSTEP Standard COSMIC solve on estimated states.
 %
 %   Treats X_hat as observed states and solves for C(k) = [A(k)'; B(k)'].
 
-    [D, Xl] = sidLTVbuildDataMatrices(X_hat, U, N, n, q, L);
+    if isVarLen
+        [D, Xl] = sidLTVbuildDataMatricesVarLen( ...
+            X_hat, U, N, n, q, L, horizons);
+    else
+        [D, Xl] = sidLTVbuildDataMatrices(X_hat, U, N, n, q, L);
+    end
     [S, T]  = sidLTVbuildBlockTerms(D, Xl, lambda, N, n, q);
     [C, ~]  = sidLTVcosmicSolve(S, T, lambda, N, n, q);
 
@@ -333,7 +409,8 @@ function [A, B] = cosmicStep(X_hat, U, lambda, N, n, q, L)
     B = permute(C(n+1:end, :, :), [2 1 3]);   % (n x q x N)
 end
 
-function J = evaluateFullCost(X_hat, A, B, Y, U, H, Rinv, lambda, N, n, q, L)
+function J = evaluateFullCost( ...
+    X_hat, A, B, Y, U, H, Rinv, lambda, N, n, q, L, isVarLen, horizons)
 % EVALUATEFULLCOST Compute full Output-COSMIC objective.
 %
 %   J = obs_fidelity + dyn_fidelity + smoothness
@@ -343,22 +420,29 @@ function J = evaluateFullCost(X_hat, A, B, Y, U, H, Rinv, lambda, N, n, q, L)
     smoothness = 0;
 
     for l = 1:L
-        for k = 0:N
+        if isVarLen
+            Nl = horizons(l);
+            Yl = Y{l};
+            Xl = X_hat{l};
+            Ul = U{l};
+        else
+            Nl = N;
+            Yl = Y(:, :, l);
+            Xl = X_hat(:, :, l);
+            Ul = U(:, :, l);
+        end
+
+        for k = 0:Nl
             j = k + 1;
-            yl = Y(j, :, l)';
-            xl = X_hat(j, :, l)';
-            res_obs = yl - H * xl;
+            res_obs = Yl(j, :)' - H * Xl(j, :)';
             obs_fidelity = obs_fidelity + res_obs' * Rinv * res_obs;
         end
 
-        for k = 0:N-1
+        for k = 0:Nl-1
             j = k + 1;
-            xl = X_hat(j, :, l)';
-            xl1 = X_hat(j+1, :, l)';
-            ul = U(j, :, l)';
-            Ak = A(:, :, j);
-            Bk = B(:, :, j);
-            res_dyn = xl1 - Ak * xl - Bk * ul;
+            res_dyn = Xl(j+1, :)' ...
+                - A(:, :, j) * Xl(j, :)' ...
+                - B(:, :, j) * Ul(j, :)';
             dyn_fidelity = dyn_fidelity + res_dyn' * res_dyn;
         end
     end
