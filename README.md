@@ -7,35 +7,51 @@
 
 [![Open in MATLAB Online](https://www.mathworks.com/images/responsive/global/open-in-matlab-online.svg)](https://matlab.mathworks.com/open/github/v1?repo=pdlourenco/sid-matlab&file=examples/exampleSISO.m)
 
-**sid** is a free, open-source toolbox for **non-parametric frequency response estimation** — the same class of algorithms found in MATLAB's commercial [System Identification Toolbox](https://www.mathworks.com/products/sysid.html), but implemented in pure MATLAB/Octave code with **zero toolbox dependencies**. It provides drop-in replacements for `spa`, `spafdr`, and `etfe` that you can use without a licence.
+**sid** is a free, open-source toolbox for **system identification** — covering both **non-parametric frequency response estimation** and **time-varying state-space identification** — implemented in pure MATLAB/Octave code with **zero toolbox dependencies**. It provides drop-in replacements for `spa`, `spafdr`, and `etfe` that you can use without a licence, and implements the **COSMIC algorithm** for identifying linear time-varying (LTV) state-space models from data.
 
-Unlike the commercial toolbox, sid exposes **asymptotic uncertainty estimates** and built-in **confidence-band plotting** out of the box, making it straightforward to assess estimation quality. It supports SISO, MIMO, and time-series (output-only) modes, all with a unified result struct and consistent API.
+All estimation functions natively support **multiple trajectories** — pass L independent experiments as a 3D array `(N x n x L)` or, for the time-domain functions, as a cell array of variable-length sequences. Frequency-domain estimates are ensemble-averaged for lower variance; COSMIC pools trajectories into a single regularized least-squares problem. sid also exposes **asymptotic uncertainty estimates** and built-in **confidence-band plotting** out of the box. It supports SISO, MIMO, and time-series (output-only) modes, all with a unified result struct and consistent API.
 
-sid is designed from the ground up to run on **GNU Octave** as a first-class target — not just MATLAB with Octave as an afterthought. Every function is tested on both platforms in CI, so Octave users get the same reliability as MATLAB users. If you work in an environment where MATLAB licences are limited or unavailable, sid and Octave give you a fully open-source path to frequency-domain system identification.
+sid is designed from the ground up to run on **GNU Octave** as a first-class target — not just MATLAB with Octave as an afterthought. Every function is tested on both platforms in CI, so Octave users get the same reliability as MATLAB users. If you work in an environment where MATLAB licences are limited or unavailable, sid and Octave give you a fully open-source path to system identification.
 
 ## Features
 
+### Frequency-domain estimation
 - **Blackman-Tukey spectral analysis** (`sidFreqBT`) — the workhorse estimator, with configurable window size and automatic defaults
 - **Frequency-dependent resolution** (`sidFreqBTFDR`) — vary the smoothing bandwidth across the frequency axis
 - **Empirical transfer function estimate** (`sidFreqETFE`) — maximum resolution via FFT ratio, with optional smoothing
-- **Multi-trajectory averaging** — pool frequency estimates across repeated experiments for lower variance
-- **Time-varying analysis** — `sidFreqMap` for sliding-window frequency response maps (Blackman-Tukey or Welch), `sidSpectrogram` for short-time FFT spectrograms
-- **LTV state-space identification** (`sidLTVdisc`) — the COSMIC algorithm for identifying time-varying A(k), B(k) matrices from state measurements, with automatic or manual regularization tuning and optional Bayesian uncertainty quantification
-- **Output-COSMIC** (`sidLTVdiscIO`) — LTV identification from partial (output-only) observations, with variable-length trajectory support
-- **LTI realization** (`sidLTIfreqIO`) — Ho-Kalman realization from input-output frequency response data
+- **Time-varying frequency maps** (`sidFreqMap`) — sliding-window frequency response maps using Blackman-Tukey or Welch inner estimators; `sidSpectrogram` for short-time FFT spectrograms
+- **Asymptotic uncertainty** — standard deviations and squared coherence for every estimate (Ljung, 1999), rendered as shaded confidence bands by `sidBodePlot`, `sidSpectrumPlot`, `sidMapPlot`, and `sidSpectrogramPlot`
+
+### Time-varying state-space identification (COSMIC)
+- **LTV identification** (`sidLTVdisc`) — the COSMIC algorithm: identify time-varying A(k), B(k) from state measurements with O(N) complexity, automatic or manual regularization, and optional Bayesian uncertainty quantification
+- **Output-COSMIC** (`sidLTVdiscIO`) — identify A(k), B(k) from output-only observations when the full state is not measured, with alternating state-dynamics optimization and automatic LTI initialization
+- **Frozen transfer function** (`sidLTVdiscFrozen`) — compute instantaneous G(w,k) = (e^{jw}I - A(k))^{-1} B(k) with propagated uncertainty bands
+- **Regularization tuning** (`sidLTVdiscTune`) — select lambda via held-out validation loss, L-curve, or frequency-response consistency scoring
+- **LTI realization** (`sidLTIfreqIO`) — Ho-Kalman realization from I/O frequency response data
 - **State estimation** (`sidLTVStateEst`) — batch LTV state estimation via RTS smoother
 - **Model order estimation** (`sidModelOrder`) — Hankel singular value analysis for selecting state dimension
-- **Frozen transfer function** (`sidLTVdiscFrozen`) — compute instantaneous G(w,k) = (e^{jw}I - A(k))^{-1} B(k) with propagated uncertainty bands
-- **Analysis and validation** — `sidDetrend` for signal preprocessing, `sidResidual` for residual diagnostics, `sidCompare` for model-vs-data comparison
-- **Asymptotic uncertainty** — standard deviations and squared coherence returned for every frequency-domain estimate (Ljung, 1999)
-- **Confidence-band plotting** — `sidBodePlot`, `sidSpectrumPlot`, `sidMapPlot`, and `sidSpectrogramPlot` render shaded confidence bands out of the box
-- **SISO, MIMO, and time-series modes** — unified API across all frequency-domain estimation functions
+
+### Multi-trajectory support
+- **Frequency-domain**: pass `(N x n x L)` arrays or cell arrays of variable-length sequences — spectral estimates are ensemble-averaged across L trajectories, reducing variance by a factor of L
+- **COSMIC**: pool L trajectories (uniform or variable-length) into a single identification problem — data matrices are stacked across trajectories while the regularization structure is shared
+
+### Analysis, validation, and preprocessing
+- `sidDetrend` — polynomial detrending (replaces `detrend`)
+- `sidResidual` — residual whiteness and independence diagnostics (replaces `resid`)
+- `sidCompare` — model output comparison with NRMSE fit metric (replaces `compare`)
+
+### Cross-cutting
+- **SISO, MIMO, and time-series modes** — unified API across all estimation functions
 - **Validated against MATLAB's System Identification Toolbox** — comparison tests for `spa`, `spafdr`, and `etfe` run in CI
 - **34 test suites** with continuous integration on both MATLAB and GNU Octave
 
 ## How It Works
 
-The core frequency-domain estimators use the **Blackman-Tukey method**: compute biased cross-covariances between input and output, apply a Hann lag window for spectral smoothing, then transform to the frequency domain via FFT (or direct DFT for custom frequency grids). The transfer function estimate is the ratio of cross-spectrum to input auto-spectrum, and the noise spectrum is obtained by subtraction. Asymptotic variance formulas from Ljung (1999) provide uncertainty estimates at each frequency, which are rendered as shaded confidence bands in the plotting functions. For time-varying state-space identification, the toolbox implements the **COSMIC algorithm** (Carvalho et al., 2022): regularized least-squares estimation of A(k), B(k) matrices with optional Bayesian uncertainty, supporting both full-state and output-only observations. See [SPEC.md](SPEC.md) for the full mathematical derivation.
+**Frequency-domain path.** The core spectral estimators use the **Blackman-Tukey method**: compute biased cross-covariances between input and output, apply a Hann lag window, then transform via FFT. The transfer function is the cross-spectrum / input auto-spectrum ratio; asymptotic variance formulas (Ljung, 1999) provide per-frequency uncertainty. When multiple trajectories are provided, covariances are ensemble-averaged before forming the ratio, reducing variance by a factor of L without sacrificing frequency resolution.
+
+**State-space path.** The **COSMIC algorithm** (Carvalho et al., 2022) identifies discrete-time LTV models x(k+1) = A(k)x(k) + B(k)u(k) by solving a block-tridiagonal regularized least-squares problem in O(N) time. Multiple trajectories — including variable-length sequences — are pooled into the data matrices. When only outputs are observed, **Output-COSMIC** alternates between state estimation (RTS smoother) and dynamics identification, converging to a joint optimum. Bayesian uncertainty quantification propagates through to frozen transfer functions G(w,k) for direct comparison with non-parametric frequency estimates.
+
+See [SPEC.md](SPEC.md) for the full mathematical derivation.
 
 ## Function Comparison
 
@@ -47,19 +63,24 @@ The core frequency-domain estimators use the **Blackman-Tukey method**: compute 
 | `sidFreqBTFDR` | `spafdr` | Blackman-Tukey with frequency-dependent resolution |
 | `sidFreqETFE` | `etfe` | Empirical transfer function estimate (FFT ratio) |
 
-**Time-varying analysis:**
+**Time-frequency analysis:**
 
 | sid function | Replaces | Description |
 |---|---|---|
 | `sidFreqMap` | `tfestimate`, `mscohere` | Time-varying frequency response map (BT or Welch) |
 | `sidSpectrogram` | `spectrogram` | Short-time FFT spectrogram |
+
+**State-space identification (COSMIC):**
+
+| sid function | Replaces | Description |
+|---|---|---|
 | `sidLTVdisc` | — | Discrete LTV state-space identification (COSMIC algorithm) |
 | `sidLTVdiscIO` | — | LTV identification from partial observations (Output-COSMIC) |
+| `sidLTVdiscTune` | — | Regularization tuning via validation loss, L-curve, or frequency consistency |
+| `sidLTVdiscFrozen` | — | Frozen transfer function G(w,k) with uncertainty propagation |
 | `sidLTIfreqIO` | — | LTI realization from I/O frequency response (Ho-Kalman) |
 | `sidLTVStateEst` | — | Batch LTV state estimation (RTS smoother) |
 | `sidModelOrder` | — | Model order estimation via Hankel SVD |
-| `sidLTVdiscTune` | — | Regularization tuning via validation loss or L-curve |
-| `sidLTVdiscFrozen` | — | Frozen transfer function G(w,k) with uncertainty propagation |
 
 **Plotting:**
 
