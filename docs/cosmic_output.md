@@ -1,4 +1,4 @@
-# Output-COSMIC: Extension of COSMIC (Closed-form Optimal data-driven linear time-varying System IdentifiCation) to Partial State Observation
+# Output-COSMIC: Extension of COSMIC (Closed-form Optimal data-driven linear time-varying SysteM IdentifiCation) to Partial State Observation
 
 ## 1. Problem Statement
 

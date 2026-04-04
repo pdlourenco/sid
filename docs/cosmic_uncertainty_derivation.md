@@ -1,4 +1,4 @@
-# Bayesian Interpretation of COSMIC (Closed-form Optimal data-driven linear time-varying System IdentifiCation): Derivation
+# Bayesian Interpretation of COSMIC (Closed-form Optimal data-driven linear time-varying SysteM IdentifiCation): Derivation
 
 **Purpose:** Justify the posterior covariance of the COSMIC estimator under a
 general (non-isotropic) noise model, and clarify the bias/variance tradeoffs.
