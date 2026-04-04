@@ -9,10 +9,10 @@
 ## Tests / examples
 - ~~Adapt tests to confirm with the SPEC~~
 - ~~Adapt examples as above~~
-- Confirm code coverage
+- ~~Confirm code coverage~~
 
 ## Code
-- Review all the implementation according to the above. Make sure tests and examples are passing
+- ~~Review all the implementation according to the above. Make sure tests and examples are passing~~
 - ~~review all the comments: every mathematical step in the code should be explained and related to the specification whenever possible.~~
 
 ## Release prep

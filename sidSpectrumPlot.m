@@ -48,6 +48,7 @@ function varargout = sidSpectrumPlot(result, varargin)
     % ---- Parse options ----
     p = inputParser;
     p.addParameter('Confidence', 3);
+    p.addParameter('ShowConfidence', true);
     p.addParameter('FrequencyUnit', 'rad/s');
     p.addParameter('Color', [0.850 0.325 0.098]);
     p.addParameter('LineWidth', 1.5);
@@ -84,7 +85,7 @@ function varargout = sidSpectrumPlot(result, varargin)
     lineH = semilogx(freq, specDB, 'Color', opts.Color, 'LineWidth', opts.LineWidth);
     hold on;
 
-    if opts.Confidence > 0 && ~isempty(PhiVStd)
+    if opts.ShowConfidence && opts.Confidence > 0 && ~isempty(PhiVStd)
         upper = 10 * log10(max(PhiV + opts.Confidence * PhiVStd, 1e-20));
         lower = 10 * log10(max(PhiV - opts.Confidence * PhiVStd, 1e-20));
         fillX = [freq; flipud(freq)];

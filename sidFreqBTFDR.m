@@ -156,9 +156,9 @@ function result = sidFreqBTFDR(y, u, varargin)
         end
     end
 
-    % ---- Resolution to window size (SPEC.md §5.1) ----
-    % M_k = round(2*pi / R_k) — local window size at frequency k
-    Mk = round(2 * pi ./ R);
+    % ---- Resolution to window size (SPEC.md §5.2) ----
+    % M_k = ceil(2*pi / R_k) — local window size at frequency k
+    Mk = ceil(2 * pi ./ R);
     Mk = max(Mk, 2);                   % M >= 2
     Mk = min(Mk, floor(N / 2));        % M <= N/2
 

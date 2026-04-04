@@ -3,7 +3,7 @@ function [A0, B0] = sidLTIfreqIO(Y, U, H, varargin)
 %
 %   [A0, B0] = sidLTIfreqIO(Y, U, H)
 %   [A0, B0] = sidLTIfreqIO(Y, U, H, 'Horizon', r)
-%   [A0, B0] = sidLTIfreqIO(Y, U, H, 'MaxStability', s)
+%   [A0, B0] = sidLTIfreqIO(Y, U, H, 'MaxStabilize', s)
 %
 %   Estimates a constant (LTI) state-space realization from input-output
 %   data, given a known observation matrix H:
@@ -28,9 +28,10 @@ function [A0, B0] = sidLTIfreqIO(Y, U, H, varargin)
 %   NAME-VALUE OPTIONS:
 %     'Horizon'       - Hankel matrix depth r. Default: min(floor(nf/3), 50)
 %                       where nf is the number of frequency bins.
-%     'MaxStability'  - Maximum allowed eigenvalue magnitude. Eigenvalues
-%                       exceeding this are projected to this radius.
-%                       Default: 0.99.
+%     'MaxStabilize'  - Maximum eigenvalue magnitude after stabilization.
+%                       Unstable eigenvalues (|lambda| > threshold) are
+%                       reflected inside the unit circle: lambda <- 1/conj(lambda),
+%                       then clamped to this radius. Default: 0.999.
 %
 %   OUTPUTS:
 %     A0 - (n x n) estimated LTI dynamics matrix.
@@ -233,7 +234,7 @@ function [Y_trim, U, H, horizon, maxStab, py, n, q] = parseInputs( ...
 
     % Defaults
     horizon = [];
-    maxStab = 0.99;
+    maxStab = 0.999;
 
     % Parse name-value options
     k = 1;
@@ -243,7 +244,7 @@ function [Y_trim, U, H, horizon, maxStab, py, n, q] = parseInputs( ...
                 case 'horizon'
                     horizon = varargin{k + 1};
                     k = k + 2;
-                case 'maxstability'
+                case {'maxstabilize', 'maxstability'}
                     maxStab = varargin{k + 1};
                     k = k + 2;
                 otherwise
@@ -372,9 +373,11 @@ function [A0, B0] = transformToHBasis(A_r, B_r, C_r, H, n)
 end
 
 function A = stabilize(A, maxStab)
-% STABILIZE Project eigenvalues onto stability region.
+% STABILIZE Reflect unstable eigenvalues inside the unit circle.
 %
-%   If any eigenvalue of A has magnitude > maxStab, scale it to maxStab.
+%   Eigenvalues with |lambda| > 1 are reflected: lambda <- 1/conj(lambda)
+%   (SPEC.md §8.13.1 step 6). The result is then clamped so that
+%   |lambda| <= maxStab.
 
     [V, D] = eig(A);
     d = diag(D);
@@ -384,7 +387,14 @@ function A = stabilize(A, maxStab)
         return;
     end
 
-    unstable = magnitudes > maxStab;
-    d(unstable) = maxStab * d(unstable) ./ magnitudes(unstable);
+    % Step 1: Reflect eigenvalues outside the unit circle (SPEC.md §8.13.1)
+    outside = magnitudes > 1;
+    d(outside) = 1 ./ conj(d(outside));
+    magnitudes(outside) = abs(d(outside));
+
+    % Step 2: Clamp to maxStab radius
+    toolarge = magnitudes > maxStab;
+    d(toolarge) = maxStab * d(toolarge) ./ magnitudes(toolarge);
+
     A = real(V * diag(d) / V);
 end

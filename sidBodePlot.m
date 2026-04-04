@@ -51,6 +51,7 @@ function varargout = sidBodePlot(result, varargin)
     % ---- Parse options ----
     p = inputParser;
     p.addParameter('Confidence', 3);
+    p.addParameter('ShowConfidence', true);
     p.addParameter('FrequencyUnit', 'rad/s');
     p.addParameter('Color', [0 0.447 0.741]);
     p.addParameter('LineWidth', 1.5);
@@ -100,7 +101,7 @@ function varargout = sidBodePlot(result, varargin)
     lineMag = semilogx(freq, magdB, 'Color', opts.Color, 'LineWidth', opts.LineWidth);
     hold on;
 
-    if opts.Confidence > 0 && ~isempty(GStd)
+    if opts.ShowConfidence && opts.Confidence > 0 && ~isempty(GStd)
         magUpper = 20 * log10(mag + opts.Confidence * GStd);
         magLower = 20 * log10(max(mag - opts.Confidence * GStd, 1e-20));
         fillX = [freq; flipud(freq)];
@@ -120,7 +121,7 @@ function varargout = sidBodePlot(result, varargin)
     linePhase = semilogx(freq, phase, 'Color', opts.Color, 'LineWidth', opts.LineWidth);
     hold on;
 
-    if opts.Confidence > 0 && ~isempty(GStd)
+    if opts.ShowConfidence && opts.Confidence > 0 && ~isempty(GStd)
         phaseStd = opts.Confidence * GStd ./ max(mag, 1e-20) * 180 / pi;
         fillY = [phase + phaseStd; flipud(phase - phaseStd)];
         fill(fillX, fillY, opts.Color, ...
