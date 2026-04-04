@@ -104,8 +104,8 @@ function result = sidFreqBT(y, u, varargin)
     args = varargin;
     if ~isempty(args) && isnumeric(args{1})
         args = [{'WindowSize'}, args(1), args(2:end)];
-        if length(args) >= 4 && isnumeric(args{4})
-            args = [args(1:2), {'Frequencies'}, args(4), args(5:end)];
+        if length(args) >= 3 && isnumeric(args{3})
+            args = [args(1:2), {'Frequencies'}, args(3:end)];
         end
     end
     defs.WindowSize = [];

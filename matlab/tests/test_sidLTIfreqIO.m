@@ -89,7 +89,7 @@ for l = 1:L
     end
 end
 
-[A0, ~] = sidLTIfreqIO(Y, U, H_obs, 'MaxStability', 0.95);
+[A0, ~] = sidLTIfreqIO(Y, U, H_obs, 'MaxStabilize', 0.95);
 
 max_eig = max(abs(eig(A0)));
 assert(max_eig <= 0.95 + 1e-10, ...
