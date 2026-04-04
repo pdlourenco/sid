@@ -131,7 +131,7 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
             end
         end
 
-        [A, B] = cosmicStep( ...
+        [A, B, S_c, D_c, Xl_c, C_c] = cosmicStep( ...
             X_hat, U, lambda, N, n, q, L, isVarLen, horizons);
 
         J = evaluateFullCost( ...
@@ -140,6 +140,8 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
         result = packResult( ...
             A, B, X_hat, H, R, J, 0, lambda, ...
             N, n, py, q, L, isVarLen, horizons);
+        result = addUncertainty( ...
+            result, S_c, D_c, Xl_c, C_c, lambda, N, n, q, isVarLen, horizons);
         return;
     end
 
@@ -171,7 +173,7 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
         X_hat = sidLTVStateEst(Y, U, A_use, B, H, 'R', R);
 
         % -- M-step: COSMIC solve --
-        [A, B] = cosmicStep( ...
+        [A, B, S_c, D_c, Xl_c, C_c] = cosmicStep( ...
             X_hat, U, lambda, N, n, q, L, isVarLen, horizons);
 
         % -- Evaluate cost and check convergence --
@@ -211,6 +213,10 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
         A, B, X_hat, H, R, costHistory(:), nIter, lambda, ...
         N, n, py, q, L, isVarLen, horizons);
 
+    % ---- Bayesian uncertainty from final COSMIC step (SPEC.md §8.12.9) ----
+    result = addUncertainty( ...
+        result, S_c, D_c, Xl_c, C_c, lambda, N, n, q, isVarLen, horizons);
+
 end
 
 % ========================================================================
@@ -239,6 +245,104 @@ function result = packResult( ...
     result.Method          = 'sidLTVdiscIO';
     if isVarLen
         result.Horizons    = horizons;
+    end
+end
+
+function result = addUncertainty( ...
+    result, S, D, Xl, C, lambda, N, n, q, isVarLen, horizons)
+% ADDUNCERTAINTY Append Bayesian uncertainty fields (SPEC.md §8.12.9).
+%
+%   Computes AStd, BStd from the block-tridiagonal Hessian inverse,
+%   reusing the S matrix from the final COSMIC step.
+
+    d = n + q;
+
+    % Diagonal blocks of the Hessian inverse (SPEC.md §8.9.2)
+    P = sidLTVuncertaintyBackwardPass(S, lambda, N, d);
+
+    % Noise covariance from COSMIC residuals (diagonal mode)
+    [Sigma, dof] = estimateNoiseCovLocal( ...
+        C, D, Xl, P, N, n, q, isVarLen, horizons);
+
+    % Standard deviations of A(k) and B(k) entries
+    [AStd, BStd] = extractStdLocal(P, Sigma, N, n, q);
+
+    result.AStd             = AStd;
+    result.BStd             = BStd;
+    result.P                = P;
+    result.NoiseCov         = Sigma;
+    result.NoiseCovEstimated = true;
+    result.NoiseVariance    = trace(Sigma) / n;
+    result.DegreesOfFreedom = dof;
+end
+
+function [Sigma, dof] = estimateNoiseCovLocal( ...
+    C, D, Xl, P, N, n, q, isVarLen, horizons) %#ok<INUSD>
+% ESTIMATENOISECOVLOCAL Noise covariance from COSMIC residuals (diagonal).
+
+    d = n + q;
+    useCell = iscell(D);
+    SSR_scaled = zeros(n, n);
+    totalObs = 0;
+
+    for k = 1:N
+        Ck = C(:, :, k);
+        if useCell
+            Dk  = D{k};
+            Xlk = Xl{k};
+            Lk  = size(Dk, 1);
+        else
+            Dk  = D(:, :, k);
+            Xlk = Xl(:, :, k);
+            Lk  = size(Dk, 1);
+        end
+        if Lk == 0
+            continue;
+        end
+        Ek = Xlk - Dk * Ck;
+        SSR_scaled = SSR_scaled + Ek' * Ek;
+        totalObs = totalObs + Lk;
+    end
+
+    traceSum = 0;
+    for k = 1:N
+        if useCell
+            Dk = D{k};
+        else
+            Dk = D(:, :, k);
+        end
+        if size(Dk, 1) > 0
+            DtD = Dk' * Dk;
+            traceSum = traceSum + sum(sum(DtD .* P(:, :, k)));
+        end
+    end
+
+    dof = totalObs - N * traceSum;
+    if dof <= 0
+        dof = totalObs - N * d;
+        if dof <= 0
+            dof = max(totalObs, 1);
+        end
+    end
+
+    Sigma = diag(diag(N * SSR_scaled / dof));
+end
+
+function [AStd, BStd] = extractStdLocal(P, Sigma, N, n, q)
+% EXTRACTSTDLOCAL Standard deviations of A(k) and B(k) entries.
+
+    AStd = zeros(n, n, N);
+    BStd = zeros(n, q, N);
+    sigDiag = diag(Sigma);
+
+    for k = 1:N
+        pDiag = diag(P(:, :, k));
+        for a = 1:n
+            AStd(:, a, k) = sqrt(sigDiag * pDiag(a));
+        end
+        for a = 1:q
+            BStd(:, a, k) = sqrt(sigDiag * pDiag(n + a));
+        end
     end
 end
 
@@ -390,11 +494,12 @@ function [Y, U, H, lambda, R, maxIter, tol, mu, muTol, doTrustRegion, ...
     end
 end
 
-function [A, B] = cosmicStep( ...
+function [A, B, S, D, Xl, C] = cosmicStep( ...
     X_hat, U, lambda, N, n, q, L, isVarLen, horizons)
 % COSMICSTEP Standard COSMIC solve on estimated states.
 %
 %   Treats X_hat as observed states and solves for C(k) = [A(k)'; B(k)'].
+%   Returns intermediates S, D, Xl, C for optional uncertainty computation.
 
     if isVarLen
         [D, Xl] = sidLTVbuildDataMatricesVarLen( ...
