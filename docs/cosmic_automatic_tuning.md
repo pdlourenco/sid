@@ -10,7 +10,7 @@ $$x(k+1) = A(k)x(k) + B(k)u(k), \quad k = 0, \ldots, N-1,$$
 
 where $x(k) \in \mathbb{R}^p$ is the state, $u(k) \in \mathbb{R}^q$ is the control input, and the system matrices $A(k) \in \mathbb{R}^{p \times p}$, $B(k) \in \mathbb{R}^{p \times q}$ vary with time.
 
-The COSMIC algorithm [1] identifies these matrices from $L$ trajectories of state-input data by solving a regularised least-squares problem. Defining $\mathbf{C}(k) = [A^T(k) \; B^T(k)]^T$ and the data matrix $\mathbf{D}(k) = [X^T(k) \; U^T(k)]$, the problem is
+The COSMIC (Closed-form Optimal data-driven linear time-varying System IdentifiCation) algorithm [1] identifies these matrices from $L$ trajectories of state-input data by solving a regularised least-squares problem. Defining $\mathbf{C}(k) = [A^T(k) \; B^T(k)]^T$ and the data matrix $\mathbf{D}(k) = [X^T(k) \; U^T(k)]$, the problem is
 
 $$\min_{\mathbf{C}} \; f(\mathbf{C}) := \underbrace{\frac{1}{2} \sum_{k=0}^{N-1} \|\mathbf{D}(k)\mathbf{C}(k) - \mathbf{X}'^T(k)\|_F^2}_{h(\mathbf{C}) \;\text{(data fidelity)}} + \underbrace{\frac{1}{2} \sum_{k=1}^{N-1} \lambda_k \|\mathbf{C}(k) - \mathbf{C}(k-1)\|_F^2}_{g(\mathbf{C}) \;\text{(temporal smoothness)}}.$$
 

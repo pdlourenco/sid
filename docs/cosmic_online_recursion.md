@@ -1,4 +1,4 @@
-# COSMIC as a Kalman Smoother: Online LTV Identification
+# COSMIC (Closed-form Optimal data-driven linear time-varying System IdentifiCation) as a Kalman Smoother: Online LTV Identification
 
 **Purpose:** Show that the COSMIC algorithm, under the Bayesian interpretation
 developed in the companion derivation, is exactly a Rauch-Tung-Striebel (RTS)

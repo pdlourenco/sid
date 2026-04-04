@@ -2,7 +2,7 @@
 
 ## 1. Motivation
 
-COSMIC identifies discrete LTV systems from multiple trajectories drawn from the same time-varying dynamics. At each time step k, the data matrix D(k) aggregates state-input pairs from all L trajectories:
+COSMIC (Closed-form Optimal data-driven linear time-varying System IdentifiCation) identifies discrete LTV systems from multiple trajectories drawn from the same time-varying dynamics. At each time step k, the data matrix D(k) aggregates state-input pairs from all L trajectories:
 
 ```
 D(k) = [x_1(k)' u_1(k)'; x_2(k)' u_2(k)'; ...; x_L(k)' u_L(k)'] / sqrt(L)
