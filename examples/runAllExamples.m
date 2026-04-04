@@ -9,12 +9,12 @@
 fprintf('=== sid-matlab Examples ===\n\n');
 
 % Add paths
-thisDir = fileparts(mfilename('fullpath'));
-rootDir = fileparts(thisDir);
-addpath(rootDir);
-addpath(fullfile(rootDir, 'internal'));
+runner__thisDir = fileparts(mfilename('fullpath'));
+runner__rootDir = fileparts(runner__thisDir);
+addpath(runner__rootDir);
+addpath(fullfile(runner__rootDir, 'internal'));
 
-exampleFiles = {
+runner__exampleFiles = {
     'exampleSISO'
     'exampleETFE'
     'exampleFreqDepRes'
@@ -28,41 +28,44 @@ exampleFiles = {
     'exampleOutputCOSMIC'
 };
 
-nExamples = length(exampleFiles);
-passed = 0;
-failed = 0;
-failedNames = {};
+runner__nExamples = length(runner__exampleFiles);
+runner__passed = 0;
+runner__failed = 0;
+runner__failedNames = {};
 
-for i = 1:nExamples
-    fprintf('Running %s...\n', exampleFiles{i});
+for runner__k = 1:runner__nExamples
+    fprintf('Running %s...\n', runner__exampleFiles{runner__k});
     try
-        run(fullfile(thisDir, [exampleFiles{i} '.m']));
+        run(fullfile(runner__thisDir, [runner__exampleFiles{runner__k} '.m']));
         close all;
-        passed = passed + 1;
-        fprintf('  %s: OK\n', exampleFiles{i});
-    catch e
+        runner__passed = runner__passed + 1;
+        fprintf('  %s: OK\n', runner__exampleFiles{runner__k});
+    catch runner__e
         close all;
-        failed = failed + 1;
-        failedNames{end+1} = exampleFiles{i}; %#ok<SAGROW>
-        fprintf('  *** %s: FAILED ***\n', exampleFiles{i});
-        fprintf('      Error: %s\n', e.message);
+        runner__failed = runner__failed + 1;
+        runner__failedNames{end+1} = runner__exampleFiles{runner__k}; %#ok<SAGROW>
+        fprintf('  *** %s: FAILED ***\n', runner__exampleFiles{runner__k});
+        fprintf('      Error: %s\n', runner__e.message);
         % Emit GitHub Actions annotation
-        fprintf('::error title=%s::%s\n', exampleFiles{i}, strrep(e.message, newline, ' '));
+        fprintf('::error title=%s::%s\n', ...
+            runner__exampleFiles{runner__k}, ...
+            strrep(runner__e.message, newline, ' '));
     end
 end
 
 fprintf('\n=== Examples Summary ===\n');
-fprintf('  Total:  %d\n', nExamples);
-fprintf('  Passed: %d\n', passed);
-fprintf('  Failed: %d\n', failed);
+fprintf('  Total:  %d\n', runner__nExamples);
+fprintf('  Passed: %d\n', runner__passed);
+fprintf('  Failed: %d\n', runner__failed);
 
-if failed > 0
+if runner__failed > 0
     fprintf('\n  Failed examples:\n');
-    for i = 1:length(failedNames)
-        fprintf('    - %s\n', failedNames{i});
+    for runner__k = 1:length(runner__failedNames)
+        fprintf('    - %s\n', runner__failedNames{runner__k});
     end
     fprintf('\n');
-    error('sid:examplesFailed', '%d of %d examples failed.', failed, nExamples);
+    error('sid:examplesFailed', '%d of %d examples failed.', ...
+        runner__failed, runner__nExamples);
 else
     fprintf('\n  ALL EXAMPLES PASSED\n\n');
 end

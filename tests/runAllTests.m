@@ -12,12 +12,12 @@
 fprintf('=== sid-matlab Test Suite ===\n\n');
 
 % Add paths
-thisDir = fileparts(mfilename('fullpath'));
-rootDir = fileparts(thisDir);
-addpath(rootDir);
-addpath(fullfile(rootDir, 'internal'));
+runner__thisDir = fileparts(mfilename('fullpath'));
+runner__rootDir = fileparts(runner__thisDir);
+addpath(runner__rootDir);
+addpath(fullfile(runner__rootDir, 'internal'));
 
-testFiles = {
+runner__testFiles = {
     'test_sidHannWin'
     'test_sidCov'
     'test_sidDFT'
@@ -54,37 +54,40 @@ testFiles = {
     'test_sidLTVdiscIO'
 };
 
-nTests = length(testFiles);
-passed = 0;
-failed = 0;
-failedNames = {};
+runner__nTests = length(runner__testFiles);
+runner__passed = 0;
+runner__failed = 0;
+runner__failedNames = {};
 
-for i = 1:nTests
+for runner__k = 1:runner__nTests
     try
-        run(fullfile(thisDir, [testFiles{i} '.m']));
-        passed = passed + 1;
-    catch e
-        failed = failed + 1;
-        failedNames{end+1} = testFiles{i}; %#ok<SAGROW>
-        fprintf('  *** %s: FAILED ***\n', testFiles{i});
-        fprintf('      Error: %s\n', e.message);
+        run(fullfile(runner__thisDir, [runner__testFiles{runner__k} '.m']));
+        runner__passed = runner__passed + 1;
+    catch runner__e
+        runner__failed = runner__failed + 1;
+        runner__failedNames{end+1} = runner__testFiles{runner__k}; %#ok<SAGROW>
+        fprintf('  *** %s: FAILED ***\n', runner__testFiles{runner__k});
+        fprintf('      Error: %s\n', runner__e.message);
         % Emit GitHub Actions annotation so the error appears in CI check-run output
-        fprintf('::error title=%s::%s\n', testFiles{i}, strrep(e.message, newline, ' '));
+        fprintf('::error title=%s::%s\n', ...
+            runner__testFiles{runner__k}, ...
+            strrep(runner__e.message, newline, ' '));
     end
 end
 
 fprintf('\n=== Test Summary ===\n');
-fprintf('  Total:  %d\n', nTests);
-fprintf('  Passed: %d\n', passed);
-fprintf('  Failed: %d\n', failed);
+fprintf('  Total:  %d\n', runner__nTests);
+fprintf('  Passed: %d\n', runner__passed);
+fprintf('  Failed: %d\n', runner__failed);
 
-if failed > 0
+if runner__failed > 0
     fprintf('\n  Failed tests:\n');
-    for i = 1:length(failedNames)
-        fprintf('    - %s\n', failedNames{i});
+    for runner__k = 1:length(runner__failedNames)
+        fprintf('    - %s\n', runner__failedNames{runner__k});
     end
     fprintf('\n');
-    error('sid:testsFailed', '%d of %d test suites failed.', failed, nTests);
+    error('sid:testsFailed', '%d of %d test suites failed.', ...
+        runner__failed, runner__nTests);
 else
     fprintf('\n  ALL TESTS PASSED\n\n');
 end
