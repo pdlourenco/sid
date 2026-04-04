@@ -450,7 +450,7 @@ Architecture is decomposed into reusable layers:
   - sidCompare: perfect model gives 100% fit, mean predictor gives 0%
   - Cross-method: detrend → estimate → residual → compare end-to-end workflow
 
-### Phase 10 — Validation, Freeze + Release (~4 days) 🔄
+### Phase 10 — Validation, Freeze + Release (~4 days) ✅
 
 - `exampleCompare.m` — head-to-head vs. MathWorks `spa`
 - Octave CI on GitHub Actions
@@ -479,7 +479,7 @@ Architecture is decomposed into reusable layers:
 | 9. ETFE + BTFDR | 4 days | 52 days | ✅ |
 | 9a. Multi-trajectory spectral | 3 days | 55 days | ✅ |
 | 11. Workflow utilities | 4 days | 59 days | ✅ |
-| 10. Validation, freeze + release | 4 days | 63 days | 🔄 |
+| 10. Validation, freeze + release | 4 days | 63 days | ✅ |
 
 ---
 

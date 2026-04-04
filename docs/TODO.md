@@ -16,5 +16,5 @@
 - ~~review all the comments: every mathematical step in the code should be explained and related to the specification whenever possible.~~
 
 ## Release prep
-- Clean up everything 
-- Refactor repo for multi-language
+- ~~Clean up everything~~
+- ~~Refactor repo for multi-language~~ Deferred to v2 (see roadmap "Out of Scope for v1.0")
