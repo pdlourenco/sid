@@ -21,7 +21,7 @@ sid  [Domain]  [Method/Variant]
 | **`sidFreqETFE`** | `etfe` | Empirical transfer function estimate | ✅ |
 | **`sidFreqMap`** | `tfestimate`, `mscohere`, `cpsd` | Time-varying frequency response map (BT or Welch) | ✅ |
 | **`sidSpectrogram`** | `spectrogram` | Short-time FFT spectrogram | ✅ |
-| **`sidLTVdisc`** | — | Discrete LTV state-space identification (COSMIC — Closed-form Optimal data-driven linear time-varying System IdentifiCation) | ✅ |
+| **`sidLTVdisc`** | — | Discrete LTV state-space identification (COSMIC — Closed-form Optimal data-driven linear time-varying SysteM IdentifiCation) | ✅ |
 | **`sidLTVdiscTune`** | — | Lambda tuning (validation-based and frequency-response) | ✅ |
 | **`sidLTVdiscFrozen`** | — | Frozen transfer function G(ω,k) from A(k), B(k) | ✅ |
 | **`sidLTVdiscInit`** | — | Initialize recursive/online COSMIC estimator | ⬜ |

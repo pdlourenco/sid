@@ -815,7 +815,7 @@ Given measured state trajectories `X` and control inputs `U`, estimate `A(k)` an
 
 Here `L` is the number of trajectories. All trajectories must have the same horizon `N+1`.
 
-### 8.3 COSMIC Algorithm (Closed-form Optimal data-driven linear time-varying System IdentifiCation)
+### 8.3 COSMIC Algorithm (Closed-form Optimal data-driven linear time-varying SysteM IdentifiCation)
 
 **Reference:** Carvalho, Soares, Lourenço, Ventura. "COSMIC: fast closed-form identification from large-scale data for LTV systems." arXiv:2112.04355, 2022.
 
