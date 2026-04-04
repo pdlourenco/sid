@@ -7,7 +7,7 @@
 - ~~add instruction on comments to contributing.md~~
 
 ## Tests / examples
-- Adapt tests to confirm with the SPEC
+- ~~Adapt tests to confirm with the SPEC~~
 - Adapt examples as above 
 - Confirm code coverage
 
