@@ -4,19 +4,15 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'matlab/**'
+      - 'matlab/**.m'
       - 'miss_hit.cfg'
       - '.github/scripts/**'
-    paths-ignore:
-      - '**/*.md'
   pull_request:
     branches: [main]
     paths:
-      - 'matlab/**'
+      - 'matlab/**.m'
       - 'miss_hit.cfg'
       - '.github/scripts/**'
-    paths-ignore:
-      - '**/*.md'
 
 jobs:
   miss-hit:
