@@ -9,7 +9,7 @@
 ## Tests / examples
 - ~~Adapt tests to confirm with the SPEC~~
 - ~~Adapt examples as above~~
-- Confirm code coverage
+- ~~Confirm code coverage~~
 
 ## Code
 - Review all the implementation according to the above. Make sure tests and examples are passing
