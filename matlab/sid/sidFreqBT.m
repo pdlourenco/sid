@@ -233,8 +233,11 @@ function result = sidFreqBT(y, u, varargin)
     if isTimeSeries
         [~, PhiVStd] = sidUncertainty([], PhiV, [], N, W, nTraj);
         GStd = [];
-    else
+    elseif ny == 1 && nu == 1
         [GStd, PhiVStd] = sidUncertainty(G, PhiV, Coh, N, W, nTraj);
+    else
+        % MIMO: pass PhiU for diagonal uncertainty approximation
+        [GStd, PhiVStd] = sidUncertainty(G, PhiV, Coh, N, W, nTraj, PhiU);
     end
 
     % ---- Pack result ----

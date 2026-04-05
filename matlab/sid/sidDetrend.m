@@ -114,7 +114,13 @@ function [x_detrended, trend] = sidDetrend(x, varargin)
                 t = (0:segN-1)';
 
                 seg = col(idx:segEnd);
-                coeffs = polyfit(t, seg, min(order, segN - 1));
+                actualOrder = min(order, segN - 1);
+                if actualOrder < order
+                    warning('sid:detrendOrderReduced', ...
+                        ['Segment of length %d is too short for polynomial order %d. ' ...
+                         'Reduced to order %d.'], segN, order, actualOrder);
+                end
+                coeffs = polyfit(t, seg, actualOrder);
                 trendCol(idx:segEnd) = polyval(coeffs, t);
 
                 idx = segEnd + 1;

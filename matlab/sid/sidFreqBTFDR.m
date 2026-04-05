@@ -245,9 +245,10 @@ function result = sidFreqBTFDR(y, u, varargin)
         % MIMO: G(w_k) = Phi_yu(w_k) * Phi_u(w_k)^{-1} (SPEC.md §5.2)
         G = zeros(nf, ny, nu);          % (nf x ny x nu) complex
         PhiV = zeros(nf, ny, ny);       % (nf x ny x ny) noise spectrum
-        GStd = nan(nf, ny, nu);
+        GStd = zeros(nf, ny, nu);
         PhiVStd = zeros(nf, ny, ny);
         Coh = [];
+        eps_floor = 1e-10;
 
         for kk = 1:nf
             Mk_k = Mk(kk);
@@ -270,6 +271,19 @@ function result = sidFreqBTFDR(y, u, varargin)
             % Noise uncertainty (SPEC.md §5.3)
             CW = W(1)^2 + 2 * sum(W(2:end).^2);
             PhiVStd(kk, :, :) = sqrt(2 * CW / Neff) * abs(PhiV_k);
+
+            % Diagonal MIMO G uncertainty: Var{G_{ij}} ≈ C_W/Neff * Phi_v_{ii} / Phi_u_{jj}
+            for ii = 1:ny
+                for jj = 1:nu
+                    phiU_jj = real(PhiU_k(jj, jj));
+                    phiV_ii = max(real(PhiV_k(ii, ii)), 0);
+                    if phiU_jj > eps_floor
+                        GStd(kk, ii, jj) = sqrt(CW / Neff * phiV_ii / phiU_jj);
+                    else
+                        GStd(kk, ii, jj) = Inf;
+                    end
+                end
+            end
         end
     end
 

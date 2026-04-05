@@ -104,10 +104,8 @@ y(:, 1) = filter([1 0.3], [1 -0.7], u(:, 1)) + ...
 y(:, 2) = filter([0.1], [1 -0.6], u(:, 1)) + ...
           filter([1 -0.2], [1 -0.8], u(:, 2)) + 0.1 * randn(N, 1);
 
-warning('off', 'sid:mimoUncertainty');
 warning('off', 'sid:singularPhiU');
 result = sidFreqBT(y, u);
-warning('on', 'sid:mimoUncertainty');
 warning('on', 'sid:singularPhiU');
 
 % Check that noise spectrum is PSD at each frequency
@@ -121,6 +119,64 @@ for kk = 1:nf
 end
 
 fprintf('  DISC-1: MIMO noise spectrum PSD clamping - PASSED\n');
+
+%% API-3: MIMO uncertainty should be finite (diagonal approximation)
+assert(~any(isnan(result.ResponseStd(:))), ...
+    'API-3: MIMO ResponseStd should not be NaN (diagonal approximation).');
+assert(all(result.ResponseStd(:) >= 0), ...
+    'API-3: MIMO ResponseStd should be non-negative.');
+assert(all(isfinite(result.ResponseStd(:)) | isinf(result.ResponseStd(:))), ...
+    'API-3: MIMO ResponseStd entries should be finite or Inf (low input power).');
+
+fprintf('  API-3: MIMO diagonal uncertainty approximation - PASSED\n');
+
+%% API-1: MIMO residual tests all channels
+rng(501);
+N = 500; ny = 2; nu = 1;
+u_res = randn(N, nu);
+y_res = zeros(N, ny);
+y_res(:, 1) = filter([1], [1 -0.8], u_res) + 0.1 * randn(N, 1);
+y_res(:, 2) = filter([0.5], [1 -0.6], u_res) + 0.1 * randn(N, 1);
+G_res = sidFreqBT(y_res, u_res);
+res = sidResidual(G_res, y_res, u_res);
+
+% Should have per-channel fields
+assert(isfield(res, 'AutoCorrAll'), ...
+    'API-1: Should have AutoCorrAll field.');
+assert(isfield(res, 'WhitenessPassAll'), ...
+    'API-1: Should have WhitenessPassAll field.');
+assert(size(res.AutoCorrAll, 2) == ny, ...
+    'API-1: AutoCorrAll should have ny=%d columns.', ny);
+assert(length(res.WhitenessPassAll) == ny, ...
+    'API-1: WhitenessPassAll should have ny=%d entries.', ny);
+% Cross-correlation should test all (output, input) pairs
+assert(isfield(res, 'IndependencePassAll'), ...
+    'API-1: Should have IndependencePassAll field.');
+assert(length(res.IndependencePassAll) == ny * nu, ...
+    'API-1: IndependencePassAll should have ny*nu=%d entries.', ny * nu);
+% Overall pass is conjunction of all channels
+assert(res.WhitenessPass == all(res.WhitenessPassAll), ...
+    'API-1: WhitenessPass should be AND of all channels.');
+assert(res.IndependencePass == all(res.IndependencePassAll), ...
+    'API-1: IndependencePass should be AND of all pairs.');
+
+fprintf('  API-1: Per-channel MIMO residual tests - PASSED\n');
+
+%% NUM-2: Frequency-domain simulation no extrapolation
+rng(601);
+N = 200;
+u_sim = randn(N, 1);
+y_sim = filter([1], [1 -0.8], u_sim) + 0.1 * randn(N, 1);
+G_sim = sidFreqBT(y_sim, u_sim);
+cmp = sidCompare(G_sim, y_sim, u_sim);
+% The predicted output should be finite (no extrapolation artifacts)
+assert(all(isfinite(cmp.Predicted(:))), ...
+    'NUM-2: Predicted output should be finite (no extrapolation).');
+% Fit should be reasonable for a well-identified system
+assert(cmp.Fit(1) > 30, ...
+    'NUM-2: Fit should be reasonable (got %.1f%%).', cmp.Fit(1));
+
+fprintf('  NUM-2: Frequency-domain simulation no extrapolation - PASSED\n');
 
 %% DISC-7: Cell array input for frequency-domain functions
 rng(401);

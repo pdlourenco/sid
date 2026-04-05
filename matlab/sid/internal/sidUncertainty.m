@@ -1,8 +1,9 @@
-function [GStd, PhiVStd] = sidUncertainty(G, PhiV, Coh, N, W, nTraj)
+function [GStd, PhiVStd] = sidUncertainty(G, PhiV, Coh, N, W, nTraj, PhiU)
 % SIDUNCERTAINTY Asymptotic standard deviations for spectral estimates.
 %
 %   [GStd, PhiVStd] = sidUncertainty(G, PhiV, Coh, N, W)
 %   [GStd, PhiVStd] = sidUncertainty(G, PhiV, Coh, N, W, nTraj)
+%   [GStd, PhiVStd] = sidUncertainty(G, PhiV, Coh, N, W, nTraj, PhiU)
 %
 %   Computes the asymptotic standard deviations of the frequency response
 %   and noise spectrum estimates, based on Ljung (1999), pp. 184 and 188.
@@ -11,17 +12,26 @@ function [GStd, PhiVStd] = sidUncertainty(G, PhiV, Coh, N, W, nTraj)
 %   scales as 1/(N*nTraj) instead of 1/N, reflecting the L-fold reduction
 %   from ensemble averaging independent trajectories.
 %
+%   For MIMO systems, pass PhiU (the input auto-spectrum) to enable a
+%   diagonal approximation of the per-element variance:
+%     Var{G_{ij}(w)} ≈ (C_W / Neff) * Phi_v_{ii}(w) / Phi_u_{jj}(w)
+%   This treats each (i,j) element independently and ignores cross-channel
+%   correlations, but gives meaningful error bars. Without PhiU, MIMO
+%   uncertainty returns NaN.
+%
 %   INPUTS:
-%     G     - Complex frequency response estimate (n_f x 1), or [].
-%     PhiV  - Noise spectrum estimate (n_f x 1), real, non-negative.
+%     G     - Complex frequency response estimate, (n_f x n_y x n_u) or [].
+%     PhiV  - Noise spectrum estimate, (n_f x n_y x n_y) or (n_f x 1).
 %     Coh   - Squared coherence (n_f x 1), or [] for time series / MIMO.
 %     N     - Number of data samples per trajectory.
 %     W     - Hann window values for lags 0..M, (M+1 x 1) vector.
 %     nTraj - (optional) Number of trajectories, default 1.
+%     PhiU  - (optional) Input auto-spectrum, (n_f x n_u x n_u). Required
+%             for MIMO uncertainty; ignored for SISO.
 %
 %   OUTPUTS:
-%     GStd    - Standard deviation of G (n_f x 1), or [].
-%     PhiVStd - Standard deviation of PhiV (n_f x 1).
+%     GStd    - Standard deviation of G, same size as G, or [].
+%     PhiVStd - Standard deviation of PhiV, same size as PhiV.
 %
 %   EXAMPLES:
 %     W = sidHannWin(30);
@@ -49,6 +59,9 @@ function [GStd, PhiVStd] = sidUncertainty(G, PhiV, Coh, N, W, nTraj)
     if nargin < 6 || isempty(nTraj)
         nTraj = 1;
     end
+    if nargin < 7
+        PhiU = [];
+    end
 
     % Effective sample size: ensemble averaging L trajectories of length N
     % reduces variance by factor L (see multi_trajectory_spectral_theory.md)
@@ -75,12 +88,35 @@ function [GStd, PhiVStd] = sidUncertainty(G, PhiV, Coh, N, W, nTraj)
         cohSafe = max(Coh, eps_floor);
         GVar = (CW / Neff) .* abs(G).^2 .* (1 - cohSafe) ./ cohSafe;
         GStd = sqrt(GVar);
+    elseif ~isempty(PhiU)
+        % MIMO case: diagonal approximation using noise and input spectra.
+        % Var{G_{ij}(w)} ≈ (C_W / Neff) * Phi_v_{ii}(w) / Phi_u_{jj}(w)
+        % This treats each element independently (Ljung 1999, §9.4).
+        nf = size(G, 1);
+        ny = size(G, 2);
+        nu = size(G, 3);
+        GStd = zeros(nf, ny, nu);
+        eps_floor = 1e-10;
+        for k = 1:nf
+            for ii = 1:ny
+                % Diagonal of noise spectrum at this frequency
+                if ndims(PhiV) == 3 || (ndims(PhiV) == 2 && ny > 1) %#ok<ISMAT>
+                    phiV_ii = real(PhiV(k, ii, ii));
+                else
+                    phiV_ii = real(PhiV(k));
+                end
+                for jj = 1:nu
+                    phiU_jj = real(PhiU(k, jj, jj));
+                    if phiU_jj > eps_floor
+                        GStd(k, ii, jj) = sqrt(CW / Neff * phiV_ii / phiU_jj);
+                    else
+                        GStd(k, ii, jj) = Inf;
+                    end
+                end
+            end
+        end
     else
-        % MIMO case: per-element uncertainty is not computed in v1.0.
-        % Return NaN array of the same size as G.
-        warning('sid:mimoUncertainty', ...
-            ['MIMO frequency response uncertainty is not implemented in v1.0. ' ...
-             'ResponseStd will contain NaN values.']);
+        % MIMO case without PhiU: cannot compute uncertainty.
         GStd = nan(size(G));
     end
 end

@@ -178,47 +178,14 @@ function [y_pred, y_meas] = simulateFreq(model, y, u)
     end
 
     nu = size(u, 2);
-
-    % Interpolate G onto FFT grid and filter
-    freqs_model = model.Frequency;
     G_model = model.Response;
-
-    nfft = N;
-    freqs_fft = (1:floor(nfft/2))' * (2 * pi / nfft);
-
-    U_fft = fft(u, nfft, 1);
-    Y_pred_fft = zeros(nfft, ny);
 
     % Ensure G_model is 3D (Octave may drop trailing singleton dims)
     if ndims(G_model) == 2 && (ny > 1 || nu > 1) %#ok<ISMAT>
         G_model = reshape(G_model, size(G_model, 1), ny, nu);
     end
-    npos = length(freqs_fft);
-    for iy = 1:ny
-        for iu = 1:nu
-            if ny == 1 && nu == 1
-                Gij = G_model(:);
-            else
-                Gij = reshape(G_model(:, iy, iu), [], 1);
-            end
-            G_interp = interp1(freqs_model(:), real(Gij(:)), freqs_fft(:), 'linear', 'extrap') + ...
-                1i * interp1(freqs_model(:), imag(Gij(:)), freqs_fft(:), 'linear', 'extrap');
-            G_interp = G_interp(:);  % ensure column
-            Y_pred_fft(2:npos+1, iy) = Y_pred_fft(2:npos+1, iy) + ...
-                G_interp .* U_fft(2:npos+1, iu);
-        end
-    end
 
-    % Conjugate symmetry for real output
-    for iy = 1:ny
-        if mod(nfft, 2) == 0
-            Y_pred_fft(npos+2:end, iy) = conj(Y_pred_fft(npos:-1:2, iy));
-        else
-            Y_pred_fft(npos+2:end, iy) = conj(Y_pred_fft(npos+1:-1:2, iy));
-        end
-    end
-
-    y_pred = real(ifft(Y_pred_fft, nfft, 1));
+    y_pred = sidFreqDomainSim(G_model, model.Frequency, u, N);
     y_meas = y;
 end
 

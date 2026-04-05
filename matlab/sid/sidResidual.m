@@ -80,75 +80,111 @@ function result = sidResidual(model, y, u, varargin)
         maxLag = min(25, floor(N_eff / 5));
     end
 
-    % ---- Whiteness test: normalised autocorrelation ----
+    % ---- Per-channel whiteness and independence tests ----
+    % Run tests on EVERY output channel, not just the first.
+    % The overall pass/fail requires ALL channels to pass.
     ny = size(e, 2);
-    % Use first channel for SISO tests; average across channels for MIMO
-    if ny == 1
-        e_test = e;
-    else
-        % Average autocorrelation across channels
-        e_test = e(:, 1);  % use first channel for scalar diagnostics
-    end
-
-    Ree = sidCov(e_test, e_test, maxLag);  % (M+1 x 1)
-    Ree0 = Ree(1);
-    if Ree0 > 0
-        autoCorr = Ree / Ree0;
-    else
-        autoCorr = zeros(maxLag + 1, 1);
-    end
-
     confBound = 2.58 / sqrt(N_eff);
-    whitenessPass = all(abs(autoCorr(2:end)) < confBound);
 
-    % ---- Independence test: normalised cross-correlation ----
+    % Determine number of input channels for independence tests
     if ~isTimeSeries
-        % Extract first channel, first trajectory as column vector
         if ndims(u) == 3 %#ok<ISMAT>
-            u_test = u(:, 1, 1);
-        elseif size(u, 2) > 1
-            u_test = u(:, 1);
+            nu = size(u, 2);
+            u_2d = u(:, :, 1);  % use first trajectory
         else
-            u_test = u(:);
+            nu = size(u, 2);
+            u_2d = u;
         end
-        % Ensure same length as residual
-        Nu = min(size(e_test, 1), size(u_test, 1));
-        e_test_trim = e_test(1:Nu, 1);
-        u_test_trim = u_test(1:Nu, 1);
-
-        Reu_pos = sidCov(e_test_trim, u_test_trim, maxLag);  % positive lags
-        Rue_pos = sidCov(u_test_trim, e_test_trim, maxLag);  % for negative lags
-
-        Ruu0 = u_test_trim' * u_test_trim / Nu;
-        denom = sqrt(Ree0 * Ruu0);
-        if denom > 0
-            crossCorr_pos = Reu_pos / denom;
-            crossCorr_neg = Rue_pos / denom;
-        else
-            crossCorr_pos = zeros(maxLag + 1, 1);
-            crossCorr_neg = zeros(maxLag + 1, 1);
-        end
-
-        % Assemble: tau = -M, ..., -1, 0, 1, ..., M
-        crossCorr = [flipud(crossCorr_neg(2:end)); crossCorr_pos];
-        independencePass = all(abs(crossCorr) < confBound);
+        Nu = min(size(e, 1), size(u_2d, 1));
     else
-        crossCorr = [];
-        independencePass = true;  % vacuously true for time-series
+        nu = 0;
+        u_2d = [];
+        Nu = size(e, 1);
     end
+
+    % Storage for per-channel results
+    autoCorr_all   = zeros(maxLag + 1, ny);
+    whitenessPass_all = true(ny, 1);
+
+    if ~isTimeSeries
+        % Cross-correlation: test each (output, input) pair
+        nPairs = ny * nu;
+        crossCorr_all   = zeros(2 * maxLag + 1, nPairs);
+        indepPass_all   = true(nPairs, 1);
+    end
+
+    for ch = 1:ny
+        e_ch = e(1:Nu, ch);
+
+        % ---- Whiteness: normalised autocorrelation ----
+        Ree = sidCov(e_ch, e_ch, maxLag);
+        Ree0 = Ree(1);
+        if Ree0 > 0
+            autoCorr_all(:, ch) = Ree / Ree0;
+        end
+        whitenessPass_all(ch) = all(abs(autoCorr_all(2:end, ch)) < confBound);
+
+        % ---- Independence: normalised cross-correlation per input ----
+        if ~isTimeSeries
+            for iu = 1:nu
+                pairIdx = (ch - 1) * nu + iu;
+                u_ch = u_2d(1:Nu, iu);
+
+                Reu_pos = sidCov(e_ch, u_ch, maxLag);
+                Rue_pos = sidCov(u_ch, e_ch, maxLag);
+
+                Ruu0 = u_ch' * u_ch / Nu;
+                denom = sqrt(Ree0 * Ruu0);
+                if denom > 0
+                    cc_pos = Reu_pos / denom;
+                    cc_neg = Rue_pos / denom;
+                else
+                    cc_pos = zeros(maxLag + 1, 1);
+                    cc_neg = zeros(maxLag + 1, 1);
+                end
+
+                crossCorr_all(:, pairIdx) = [flipud(cc_neg(2:end)); cc_pos];
+                indepPass_all(pairIdx) = all(abs(crossCorr_all(:, pairIdx)) < confBound);
+            end
+        end
+    end
+
+    % Aggregate: pass only if ALL channels/pairs pass
+    whitenessPass    = all(whitenessPass_all);
+    if ~isTimeSeries
+        independencePass = all(indepPass_all);
+        crossCorr = crossCorr_all;
+    else
+        independencePass = true;
+        crossCorr = [];
+    end
+
+    % For backward compatibility and plotting, provide first-channel summary
+    autoCorr = autoCorr_all(:, 1);
 
     % ---- Pack result ----
-    result.Residual         = e;
-    result.AutoCorr         = autoCorr;
-    result.CrossCorr        = crossCorr;
-    result.ConfidenceBound  = confBound;
-    result.WhitenessPass    = whitenessPass;
-    result.IndependencePass = independencePass;
-    result.DataLength       = N_eff;
+    result.Residual           = e;
+    result.AutoCorr           = autoCorr;
+    result.AutoCorrAll        = autoCorr_all;
+    result.CrossCorr          = crossCorr;
+    result.ConfidenceBound    = confBound;
+    result.WhitenessPass      = whitenessPass;
+    result.WhitenessPassAll   = whitenessPass_all;
+    result.IndependencePass   = independencePass;
+    if ~isTimeSeries
+        result.IndependencePassAll = indepPass_all;
+    end
+    result.DataLength         = N_eff;
 
     % ---- Plot ----
     if doPlot
-        plotResidualDiagnostics(autoCorr, crossCorr, confBound, maxLag, isTimeSeries);
+        % Plot first channel for backward-compatible display
+        if ~isTimeSeries
+            crossCorr_plot = crossCorr(:, 1);
+        else
+            crossCorr_plot = [];
+        end
+        plotResidualDiagnostics(autoCorr, crossCorr_plot, confBound, maxLag, isTimeSeries);
     end
 end
 
@@ -212,70 +248,15 @@ function [e, N] = computeResidualFreq(model, y, u)
     end
 
     nu = size(u, 2);
+    G_model = model.Response;
 
-    % Interpolate G onto full FFT grid
-    freqs_model = model.Frequency;  % (nf x 1) rad/sample
-    G_model = model.Response;       % (nf x ny x nu) complex
-
-    nfft = N;
-    freqs_fft = (1:floor(nfft/2))' * (2 * pi / nfft);  % FFT freq grid, rad/sample
-
-    % FFT of input
-    U_fft = fft(u, nfft, 1);  % (nfft x nu)
-
-    % Predicted output in frequency domain
-    Y_pred_fft = zeros(nfft, ny);
-
-    if ny == 1 && nu == 1
-        % SISO: interpolate G onto FFT grid
-        G_interp = interpG(freqs_model, G_model(:), freqs_fft);
-        % Apply to positive frequencies
-        npos = length(freqs_fft);
-        Y_pred_fft(2:npos+1, 1) = G_interp .* U_fft(2:npos+1, 1);
-        % Mirror for negative frequencies (conjugate symmetry)
-        if mod(nfft, 2) == 0
-            Y_pred_fft(npos+2:end, 1) = conj(Y_pred_fft(npos:-1:2, 1));
-        else
-            Y_pred_fft(npos+2:end, 1) = conj(Y_pred_fft(npos+1:-1:2, 1));
-        end
-    else
-        % MIMO: interpolate each channel
-        % Ensure G_model is 3D (Octave may drop trailing singleton dims)
-        if ndims(G_model) == 2 %#ok<ISMAT>
-            G_model = reshape(G_model, size(G_model, 1), ny, nu);
-        end
-        for iy = 1:ny
-            for iu = 1:nu
-                Gij = reshape(G_model(:, iy, iu), [], 1);
-                G_interp = interpG(freqs_model, Gij, freqs_fft);
-                npos = length(freqs_fft);
-                Y_pred_fft(2:npos+1, iy) = Y_pred_fft(2:npos+1, iy) + ...
-                    G_interp .* U_fft(2:npos+1, iu);
-            end
-        end
-        % Mirror
-        npos = length(freqs_fft);
-        for iy = 1:ny
-            if mod(nfft, 2) == 0
-                Y_pred_fft(npos+2:end, iy) = conj(Y_pred_fft(npos:-1:2, iy));
-            else
-                Y_pred_fft(npos+2:end, iy) = conj(Y_pred_fft(npos+1:-1:2, iy));
-            end
-        end
+    % Ensure G_model is 3D (Octave may drop trailing singleton dims)
+    if ndims(G_model) == 2 %#ok<ISMAT>
+        G_model = reshape(G_model, size(G_model, 1), ny, nu);
     end
 
-    y_pred = real(ifft(Y_pred_fft, nfft, 1));
+    y_pred = sidFreqDomainSim(G_model, model.Frequency, u, N);
     e = y - y_pred;
-end
-
-function G_interp = interpG(freqs_model, G, freqs_target)
-% INTERPG Interpolate complex transfer function onto target frequency grid.
-%   Uses linear interpolation of real and imaginary parts.
-%   Always returns a column vector.
-
-    G_interp = interp1(freqs_model(:), real(G(:)), freqs_target(:), 'linear', 'extrap') + ...
-        1i * interp1(freqs_model(:), imag(G(:)), freqs_target(:), 'linear', 'extrap');
-    G_interp = G_interp(:);  % ensure column
 end
 
 function plotResidualDiagnostics(autoCorr, crossCorr, confBound, maxLag, isTimeSeries)
