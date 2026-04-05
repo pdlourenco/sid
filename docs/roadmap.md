@@ -68,7 +68,6 @@ sid  [Domain]  [Method/Variant]
 sid/
 ├── spec/                        % Algorithm specification (single source of truth)
 │   ├── SPEC.md
-│   ├── multi_trajectory_spectral_theory.md
 │   └── cosmic/                  % COSMIC-specific theory
 │       ├── uncertainty_derivation.md
 │       ├── online_recursion.md
@@ -341,7 +340,7 @@ Architecture is decomposed into reusable layers:
 
 ### Phase 9a — Multi-Trajectory Support for Frequency Functions (~3 days) ✅
 
-**Theory:** `spec/multi_trajectory_spectral_theory.md`
+**Theory:** Covered in `spec/SPEC.md` (§2, §4.1, §6)
 
 - Extend `sidFreqBT`, `sidFreqETFE` input parsing to accept 3D arrays `(N × n_ch × L)` and cell arrays
 - Implement ensemble-averaged covariance in `sidCov` (average per-trajectory covariances across 3rd dimension)

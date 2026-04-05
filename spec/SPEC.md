@@ -38,7 +38,7 @@ where `e(t)` is white noise with covariance matrix `Λ`.
 
 **LTV extension:** The `sidFreqMap` function (§6) relaxes the time-invariance assumption by applying spectral analysis (Blackman-Tukey or Welch) to overlapping segments, producing a time-varying frequency response Ĝ(ω, t). Within each segment, local time-invariance is assumed.
 
-**Multi-trajectory support:** All `sid` functions accept multiple independent trajectories (experiments) of the same system. For frequency-domain functions (`sidFreqBT`, `sidFreqETFE`, `sidFreqMap`, `sidSpectrogram`), spectral estimates are ensemble-averaged across trajectories before forming transfer function ratios or power spectra, reducing variance by a factor of `L` without sacrificing frequency resolution. For `sidLTVdisc`, multiple trajectories are aggregated in the data matrices as described in §8. Multi-trajectory data is passed as 3D arrays `(N × n_ch × L)` when all trajectories share the same length, or as cell arrays `{y1, y2, ..., yL}` when lengths differ. See `spec/multi_trajectory_spectral_theory.md` for the mathematical basis.
+**Multi-trajectory support:** All `sid` functions accept multiple independent trajectories (experiments) of the same system. For frequency-domain functions (`sidFreqBT`, `sidFreqETFE`, `sidFreqMap`, `sidSpectrogram`), spectral estimates are ensemble-averaged across trajectories before forming transfer function ratios or power spectra, reducing variance by a factor of `L` without sacrificing frequency resolution. For `sidLTVdisc`, multiple trajectories are aggregated in the data matrices as described in §8. Multi-trajectory data is passed as 3D arrays `(N × n_ch × L)` when all trajectories share the same length, or as cell arrays `{y1, y2, ..., yL}` when lengths differ. See §2, §4.1, and §6 below for the mathematical basis.
 
 ---
 
@@ -1217,7 +1217,7 @@ and propagate the posterior covariance `Σ_kk` to obtain `σ_cosmic(ω, k)` via 
 
 The criterion: **find the largest λ whose COSMIC posterior bands are consistent with the non-parametric bands.**
 
-**Multi-trajectory:** When multiple trajectories are available, `sidFreqMap` should be called with all `L` trajectories to produce ensemble-averaged estimates. This makes the variation metric `Δ_k` in the spectral pre-scan significantly more reliable, since the within-trajectory estimation noise averages out while genuine system variation is preserved. See `spec/multi_trajectory_spectral_theory.md` §3 and §7.
+**Multi-trajectory:** When multiple trajectories are available, `sidFreqMap` should be called with all `L` trajectories to produce ensemble-averaged estimates. This makes the variation metric `Δ_k` in the spectral pre-scan significantly more reliable, since the within-trajectory estimation noise averages out while genuine system variation is preserved. See §2 and §6 above.
 
 #### 8.11.2 Consistency Score
 

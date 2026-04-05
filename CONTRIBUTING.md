@@ -9,7 +9,7 @@ mathematical specification:
 
 - [`spec/`](spec/) — Algorithm specification and mathematical derivations
   (single source of truth for all implementations)
-- [`testdata/`](testdata/) — Cross-language reference test vectors (JSON)
+- [`testdata/`](testdata/) — Cross-language reference test vectors (JSON; see [README](testdata/README.md) for format)
 - [`matlab/`](matlab/) — MATLAB/Octave implementation (stable)
 - [`python/`](python/) — Python implementation (planned)
 - [`julia/`](julia/) — Julia implementation (planned)

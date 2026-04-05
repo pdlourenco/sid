@@ -51,7 +51,7 @@ function [GStd, PhiVStd] = sidUncertainty(G, PhiV, Coh, N, W, nTraj)
     end
 
     % Effective sample size: ensemble averaging L trajectories of length N
-    % reduces variance by factor L (see multi_trajectory_spectral_theory.md)
+    % reduces variance by factor L (see SPEC.md §2)
     Neff = N * nTraj;
 
     % ---- Window norm: C_W = sum_{tau=-M}^{M} W(tau)^2 ----
