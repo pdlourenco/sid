@@ -202,11 +202,11 @@ function result = sidLTVdisc(X, U, varargin)
             Sigma = noiseCov;
             dof = NaN;
         else
-            [Sigma, dof] = estimateNoiseCov(C, D, Xl, P, covMode, N, p, q, isVarLen, horizons);
+            [Sigma, dof] = sidEstimateNoiseCov(C, D, Xl, P, covMode, N, p, q);
         end
 
         % Standard deviations of A(k), B(k) entries
-        [AStd, BStd] = extractStd(P, Sigma, N, p, q);
+        [AStd, BStd] = sidExtractStd(P, Sigma, N, p, q);
 
         result.AStd             = AStd;
         result.BStd             = BStd;
@@ -473,112 +473,5 @@ function bestLambda = lcurveLambda(D, Xl, N, p, q, doPrecondition)
     bestLambda = grid(idx);
 end
 
-function [Sigma, dof] = estimateNoiseCov(C, D, Xl, P, covMode, N, p, q, isVarLen, horizons)
-% ESTIMATENOISECOV Estimate noise covariance from COSMIC residuals.
-%
-%   The data D and Xl are scaled by 1/sqrt(N) (COSMIC convention). The
-%   scaled residuals E_s(k) have noise covariance Sigma/N. This function
-%   returns the UNSCALED noise covariance Sigma by multiplying by N.
-%
-%   The degrees of freedom use the unscaled hat-matrix trace:
-%     nu = sum_k |L(k)| - N * sum_k trace(D_s(k)'D_s(k) * P(k))
-%   where P(k) is from the unscaled Hessian.
-
-    d = p + q;
-    useCell = iscell(D);
-
-    % Accumulate scaled residual scatter matrix and count observations
-    SSR_scaled = zeros(p, p);  % sum of E_s(k)' * E_s(k)
-    totalObs = 0;
-
-    for k = 1:N
-        Ck = C(:, :, k);
-        if useCell
-            Dk  = D{k};
-            Xlk = Xl{k};
-            Lk  = size(Dk, 1);
-        else
-            Dk  = D(:, :, k);
-            Xlk = Xl(:, :, k);
-            Lk  = size(Dk, 1);
-        end
-
-        if Lk == 0
-            continue;
-        end
-
-        Ek = Xlk - Dk * Ck;  % (Lk x p), scaled residuals
-        SSR_scaled = SSR_scaled + Ek' * Ek;
-        totalObs = totalObs + Lk;
-    end
-
-    % Exact degrees of freedom using unscaled hat-matrix trace:
-    % trace(V_u'V_u A_u^{-1}) = N * sum_k trace(D_s'D_s * P_u(k))
-    traceSum = 0;
-    for k = 1:N
-        if useCell
-            Dk = D{k};
-        else
-            Dk = D(:, :, k);
-        end
-        if size(Dk, 1) > 0
-            DtD = Dk' * Dk;  % (d x d), scaled
-            traceSum = traceSum + sum(sum(DtD .* P(:, :, k)));  % trace(DtD_s * P_u(k))
-        end
-    end
-
-    dof = totalObs - N * traceSum;
-
-    % Conservative fallback if exact dof is non-positive
-    if dof <= 0
-        dof = totalObs - N * d;
-        if dof <= 0
-            dof = max(totalObs, 1);
-        end
-    end
-
-    % Unscaled noise covariance: scaled residuals have variance Sigma/N,
-    % so Sigma = N * SSR_scaled / dof
-    Sigma = N * SSR_scaled / dof;
-
-    % Apply covariance mode restriction
-    switch covMode
-        case 'diagonal'
-            Sigma = diag(diag(Sigma));
-        case 'isotropic'
-            Sigma = (trace(Sigma) / p) * eye(p);
-        case 'full'
-            % Keep as is
-    end
-end
-
-function [AStd, BStd] = extractStd(P, Sigma, N, p, q)
-% EXTRACTSTD Compute standard deviations of A(k) and B(k) entries.
-%
-%   Var(A(k)_{ba}) = Sigma_{bb} * P(k)_{aa}       for a = 1,...,p
-%   Var(B(k)_{ba}) = Sigma_{bb} * P(k)_{p+a,p+a}  for a = 1,...,q
-%
-%   Note: C(k) = [A(k)'; B(k)'], so row a of C(k) corresponds to:
-%     a = 1..p   -> row a of A(k)' -> column a of A(k) -> A(k)_{:,a}
-%     a = p+1..d -> row (a-p) of B(k)' -> column (a-p) of B(k) -> B(k)_{:,a-p}
-
-    AStd = zeros(p, p, N);
-    BStd = zeros(p, q, N);
-
-    sigDiag = diag(Sigma);  % (p x 1)
-
-    for k = 1:N
-        pDiag = diag(P(:, :, k));  % (d x 1)
-
-        % A(k)_{b,a} = C(k)_{a,b}, Var = Sigma_{bb} * P(k)_{aa}
-        % AStd(b,a,k) = sqrt(Sigma_{bb} * P(k)_{aa})
-        for a = 1:p
-            AStd(:, a, k) = sqrt(sigDiag * pDiag(a));
-        end
-
-        % B(k)_{b,a} = C(k)_{p+a,b}, Var = Sigma_{bb} * P(k)_{p+a,p+a}
-        for a = 1:q
-            BStd(:, a, k) = sqrt(sigDiag * pDiag(p + a));
-        end
-    end
-end
+% Local functions estimateNoiseCov and extractStd have been moved to
+% shared internal helpers: sidEstimateNoiseCov.m and sidExtractStd.m

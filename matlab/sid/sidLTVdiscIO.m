@@ -127,7 +127,7 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
         else
             X_hat = zeros(N + 1, n, L);
             for l = 1:L
-                X_hat(:, :, l) = squeeze(Y(:, :, l)) * Hpinv';
+                X_hat(:, :, l) = reshape(Y(:, :, l), N + 1, py) * Hpinv';
             end
         end
 
@@ -261,11 +261,10 @@ function result = addUncertainty( ...
     P = sidLTVuncertaintyBackwardPass(S, lambda, N, d);
 
     % Noise covariance from COSMIC residuals (diagonal mode)
-    [Sigma, dof] = estimateNoiseCovLocal( ...
-        C, D, Xl, P, N, n, q, isVarLen, horizons);
+    [Sigma, dof] = sidEstimateNoiseCov(C, D, Xl, P, 'diagonal', N, n, q);
 
     % Standard deviations of A(k) and B(k) entries
-    [AStd, BStd] = extractStdLocal(P, Sigma, N, n, q);
+    [AStd, BStd] = sidExtractStd(P, Sigma, N, n, q);
 
     result.AStd             = AStd;
     result.BStd             = BStd;
@@ -276,75 +275,9 @@ function result = addUncertainty( ...
     result.DegreesOfFreedom = dof;
 end
 
-function [Sigma, dof] = estimateNoiseCovLocal( ...
-    C, D, Xl, P, N, n, q, isVarLen, horizons) %#ok<INUSD>
-% ESTIMATENOISECOVLOCAL Noise covariance from COSMIC residuals (diagonal).
-
-    d = n + q;
-    useCell = iscell(D);
-    SSR_scaled = zeros(n, n);
-    totalObs = 0;
-
-    for k = 1:N
-        Ck = C(:, :, k);
-        if useCell
-            Dk  = D{k};
-            Xlk = Xl{k};
-            Lk  = size(Dk, 1);
-        else
-            Dk  = D(:, :, k);
-            Xlk = Xl(:, :, k);
-            Lk  = size(Dk, 1);
-        end
-        if Lk == 0
-            continue;
-        end
-        Ek = Xlk - Dk * Ck;
-        SSR_scaled = SSR_scaled + Ek' * Ek;
-        totalObs = totalObs + Lk;
-    end
-
-    traceSum = 0;
-    for k = 1:N
-        if useCell
-            Dk = D{k};
-        else
-            Dk = D(:, :, k);
-        end
-        if size(Dk, 1) > 0
-            DtD = Dk' * Dk;
-            traceSum = traceSum + sum(sum(DtD .* P(:, :, k)));
-        end
-    end
-
-    dof = totalObs - N * traceSum;
-    if dof <= 0
-        dof = totalObs - N * d;
-        if dof <= 0
-            dof = max(totalObs, 1);
-        end
-    end
-
-    Sigma = diag(diag(N * SSR_scaled / dof));
-end
-
-function [AStd, BStd] = extractStdLocal(P, Sigma, N, n, q)
-% EXTRACTSTDLOCAL Standard deviations of A(k) and B(k) entries.
-
-    AStd = zeros(n, n, N);
-    BStd = zeros(n, q, N);
-    sigDiag = diag(Sigma);
-
-    for k = 1:N
-        pDiag = diag(P(:, :, k));
-        for a = 1:n
-            AStd(:, a, k) = sqrt(sigDiag * pDiag(a));
-        end
-        for a = 1:q
-            BStd(:, a, k) = sqrt(sigDiag * pDiag(n + a));
-        end
-    end
-end
+% Local functions estimateNoiseCovLocal and extractStdLocal have been
+% replaced by shared internal helpers: sidEstimateNoiseCov.m and
+% sidExtractStd.m
 
 function [Y, U, H, lambda, R, maxIter, tol, mu, muTol, doTrustRegion, ...
           N, n, py, q, L, isVarLen, horizons] = parseInputs(Y, U, H, varargin)

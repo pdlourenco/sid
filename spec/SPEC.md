@@ -332,6 +332,20 @@ Var{Φ̂_y(ω)} ≈ (2 × C_W / N) × Φ̂_y(ω)²
 
 This is the standard asymptotic result for windowed spectral estimates.
 
+### 3.6 MIMO Variance (Diagonal Approximation)
+
+The SISO formula in §3.3 does not directly extend to MIMO systems because the multi-input, multi-output coherence structure is more complex. The implementation uses a **diagonal approximation** that treats each element `Ĝ_{ij}(ω)` independently:
+
+```
+Var{Ĝ_{ij}(ω)} ≈ (C_W / N_eff) × Φ̂_v_{ii}(ω) / Φ̂_u_{jj}(ω)
+```
+
+where `Φ̂_v_{ii}` is the `(i,i)` diagonal of the noise spectrum matrix and `Φ̂_u_{jj}` is the `(j,j)` diagonal of the input spectrum matrix. This is the ratio of noise power at output `i` to input power at input `j`, scaled by the window norm — equivalent to treating each (i,j) channel as a SISO system.
+
+**Regularization:** If `Φ̂_u_{jj}(ω_k) < ε` (where `ε = 1e-10`), set `σ_{G_{ij}}(ω_k) = Inf`.
+
+**Limitations:** This approximation ignores cross-channel correlations in both the noise and input spectra. It is exact when inputs are uncorrelated and the noise is channel-independent, and provides a reasonable approximation otherwise. A full MIMO treatment based on `Φ̂_u(ω)^{-1} ⊗ Φ̂_v(ω)` is deferred to a future version.
+
 ---
 
 ## 4. `sidFreqETFE` — Empirical Transfer Function Estimate
@@ -820,11 +834,13 @@ C(k) = [A(k)ᵀ; B(k)ᵀ] ∈ ℝ⁽ᵖ⁺ᵍ⁾ˣᵖ       k = 0, ..., N-1
 For `L` trajectories at time step `k`:
 
 ```
-D(k) = [X(k)ᵀ  U(k)ᵀ] ∈ ℝᴸˣ⁽ᵖ⁺ᵍ⁾       (data matrix)
-X'(k) = X(k+1)ᵀ ∈ ℝᴸˣᵖ                    (next-state matrix)
+D(k) = [X(k)ᵀ  U(k)ᵀ] / sqrt(L) ∈ ℝᴸˣ⁽ᵖ⁺ᵍ⁾       (data matrix)
+X'(k) = X(k+1)ᵀ / sqrt(L) ∈ ℝᴸˣᵖ                    (next-state matrix)
 ```
 
 where `X(k) = [x₁(k), x₂(k), ..., x_L(k)]` collects states from all trajectories.
+
+**Normalization:** The `1/sqrt(L)` scaling ensures that `D(k)ᵀD(k)` converges to the empirical covariance as `L → ∞`, making the normal equations (and hence the effective regularization strength `λ`) independent of the number of trajectories. For variable-length trajectories (§8.8), `L` is replaced by `|L(k)|`, the number of active trajectories at step `k`.
 
 #### 8.3.3 Cost Function
 
@@ -897,6 +913,8 @@ S_ij^PC = S_kk⁻¹ S_ij         for i ≠ j
 ```
 
 This rescales each block row of the tridiagonal system to have identity on the diagonal, reducing the condition number of the matrices that need to be inverted.
+
+> **v1.0 implementation note:** Preconditioning is not available in v1.0. When `'Precondition', true` is requested, the function issues a warning and the `Preconditioned` output field is set to `'not_implemented'`. The off-diagonal blocks of the preconditioned system require `S_kk⁻¹`-weighted coupling terms, which the current block tridiagonal solver does not support. This will be addressed in a future version.
 
 ### 8.4 Lambda Selection
 
@@ -976,7 +994,7 @@ where `x̂` is the state predicted by propagating the identified model from init
 | `InputDim` | scalar | q |
 | `NumTrajectories` | scalar | L |
 | `Algorithm` | char | `'cosmic'` |
-| `Preconditioned` | logical | Whether preconditioning was applied |
+| `Preconditioned` | logical or char | `false` if not requested, `'not_implemented'` if requested but unavailable (v1.0), `true` when implemented and applied |
 | `Method` | char | `'sidLTVdisc'` |
 
 ### 8.6 Usage Examples
@@ -1068,59 +1086,94 @@ H = V^T V + F^T Υ F
 
 This is exactly the block tridiagonal matrix `LM` from the COSMIC derivation. The posterior covariance is `Σ = σ² H⁻¹`.
 
-#### 8.9.2 Diagonal Block Extraction via Forward-Backward Pass
+#### 8.9.2 Diagonal Block Extraction via Left-Right Schur Complements
 
-The full `H⁻¹` is `N(p+q) × N(p+q)` — too large to store. But we only need the diagonal blocks `Σ_kk = σ² [H⁻¹]_kk`, which give the marginal posterior covariance of `C(k)` at each time step.
+The full `H⁻¹` is `N(p+q) × N(p+q)` — too large to store. But we only need the diagonal blocks `P(k) = [H⁻¹]_kk`, which give the marginal posterior covariance of `C(k)` at each time step.
 
-The diagonal blocks of a block tridiagonal inverse can be computed by a second backward pass reusing the `Λ_k` matrices from COSMIC's forward pass.
+For a symmetric block tridiagonal matrix, the diagonal blocks of the inverse can be computed via **left and right Schur complements**:
 
-**Algorithm (Uncertainty Backward Pass):**
-
-```
-// Λ_k already computed during COSMIC forward pass
-
-// Initialize at last time step
-P(N-1) = Λ_{N-1}⁻¹
-
-// Backward pass: k = N-2, ..., 0
-For k = N-2 down to 0:
-    G_k = λ_{k+1} Λ_k⁻¹                      // gain matrix
-    P(k) = Λ_k⁻¹ + G_k P(k+1) G_k^T          // Joseph form
-```
-
-where `P(k) = [H⁻¹]_kk` is the `(p+q) × (p+q)` diagonal block of the inverse Hessian at step `k`.
-
-**Complexity:** `O(N(p+q)³)` — identical to COSMIC itself. The `Λ_k⁻¹` are already computed during the forward pass, so the marginal cost is one additional backward sweep of matrix multiplications.
-
-**Connection to Kalman smoothing:** The forward pass computes `Λ_k` (analogous to the Kalman filter's predicted covariance), and the uncertainty backward pass computes `P(k)` (analogous to the Rauch-Tung-Striebel smoother's smoothed covariance). This is not a coincidence — the Bayesian interpretation of COSMIC's regularized least squares *is* a Kalman smoother applied to the parameter evolution model `C(k+1) = C(k) + w_k`.
-
-#### 8.9.3 Noise Variance Estimation
-
-The noise variance `σ²` can be estimated from the data fidelity residuals:
+**Step 1: Reconstruct unscaled Hessian diagonal blocks.** The COSMIC solver normalizes data by `1/sqrt(L)` (§8.3.2), so the scaled block diagonal terms `S_scaled(k)` contain `D_s(k)ᵀD_s(k) + reg(k)`. Reconstruct the unscaled blocks:
 
 ```
-σ̂² = (2 / (N × L × p)) × h(C*)
+S(k) = L × (S_scaled(k) - reg(k)) + reg(k)
 ```
 
-where `h(C*)` is the data fidelity term evaluated at the optimal solution. This is the maximum likelihood estimate under the Gaussian assumption.
+where `reg(k)` is the regularization contribution: `λ₁I` for `k=0`, `λ_{N-1}I` for `k=N-1`, and `(λ_k + λ_{k+1})I` otherwise.
 
-#### 8.9.4 Output Fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `AStd` | `(p × p × N)` | Standard deviation of each A(k) element |
-| `BStd` | `(p × q × N)` | Standard deviation of each B(k) element |
-| `P` | `(p+q × p+q × N)` | Posterior covariance `Σ_kk` at each step |
-| `NoiseVariance` | scalar | Estimated `σ̂²` |
-
-The standard deviations are extracted from the diagonal of `Σ_kk`:
+**Step 2: Left Schur complements (forward pass):**
 
 ```
-AStd(i, j, k) = σ̂ × sqrt(P(k)_{j, j})    for the (i,j) element of A(k)
-BStd(i, j, k) = σ̂ × sqrt(P(k)_{p+j, p+j}) for the (i,j) element of B(k)
+Λ^L(0) = S(0)
+
+For k = 1, ..., N-1:
+    Λ^L(k) = S(k) - λ_k² [Λ^L(k-1)]⁻¹
 ```
 
-(Note: `C(k) = [A(k)'; B(k)']`, so the rows of `C` are columns of `A` and `B`.)
+**Step 3: Right Schur complements (backward pass):**
+
+```
+Λ^R(N-1) = S(N-1)
+
+For k = N-2, ..., 0:
+    Λ^R(k) = S(k) - λ_{k+1}² [Λ^R(k+1)]⁻¹
+```
+
+**Step 4: Combine:**
+
+```
+P(k) = [Λ^L(k) + Λ^R(k) - S(k)]⁻¹
+```
+
+This identity holds because `Λ^L(k)` captures the information from blocks `0..k` and `Λ^R(k)` captures blocks `k..N-1`, with `S(k)` double-counted and therefore subtracted.
+
+**Complexity:** `O(N(p+q)³)` — two sequential passes of `(p+q)×(p+q)` matrix inversions, identical cost to COSMIC itself.
+
+**Connection to Kalman smoothing:** The left Schur complement `Λ^L(k)` is analogous to the Kalman filter's predicted information matrix, and the right complement `Λ^R(k)` to a backward information filter. Their combination produces the smoothed covariance, paralleling the Rauch-Tung-Striebel smoother. This is not a coincidence — the Bayesian interpretation of COSMIC's regularized least squares *is* a Kalman smoother applied to the parameter evolution model `C(k+1) = C(k) + w_k`.
+
+#### 8.9.3 Noise Covariance Estimation
+
+The noise model is `w(k) ~ N(0, Σ)` where `Σ ∈ ℝᵖˣᵖ` is the noise covariance matrix. The user may provide `Σ` directly (e.g., from sensor specifications) or let the implementation estimate it from the COSMIC residuals.
+
+**Estimation from residuals.** The scaled residuals `E_s(k) = X'_s(k) - D_s(k) C(k)` have covariance `Σ/L` (due to the `1/sqrt(L)` data scaling). The unscaled noise covariance is:
+
+```
+Σ̂ = L × (Σ_k E_s(k)ᵀ E_s(k)) / ν
+```
+
+where `ν` is the effective degrees of freedom:
+
+```
+ν = Σ_k |L(k)| - L × Σ_k trace(D_s(k)ᵀ D_s(k) × P(k))
+```
+
+The second term is the hat-matrix trace correction, ensuring that the effective number of free parameters is subtracted. If `ν ≤ 0` (heavily over-parameterized), a conservative fallback `ν = Σ_k |L(k)| - N × d` is used.
+
+**Covariance modes.** The `'CovarianceMode'` option controls the structure imposed on `Σ̂`:
+
+| Mode | Structure | Use case |
+|------|-----------|----------|
+| `'diagonal'` (default) | `Σ̂ = diag(diag(Σ̂_full))` | Independent noise per state component |
+| `'full'` | `Σ̂ = Σ̂_full` | Correlated noise across states |
+| `'isotropic'` | `Σ̂ = (trace(Σ̂_full)/p) × I` | Equal noise on all states |
+
+**Posterior covariance.** Given `Σ` (provided or estimated), the posterior covariance of the parameter matrix at step `k` is:
+
+```
+Cov(vec(C(k))) = Σ ⊗ P(k)
+```
+
+where `P(k)` is the diagonal block from §8.9.2 and `⊗` is the Kronecker product.
+
+#### 8.9.4 Standard Deviations
+
+The standard deviations are extracted from the Kronecker structure:
+
+```
+Var(A(k)_{b,a}) = Σ_{bb} × P(k)_{a,a}     → AStd(b, a, k) = sqrt(Σ_{bb} × P(k)_{a,a})
+Var(B(k)_{b,a}) = Σ_{bb} × P(k)_{p+a,p+a} → BStd(b, a, k) = sqrt(Σ_{bb} × P(k)_{p+a,p+a})
+```
+
+(Note: `C(k) = [A(k)'; B(k)']`, so row `a` of `C` is column `a` of `A`, and row `p+a` of `C` is column `a` of `B`.)
 
 ### 8.10 Online/Recursive COSMIC
 
@@ -1202,6 +1255,21 @@ G_cosmic(ω, k) = (e^{jω} I - A(k))⁻¹ B(k)
 ```
 
 and propagate the posterior covariance `Σ_kk` to obtain `σ_cosmic(ω, k)` via the Jacobian of the `(A, B) → G(ω)` mapping.
+
+**Frozen transfer function Jacobian.** Let `R = (e^{jω}I - A(k))⁻¹`. The Jacobian entries are:
+
+```
+∂G_{ab}/∂A_{ji} = R_{aj} × [R × B]_{ib}
+∂G_{ab}/∂B_{ji} = R_{aj} × δ_{ib}
+```
+
+Since `C(k) = [A(k)ᵀ; B(k)ᵀ]` and `Cov(vec(C(k))) = Σ ⊗ P(k)`, the element-wise variance is:
+
+```
+Var(G_{ab}) = Σ_{r,j} |∂G_{ab}/∂C_{rj}|² × Σ_{jj} × P(k)_{rr}
+```
+
+where rows `r = 1..p` correspond to `A` columns and rows `r = p+1..d` to `B` columns.
 
 The criterion: **find the largest λ whose COSMIC posterior bands are consistent with the non-parametric bands.**
 
