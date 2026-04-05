@@ -6,7 +6,7 @@ function sidInstall()
 %   Adds the sid root folder and the internal subfolder to the path.
 %   Run this once per session, or add the following to your startup.m:
 %
-%       run('/path/to/sid/sidInstall.m')
+%       run('/path/to/sid-matlab/matlab/sidInstall.m')
 %
 %   EXAMPLES:
 %     sidInstall
@@ -29,9 +29,10 @@ function sidInstall()
 %  -----------------------------------------------------------------------
 
     rootDir = fileparts(mfilename('fullpath'));
-    addpath(rootDir);
-    addpath(fullfile(rootDir, 'internal'));
+    sidDir  = fullfile(rootDir, 'sid');
+    addpath(sidDir);
+    addpath(fullfile(sidDir, 'internal'));
     fprintf('sid: added to path.\n');
-    fprintf('  %s\n', rootDir);
-    fprintf('  %s\n', fullfile(rootDir, 'internal'));
+    fprintf('  %s\n', sidDir);
+    fprintf('  %s\n', fullfile(sidDir, 'internal'));
 end
