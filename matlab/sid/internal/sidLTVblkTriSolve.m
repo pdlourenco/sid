@@ -78,6 +78,12 @@ function [w, Lbd] = sidLTVblkTriSolve(S, U, Theta)
     Y{1}   = Lbd{1} \ Theta{1};
 
     for k = 2:K
+        rc = rcond(Lbd{k-1});
+        if rc < eps
+            warning('sid:singularLbd', ...
+                ['Block tridiagonal forward pass: Lbd{%d} is near-singular ' ...
+                 '(rcond=%.2e). Results may be unreliable.'], k-1, rc);
+        end
         LbdInvU = Lbd{k-1} \ U{k-1};
         Lbd{k}  = S{k} - U{k-1}' * LbdInvU;
         Y{k}    = Lbd{k} \ (Theta{k} - U{k-1}' * Y{k-1});
