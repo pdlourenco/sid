@@ -78,6 +78,9 @@ function [GStd, PhiVStd] = sidUncertainty(G, PhiV, Coh, N, W, nTraj)
     else
         % MIMO case: per-element uncertainty is not computed in v1.0.
         % Return NaN array of the same size as G.
+        warning('sid:mimoUncertainty', ...
+            ['MIMO frequency response uncertainty is not implemented in v1.0. ' ...
+             'ResponseStd will contain NaN values.']);
         GStd = nan(size(G));
     end
 end

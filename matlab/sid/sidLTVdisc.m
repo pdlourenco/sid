@@ -151,7 +151,13 @@ function result = sidLTVdisc(X, U, varargin)
 
     % ---- Preconditioning ----
     if doPrecondition
-        [S, T, lambda] = precondition(S, T, lambda, N, p, q);
+        warning('sid:preconditionUnsupported', ...
+            ['Preconditioning is disabled in v1.0 due to a known issue ' ...
+             'with off-diagonal block handling. Using unpreconditioned solver.']);
+        doPrecondition = false;
+        precondRequested = true;
+    else
+        precondRequested = false;
     end
 
     % ---- COSMIC forward-backward pass (SPEC.md §8.3.4) ----
@@ -174,7 +180,11 @@ function result = sidLTVdisc(X, U, varargin)
     result.InputDim        = q;
     result.NumTrajectories = L;
     result.Algorithm       = algorithm;
-    result.Preconditioned  = doPrecondition;
+    if precondRequested
+        result.Preconditioned = 'not_implemented';
+    else
+        result.Preconditioned = false;
+    end
     result.Method          = 'sidLTVdisc';
 
     % ---- Bayesian uncertainty estimation (SPEC.md §8.9) ----
@@ -429,9 +439,6 @@ function bestLambda = lcurveLambda(D, Xl, N, p, q, doPrecondition)
     for j = 1:nGrid
         lam = grid(j) * ones(N - 1, 1);
         [S, T] = sidLTVbuildBlockTerms(D, Xl, lam, N, p, q);
-        if doPrecondition
-            [S, T, lam] = precondition(S, T, lam, N, p, q);
-        end
         [C, ~] = sidLTVcosmicSolve(S, T, lam, N, p, q);
 
         A = permute(C(1:p, :, :), [2 1 3]);

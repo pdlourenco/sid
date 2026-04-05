@@ -29,7 +29,7 @@ function [y, u, N, ny, nu, isTimeSeries, nTraj] = sidValidateData(y, u)
 %     [y, u, N, ny, nu, isTS] = sidValidateData(y, u);
 %
 %   SPECIFICATION:
-%     SPEC.md §10.1 — Input Validation
+%     (Input validation — not yet in SPEC.md)
 %
 %   See also: sidParseOptions, sidFreqBT
 %
@@ -46,6 +46,76 @@ function [y, u, N, ny, nu, isTimeSeries, nTraj] = sidValidateData(y, u)
 %   For full documentation and examples, visit
 %   https://github.com/pdlourenco/sid-matlab
 %  -----------------------------------------------------------------------
+
+    % ---- Handle cell array input (variable-length trajectories) ----
+    % Cell arrays are trimmed to the shortest trajectory length and
+    % stacked into a 3D array. This follows SPEC.md §2.1.
+    if iscell(y)
+        isTimeSeries = isempty(u) || (iscell(u) && isempty(u));
+        L = numel(y);
+        if L == 0
+            error('sid:badInput', 'Cell arrays must not be empty.');
+        end
+        if ~isTimeSeries
+            if ~iscell(u)
+                error('sid:badInput', ...
+                    'When y is a cell array, u must also be a cell array or [].');
+            end
+            if numel(u) ~= L
+                error('sid:dimMismatch', ...
+                    'y has %d trajectories but u has %d.', L, numel(u));
+            end
+        end
+
+        % Determine common length (trim to shortest)
+        lengths = zeros(L, 1);
+        for l = 1:L
+            if isvector(y{l})
+                y{l} = y{l}(:);
+            end
+            lengths(l) = size(y{l}, 1);
+        end
+        N_common = min(lengths);
+        ny = size(y{1}, 2);
+
+        % Stack into 3D array
+        y_3d = zeros(N_common, ny, L);
+        for l = 1:L
+            if size(y{l}, 2) ~= ny
+                error('sid:dimMismatch', ...
+                    'y{%d} has %d columns, expected %d.', l, size(y{l}, 2), ny);
+            end
+            y_3d(:, :, l) = y{l}(1:N_common, :);
+        end
+        y = y_3d;
+
+        if ~isTimeSeries
+            nu = size(u{1}, 2);
+            u_3d = zeros(N_common, nu, L);
+            for l = 1:L
+                if isvector(u{l})
+                    u{l} = u{l}(:);
+                end
+                if size(u{l}, 2) ~= nu
+                    error('sid:dimMismatch', ...
+                        'u{%d} has %d columns, expected %d.', l, size(u{l}, 2), nu);
+                end
+                if size(u{l}, 1) < N_common
+                    error('sid:sizeMismatch', ...
+                        'u{%d} has %d samples but y requires at least %d.', ...
+                        l, size(u{l}, 1), N_common);
+                end
+                u_3d(:, :, l) = u{l}(1:N_common, :);
+            end
+            u = u_3d;
+        end
+
+        if any(lengths ~= N_common)
+            warning('sid:trimmedTrajectories', ...
+                'Variable-length trajectories trimmed to shortest length N = %d.', ...
+                N_common);
+        end
+    end
 
     % ---- Ensure column orientation ----
     if isvector(y)

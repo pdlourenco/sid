@@ -27,7 +27,7 @@ function varargout = sidSpectrumPlot(result, varargin)
 %     sidSpectrumPlot(result, 'Confidence', 3);
 %
 %   SPECIFICATION:
-%     SPEC.md §11.2 — sidSpectrumPlot
+%     (Spectrum plotting — not yet in SPEC.md)
 %
 %   See also: sidFreqBT, sidBodePlot
 %

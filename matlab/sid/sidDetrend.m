@@ -37,7 +37,7 @@ function [x_detrended, trend] = sidDetrend(x, varargin)
 %     result = sidFreqBT(y_dt, u_dt);
 %
 %   SPECIFICATION:
-%     SPEC.md §13 — Data Preprocessing
+%     (Data preprocessing — not yet in SPEC.md)
 %
 %   See also: sidFreqBT, sidFreqETFE, sidFreqMap
 %

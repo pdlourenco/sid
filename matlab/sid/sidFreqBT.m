@@ -188,15 +188,44 @@ function result = sidFreqBT(y, u, varargin)
         % MIMO: G(w) = Phi_yu(w) * Phi_u(w)^{-1} (SPEC.md §3.2)
         G = zeros(nf, ny, nu);
         PhiV = zeros(nf, ny, ny);
+        epsReg = 1e-10;
+        warnedSingular = false;
         for k = 1:nf
             PhiU_k = reshape(PhiU(k, :, :), nu, nu);
             PhiYU_k = reshape(PhiYU(k, :, :), ny, nu);
             PhiY_k = reshape(PhiY(k, :, :), ny, ny);
-            G(k, :, :) = PhiYU_k / PhiU_k;
-            % Phi_v(w) = Phi_y(w) - Phi_yu(w) * Phi_u(w)^{-1} * Phi_uy(w)
-            PhiV(k, :, :) = PhiY_k - PhiYU_k / PhiU_k * PhiYU_k';
+
+            % Regularization: check condition of Phi_u (SPEC.md §2.6)
+            rc = rcond(PhiU_k);
+            if rc < epsReg
+                G(k, :, :) = NaN;
+                PhiV(k, :, :) = real(PhiY_k);
+                if ~warnedSingular
+                    warning('sid:singularPhiU', ...
+                        ['Input spectrum Phi_u is near-singular at some ' ...
+                         'frequencies. G set to NaN at those points.']);
+                    warnedSingular = true;
+                end
+            else
+                G(k, :, :) = PhiYU_k / PhiU_k;
+                PhiV(k, :, :) = PhiY_k - PhiYU_k / PhiU_k * PhiYU_k';
+            end
         end
         PhiV = real(PhiV);
+
+        % Clamp MIMO noise spectrum to PSD (SPEC.md §2.7):
+        % zero any negative eigenvalues at each frequency.
+        for k = 1:nf
+            Vk = reshape(PhiV(k, :, :), ny, ny);
+            Vk = (Vk + Vk') / 2;  % enforce symmetry
+            [Veig, Deig] = eig(Vk);
+            d = diag(Deig);
+            if any(d < 0)
+                d = max(d, 0);
+                Vk = Veig * diag(d) * Veig';
+                PhiV(k, :, :) = real(Vk);
+            end
+        end
         Coh = [];
     end
 

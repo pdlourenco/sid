@@ -38,7 +38,7 @@ function result = sidCompare(model, y, u, varargin)
 %     100% = perfect, 0% = no better than mean, negative = worse than mean.
 %
 %   SPECIFICATION:
-%     SPEC.md §15 — Model Output Comparison
+%     (Model output comparison — not yet in SPEC.md)
 %
 %   See also: sidResidual, sidFreqBT, sidLTVdisc
 %
@@ -73,7 +73,7 @@ function result = sidCompare(model, y, u, varargin)
             'Model struct must have Response field (freq-domain) or A,B fields (state-space).');
     end
 
-    % ---- Compute NRMSE fit (SPEC.md §15) ----
+    % ---- Compute NRMSE fit ----
     % fit = 100 * (1 - ||y - y_pred|| / ||y - mean(y)||)
     ny = size(y_meas, 2);
     fitVec = zeros(1, ny);

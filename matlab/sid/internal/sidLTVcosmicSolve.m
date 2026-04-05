@@ -66,7 +66,15 @@ function [C, Lbd] = sidLTVcosmicSolve(S, T, lambda, N, p, q)
     Y(:, :, 1)   = Lbd(:, :, 1) \ T(:, :, 1);
 
     for k = 2:N
-        Lbd(:, :, k) = S(:, :, k) - lambda(k-1)^2 * (Lbd(:, :, k-1) \ I);
+        Lbd_prev = Lbd(:, :, k-1);
+        rc = rcond(Lbd_prev);
+        if rc < eps
+            warning('sid:singularLbd', ...
+                ['COSMIC forward pass: Lbd(%d) is near-singular (rcond=%.2e). ' ...
+                 'Results may be unreliable. Try adjusting lambda.'], ...
+                k-1, rc);
+        end
+        Lbd(:, :, k) = S(:, :, k) - lambda(k-1)^2 * (Lbd_prev \ I);
         Y(:, :, k)   = Lbd(:, :, k) \ (T(:, :, k) + lambda(k-1) * Y(:, :, k-1));
     end
 

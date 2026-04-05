@@ -200,8 +200,10 @@ function [bestResult, bestLambda, info] = frequencyTune(X, U, varargin)
     % Process each state component x_i as a separate SISO channel.
     % MIMO mode produces NaN for ResponseStd in v1.0, so SISO per-channel
     % is needed to get valid uncertainty estimates for the Mahalanobis test.
+    % All trajectories are passed to sidFreqMap for ensemble averaging
+    % (SPEC.md §8.11).
     if iscell(X)
-        u_freq = U{1};
+        u_freq = U;  % pass all trajectories (cell array)
     else
         nTrajData = size(X, 3);
         u_freq = U;
@@ -213,7 +215,11 @@ function [bestResult, bestLambda, info] = frequencyTune(X, U, varargin)
     fmapResults = cell(p, 1);
     for ch = 1:p
         if iscell(X)
-            y_ch = X{1}(1:end-1, ch);
+            % Build cell array of single-channel outputs from all trajectories
+            y_ch = cell(size(X));
+            for l = 1:numel(X)
+                y_ch{l} = X{l}(1:end-1, ch);
+            end
         else
             if nTrajData > 1
                 y_ch = X(1:N, ch, :);  % (N x 1 x L) — single state component

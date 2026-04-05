@@ -125,20 +125,15 @@ function result = sidFreqETFE(y, u, varargin)
             Udft = sidDFT(u, freqs, useFFT); % (nf x nu)
         end
     else
-        % Multi-trajectory H1 estimator: G = sum_l Y_l / sum_l U_l
-        Ydft = sidDFT(y(:, :, 1), freqs, useFFT);
-        if ~isTimeSeries
-            Udft = sidDFT(u(:, :, 1), freqs, useFFT);
-        end
-        for l = 2:nTraj
-            Ydft = Ydft + sidDFT(y(:, :, l), freqs, useFFT);
-            if ~isTimeSeries
-                Udft = Udft + sidDFT(u(:, :, l), freqs, useFFT);
-            end
-        end
-        % Note: for ETFE, we keep the summed DFTs (not averaged), because
-        % G = sum(Y)/sum(U) is the H1 estimator from pooled data.
-        % The periodogram scaling (1/N) is applied per original convention.
+        % Multi-trajectory: compute DFTs per trajectory. For the
+        % input-output case, cross-periodograms are averaged before
+        % forming the ratio (H1 estimator, SPEC.md §4.1):
+        %   G = (1/L) sum_l Y_l conj(U_l) / ((1/L) sum_l |U_l|^2)
+        % Single-trajectory DFTs are stored only for the time-series path;
+        % for I/O, cross- and auto-periodograms are accumulated in the
+        % transfer function formation section below.
+        Ydft = [];
+        Udft = [];
     end
 
     % ---- Form transfer function and noise spectrum (SPEC.md §4.2-4.3) ----
@@ -180,17 +175,45 @@ function result = sidFreqETFE(y, u, varargin)
         Coh = [];
 
     elseif ny == 1 && nu == 1
-        % SISO: G(w) = Y(w) / U(w) (SPEC.md §4.2)
+        % SISO: G(w) = Phi_yu(w) / Phi_u(w) via H1 estimator (SPEC.md §4.2)
         epsReg = 1e-10;
-        Uabs = abs(Udft);
-        Umax = max(Uabs);
 
-        G = zeros(nf, 1);
-        for kk = 1:nf
-            if Uabs(kk) < epsReg * Umax
-                G(kk) = NaN + 1j*NaN;
-            else
-                G(kk) = Ydft(kk) / Udft(kk);
+        if nTraj == 1
+            % Single trajectory: G = Y / U directly
+            Uabs = abs(Udft);
+            Umax = max(Uabs);
+
+            G = zeros(nf, 1);
+            for kk = 1:nf
+                if Uabs(kk) < epsReg * Umax
+                    G(kk) = NaN + 1j*NaN;
+                else
+                    G(kk) = Ydft(kk) / Udft(kk);
+                end
+            end
+        else
+            % Multi-trajectory H1: average cross-periodograms (SPEC.md §4.1)
+            % Phi_yu = (1/L) sum_l Y_l conj(U_l)
+            % Phi_u  = (1/L) sum_l |U_l|^2
+            PhiYU = zeros(nf, 1);
+            PhiU  = zeros(nf, 1);
+            for l = 1:nTraj
+                Yl = sidDFT(y(:, :, l), freqs, useFFT);
+                Ul = sidDFT(u(:, :, l), freqs, useFFT);
+                PhiYU = PhiYU + Yl .* conj(Ul);
+                PhiU  = PhiU  + abs(Ul).^2;
+            end
+            PhiYU = PhiYU / nTraj;
+            PhiU  = PhiU  / nTraj;
+
+            Umax = max(PhiU);
+            G = zeros(nf, 1);
+            for kk = 1:nf
+                if PhiU(kk) < epsReg * Umax
+                    G(kk) = NaN + 1j*NaN;
+                else
+                    G(kk) = PhiYU(kk) / PhiU(kk);
+                end
             end
         end
 
@@ -200,41 +223,72 @@ function result = sidFreqETFE(y, u, varargin)
         end
 
         % Noise spectrum: Phi_v(w) = (1/N) * |Y(w) - G(w) * U(w)|^2
-        residual = Ydft - G .* Udft;
-        PhiV = (1/N) * abs(residual).^2;
+        % For multi-trajectory: average per-trajectory noise periodograms
+        if nTraj == 1
+            residual = Ydft - G .* Udft;
+            PhiV = (1/N) * abs(residual).^2;
+        else
+            PhiV = zeros(nf, 1);
+            for l = 1:nTraj
+                Yl = sidDFT(y(:, :, l), freqs, useFFT);
+                Ul = sidDFT(u(:, :, l), freqs, useFFT);
+                res_l = Yl - G .* Ul;
+                PhiV = PhiV + (1/N) * abs(res_l).^2;
+            end
+            PhiV = PhiV / nTraj;
+        end
         PhiV = max(PhiV, 0);
         Coh = [];
 
     else
-        % MIMO: G(w) = Y(w) * U(w)^H * (U(w)^H * U(w))^{-1} (SPEC.md §4.2)
-        G = zeros(nf, ny, nu);
-        PhiV = zeros(nf, ny, ny);
+        % MIMO: G(w) = Phi_yu(w) * Phi_u(w)^{-1} via H1 estimator (SPEC.md §4.2)
         epsReg = 1e-10;
 
-        for kk = 1:nf
-            Uk = reshape(Udft(kk, :), nu, 1);     % (nu x 1) — but we need (nu x 1) for each freq
-            Yk = reshape(Ydft(kk, :), ny, 1);
+        if nTraj == 1
+            % Single trajectory: rank-1 cross/auto-periodograms
+            PhiYU = zeros(nf, ny, nu);
+            PhiU  = zeros(nf, nu, nu);
+            for kk = 1:nf
+                Yk = reshape(Ydft(kk, :), ny, 1);
+                Uk = reshape(Udft(kk, :), nu, 1);
+                PhiYU(kk, :, :) = Yk * Uk';
+                PhiU(kk, :, :)  = Uk * Uk';
+            end
+        else
+            % Multi-trajectory: average cross-periodograms (SPEC.md §4.1)
+            PhiYU = zeros(nf, ny, nu);
+            PhiU  = zeros(nf, nu, nu);
+            for l = 1:nTraj
+                Yl = sidDFT(y(:, :, l), freqs, useFFT);
+                Ul = sidDFT(u(:, :, l), freqs, useFFT);
+                for kk = 1:nf
+                    Yk = reshape(Yl(kk, :), ny, 1);
+                    Uk = reshape(Ul(kk, :), nu, 1);
+                    PhiYU(kk, :, :) = PhiYU(kk, :, :) + reshape(Yk * Uk', [1 ny nu]);
+                    PhiU(kk, :, :)  = PhiU(kk, :, :)  + reshape(Uk * Uk', [1 nu nu]);
+                end
+            end
+            PhiYU = PhiYU / nTraj;
+            PhiU  = PhiU  / nTraj;
+        end
 
-            % For MIMO: G = Y * U' * inv(U * U') — but we only have single-snapshot DFT
-            % With a single snapshot, U is (nu x 1), so U*U' is rank-1 (nu x nu).
-            % For nu > 1 this is singular. MIMO ETFE requires multiple snapshots or smoothing.
-            % For single snapshot with nu=1: works fine.
-            % For nu > 1: use pseudoinverse.
+        G = zeros(nf, ny, nu);
+        for kk = 1:nf
+            PhiU_k  = reshape(PhiU(kk, :, :), nu, nu);
+            PhiYU_k = reshape(PhiYU(kk, :, :), ny, nu);
+
             if nu == 1
-                if abs(Uk) < epsReg * max(abs(Udft(:)))
+                if abs(PhiU_k) < epsReg * max(abs(PhiU(:)))
                     G(kk, :, :) = NaN;
                 else
-                    G(kk, :, :) = Yk / Uk;
+                    G(kk, :, :) = PhiYU_k / PhiU_k;
                 end
             else
-                % Use left division: G = Yk * pinv(Uk') where Uk' is (1 x nu)
-                % Actually for single snapshot: G(w) = Y(w) * U(w)^H / (U(w)^H * U(w))
-                UkH = Uk';
-                denom = UkH * Uk;  % scalar
-                if abs(denom) < epsReg * max(abs(Udft(:)))^2
+                rc = rcond(PhiU_k);
+                if rc < epsReg
                     G(kk, :, :) = NaN;
                 else
-                    G(kk, :, :) = (Yk * UkH) / denom;
+                    G(kk, :, :) = PhiYU_k / PhiU_k;
                 end
             end
         end
@@ -248,13 +302,30 @@ function result = sidFreqETFE(y, u, varargin)
             end
         end
 
-        % Noise spectrum
-        for kk = 1:nf
-            Uk = reshape(Udft(kk, :), nu, 1);
-            Yk = reshape(Ydft(kk, :), ny, 1);
-            Gk = reshape(G(kk, :, :), ny, nu);
-            res = Yk - Gk * Uk;
-            PhiV(kk, :, :) = (1/N) * (res * res');
+        % Noise spectrum: average per-trajectory residual periodograms
+        PhiV = zeros(nf, ny, ny);
+        if nTraj == 1
+            for kk = 1:nf
+                Yk = reshape(Ydft(kk, :), ny, 1);
+                Uk = reshape(Udft(kk, :), nu, 1);
+                Gk = reshape(G(kk, :, :), ny, nu);
+                res = Yk - Gk * Uk;
+                PhiV(kk, :, :) = (1/N) * (res * res');
+            end
+        else
+            for l = 1:nTraj
+                Yl = sidDFT(y(:, :, l), freqs, useFFT);
+                Ul = sidDFT(u(:, :, l), freqs, useFFT);
+                for kk = 1:nf
+                    Yk = reshape(Yl(kk, :), ny, 1);
+                    Uk = reshape(Ul(kk, :), nu, 1);
+                    Gk = reshape(G(kk, :, :), ny, nu);
+                    res = Yk - Gk * Uk;
+                    PhiV(kk, :, :) = PhiV(kk, :, :) + ...
+                        reshape((1/N) * (res * res'), [1 ny ny]);
+                end
+            end
+            PhiV = PhiV / nTraj;
         end
         PhiV = real(PhiV);
         Coh = [];

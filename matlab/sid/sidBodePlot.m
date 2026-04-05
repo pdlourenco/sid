@@ -30,7 +30,7 @@ function varargout = sidBodePlot(result, varargin)
 %     sidBodePlot(result, 'Confidence', 3);
 %
 %   SPECIFICATION:
-%     SPEC.md §11.1 — sidBodePlot
+%     (Bode plotting — not yet in SPEC.md)
 %
 %   See also: sidFreqBT, sidSpectrumPlot
 %

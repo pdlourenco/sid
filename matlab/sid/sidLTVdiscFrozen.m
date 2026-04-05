@@ -134,18 +134,19 @@ function result = sidLTVdiscFrozen(ltvResult, varargin)
                 % Cov(vec(C(k))) = Sigma kron P(k), so
                 % Var(G_{ab}) = sum_{r,j} |dG_{ab}/dC_{rj}|^2 * Sigma_{jj} * P_{rr}
                 %
-                % Jacobians: dG_{ab}/dA_{ji} = R_{aj} * (R*B)_{ib}
+                % Jacobians: dG_{ab}/dA_{ji} = R_{aj} * [R*B]_{ib}
                 %            dG_{ab}/dB_{ji} = R_{aj} * delta_{ib}
                 varG = zeros(p, q);
                 for b = 1:q
                     for a = 1:p
                         v = 0;
-                        % Contribution from A entries: dG_{ab}/dA_{ji} = R_{aj} * (R*B)_{ib}
+                        % Contribution from A entries: dG_{ab}/dA_{ji} = R_{aj} * Gk_{ib}
+                        % where Gk = R*B (already computed).
                         % C(k) stores A' in rows 1:p, so A_{ji} = C_{i,j}, row index i, col j
                         % Var(C_{i,j}) = Sigma_{jj} * P_{ii}
                         for j = 1:p
                             for i = 1:p
-                                dG = R(a, j) * (R(:, i)' * Bk(:, b));
+                                dG = R(a, j) * Gk(i, b);
                                 v = v + abs(dG)^2 * sigDiag(j) * pDiag(i);
                             end
                         end

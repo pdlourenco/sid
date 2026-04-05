@@ -164,34 +164,22 @@ When using the default frequency grid (§2.2), the computation is done via FFT:
 
 #### 2.5.2 Direct DFT Path
 
-When the user supplies a custom frequency vector `ω`, compute the sum explicitly:
-
-```
-Φ̂_xz(ω) = R̂_xz(0) × W_M(0) + 2 × Σ_{τ=1}^{M} Re[ R̂_xz(τ) × W_M(τ) × exp(-j ω τ) ]
-```
-
-Wait — this shortcut is only valid when `R̂_xz(τ)` is the auto-covariance of a real signal (which is real and symmetric). For the cross-covariance `R̂_yu(τ)`, the full complex sum must be used:
-
-```
-Φ̂_yu(ω) = Σ_{τ=-M}^{M} R̂_yu(τ) × W_M(τ) × exp(-j ω τ)
-```
-
-where `R̂_yu(-τ) = R̂_uy(τ)' = conj(R̂_uy(τ))` for the scalar case.
-
-**Implementation:** For each frequency `ω_k`, compute:
+When the user supplies a custom frequency vector `ω`, the sum is computed explicitly. The general formula handles both auto-covariance and cross-covariance:
 
 ```
 Φ̂_xz(ω_k) = W_M(0) × R̂_xz(0) + Σ_{τ=1}^{M} W_M(τ) × [ R̂_xz(τ) × exp(-j ω_k τ)
-                                                             + conj(R̂_xz(τ)) × exp(+j ω_k τ) ]
+                                                             + R̂_xz(-τ) × exp(+j ω_k τ) ]
 ```
 
-which for real signals and auto-covariances simplifies to:
+For **auto-covariance** of real signals, `R̂_xx(-τ) = R̂_xx(τ)` (real and symmetric), so the formula simplifies to:
 
 ```
 Φ̂_xx(ω_k) = W_M(0) × R̂_xx(0) + 2 × Σ_{τ=1}^{M} W_M(τ) × R̂_xx(τ) × cos(ω_k τ)
 ```
 
 This form is real-valued and non-negative, as expected for a power spectrum.
+
+For **cross-covariance**, `R̂_xz(-τ) = conj(R̂_zx(τ))` (scalar case) or `R̂_xz(-τ) = R̂_zx(τ)'` (matrix case), so the full complex computation must be used. The implementation passes `R̂_zx(τ)` as the `Rneg` argument to handle negative lags correctly.
 
 ### 2.6 Frequency Response Estimate
 

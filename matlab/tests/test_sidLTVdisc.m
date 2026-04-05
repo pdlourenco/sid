@@ -162,7 +162,7 @@ assert(all(result.Lambda > 0), 'Auto lambda should be positive');
 assert(length(result.Lambda) == N-1, 'Auto lambda should have N-1 elements');
 fprintf('  Test 9 passed: L-curve auto lambda works (lambda=%.2e).\n', result.Lambda(1));
 
-%% Test 10: Preconditioning runs without error
+%% Test 10: Preconditioning request reports not_implemented (v1.0)
 rng(700);
 p = 2; q = 1; N = 20; L = 5;
 A_true = [0.9 0.1; -0.1 0.8]; B_true = [0.5; 0.3];
@@ -173,10 +173,14 @@ for l = 1:L
         X(k+1, :, l) = (A_true * X(k, :, l)' + B_true * U(k, :, l)')' + 0.02 * randn(1, p);
     end
 end
+warning('off', 'sid:preconditionUnsupported');
 result = sidLTVdisc(X, U, 'Lambda', 1e4, 'Precondition', true);
-assert(result.Preconditioned == true, 'Preconditioned should be true');
-assert(isequal(size(result.A), [p, p, N]), 'Preconditioned A dimensions');
-fprintf('  Test 10 passed: preconditioning runs correctly.\n');
+warning('on', 'sid:preconditionUnsupported');
+% Preconditioning requested but not available in v1.0
+assert(ischar(result.Preconditioned) && strcmp(result.Preconditioned, 'not_implemented'), ...
+    'Preconditioned should be ''not_implemented'' when requested but unavailable');
+assert(isequal(size(result.A), [p, p, N]), 'A dimensions should be valid');
+fprintf('  Test 10 passed: preconditioning reports not_implemented.\n');
 
 %% Test 11: Cost decomposition: total = fidelity + reg
 rng(800);
@@ -321,7 +325,7 @@ assert(r_low.Cost(2) <= r_high.Cost(2) * 1.01, ...
     r_low.Cost(2), r_high.Cost(2));
 fprintf('  Test 16 passed: low vs high lambda variation.\n');
 
-%% Test 17: Preconditioning flag and output validity (SPEC §8.4)
+%% Test 17: Preconditioning not_implemented in v1.0, results match unpreconditioned
 rng(1700);
 p = 2; q = 1; N = 30; L = 5;
 A_true = [0.9 0.1; -0.1 0.8];
@@ -337,20 +341,21 @@ for l = 1:L
 end
 
 r_nopre = sidLTVdisc(X, U, 'Lambda', 1e4, 'Precondition', false);
+warning('off', 'sid:preconditionUnsupported');
 r_pre   = sidLTVdisc(X, U, 'Lambda', 1e4, 'Precondition', true);
+warning('on', 'sid:preconditionUnsupported');
 
-% Preconditioning flag should be recorded
+% Not requested -> false; requested -> 'not_implemented'
 assert(r_nopre.Preconditioned == false, 'Should report Preconditioned=false');
-assert(r_pre.Preconditioned == true, 'Should report Preconditioned=true');
+assert(ischar(r_pre.Preconditioned) && strcmp(r_pre.Preconditioned, 'not_implemented'), ...
+    'Should report Preconditioned=''not_implemented''');
 
-% Both should produce valid finite output
-assert(all(isfinite(r_pre.A(:))), 'Precond A should be finite');
-assert(all(isfinite(r_pre.B(:))), 'Precond B should be finite');
-
-% Cost decomposition should still hold for preconditioned result
-assert(abs(r_pre.Cost(1) - (r_pre.Cost(2) + r_pre.Cost(3))) < 1e-8, ...
-    'Precond cost decomposition should hold');
-fprintf('  Test 17 passed: preconditioning flags and output validity.\n');
+% Since preconditioning is not implemented, results should be identical to unpreconditioned
+assert(max(abs(r_pre.A(:) - r_nopre.A(:))) < 1e-14, ...
+    'not_implemented precondition should match unpreconditioned');
+assert(all(isfinite(r_pre.A(:))), 'A should be finite');
+assert(all(isfinite(r_pre.B(:))), 'B should be finite');
+fprintf('  Test 17 passed: preconditioning not_implemented, results match unpreconditioned.\n');
 
 %% Test 18: Uncertainty fields present when requested (SPEC §8.9)
 r_unc = sidLTVdisc(X, U, 'Lambda', 1e3, 'Uncertainty', true);
