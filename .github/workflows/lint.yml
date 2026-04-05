@@ -5,13 +5,13 @@ on:
   push:
     paths:
       - 'matlab/**.m'
-      - 'miss_hit.cfg'
+      - 'matlab/miss_hit.cfg'
       - '.github/scripts/**'
   pull_request:
     branches: [main]
     paths:
       - 'matlab/**.m'
-      - 'miss_hit.cfg'
+      - 'matlab/miss_hit.cfg'
       - '.github/scripts/**'
 
 jobs:

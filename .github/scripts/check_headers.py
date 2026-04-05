@@ -22,11 +22,11 @@ import sys
 SCAN_DIRS = ["matlab/sid", "matlab/sid/internal"]
 
 # Files exempt from SPECIFICATION check
-SPEC_EXEMPT = {"sidInstall.m"}
+SPEC_EXEMPT = set()
 
 # Files exempt from INPUTS/OUTPUTS (no arguments or no return value)
-INPUTS_EXEMPT = {"sidInstall.m"}
-OUTPUTS_EXEMPT = {"sidInstall.m"}
+INPUTS_EXEMPT = set()
+OUTPUTS_EXEMPT = set()
 
 # Canonical section order — entries that may appear in the header.
 # Each tuple: (regex pattern, label, is_required)

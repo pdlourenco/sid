@@ -75,6 +75,9 @@ sid/
 │       ├── automatic_tuning.md
 │       └── output.md
 ├── matlab/                      % MATLAB/Octave implementation
+│   ├── sidInstall.m             % Setup script (adds sid/ to path)
+│   ├── miss_hit.cfg             % MISS_HIT linter configuration
+│   ├── CONTRIBUTING.md          % MATLAB-specific contribution guidelines
 │   ├── sid/                     % Public functions
 │   │   ├── sidFreqBT.m, sidFreqBTFDR.m, sidFreqETFE.m
 │   │   ├── sidFreqMap.m, sidSpectrogram.m
@@ -82,7 +85,6 @@ sid/
 │   │   ├── sidLTVStateEst.m, sidLTIfreqIO.m, sidModelOrder.m
 │   │   ├── sidBodePlot.m, sidSpectrumPlot.m, sidMapPlot.m, sidSpectrogramPlot.m
 │   │   ├── sidDetrend.m, sidResidual.m, sidCompare.m
-│   │   ├── sidInstall.m
 │   │   └── internal/           % Internal helpers
 │   ├── tests/                   % Test suites
 │   │   ├── runAllTests.m
@@ -96,8 +98,8 @@ sid/
 ├── docs/                        % Cross-cutting documentation
 │   ├── roadmap.md
 │   └── TODO.md
-├── .editorconfig, miss_hit.cfg
-├── CONTRIBUTING.md
+├── .editorconfig
+├── CONTRIBUTING.md              % General contribution guidelines
 ├── LICENSE, README.md
 └── .github/                     % CI workflows, scripts
 ```
