@@ -1044,11 +1044,14 @@ A recommended workflow:
 
 **Reference:** `spec/cosmic/uncertainty_derivation.md` §1.
 
-When trajectories have different horizons, let `L(k) ⊆ {1,...,L}` be the set of trajectories active at time step `k`. The data matrices become:
+When trajectories have different horizons, let `L(k) ⊆ {1,...,L}` be the set of trajectories active at time step `k`, and `N = max(N_1, ..., N_L)` be the longest horizon. The data matrices become:
 
 ```
-D(k) = [X_{L(k)}(k)^T  U_{L(k)}(k)^T] / sqrt(|L(k)|)
+D(k) = [X_{L(k)}(k)^T  U_{L(k)}(k)^T] / sqrt(N) ∈ ℝ^{|L(k)| × (p+q)}
+X'(k) = X_{L(k)}(k+1)^T / sqrt(N) ∈ ℝ^{|L(k)| × p}
 ```
+
+The normalization uses `1/sqrt(N)` (not `1/sqrt(|L(k)|)`), matching the uniform-trajectory convention in §8.3.2. This ensures that `λ` has the same effective strength regardless of how many trajectories are active at a given time step — fewer active trajectories at later steps naturally receive more regularization influence through the reduced rank of `D(k)ᵀD(k)`, without artificial inflation from a per-step normalization.
 
 Only the `S_kk` and `Θ_k` terms change; the regularization term `F^T Υ F` is unchanged because it couples only consecutive `C(k)` values and does not reference the data. The forward-backward pass structure is completely preserved.
 
