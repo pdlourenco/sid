@@ -155,6 +155,9 @@ function result = sidLTVdisc(X, U, varargin)
             ['Preconditioning is disabled in v1.0 due to a known issue ' ...
              'with off-diagonal block handling. Using unpreconditioned solver.']);
         doPrecondition = false;
+        precondRequested = true;
+    else
+        precondRequested = false;
     end
 
     % ---- COSMIC forward-backward pass (SPEC.md §8.3.4) ----
@@ -177,7 +180,11 @@ function result = sidLTVdisc(X, U, varargin)
     result.InputDim        = q;
     result.NumTrajectories = L;
     result.Algorithm       = algorithm;
-    result.Preconditioned  = doPrecondition;
+    if precondRequested
+        result.Preconditioned = 'not_implemented';
+    else
+        result.Preconditioned = false;
+    end
     result.Method          = 'sidLTVdisc';
 
     % ---- Bayesian uncertainty estimation (SPEC.md §8.9) ----

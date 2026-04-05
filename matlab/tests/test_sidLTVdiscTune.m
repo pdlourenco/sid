@@ -79,15 +79,16 @@ assert(max(abs(bestResult.B(:) - check.B(:))) < 1e-10, ...
     'bestResult.B should match direct sidLTVdisc call');
 fprintf('  Test 5 passed: bestResult consistent with sidLTVdisc.\n');
 
-%% Test 6: Passthrough of Precondition option (disabled in v1.0)
+%% Test 6: Passthrough of Precondition option (not_implemented in v1.0)
 warning('off', 'sid:preconditionUnsupported');
 [bestRes_pc, ~, ~] = sidLTVdiscTune(X_train, U_train, X_val, U_val, ...
     'LambdaGrid', [100, 1000, 10000], 'Precondition', true);
 warning('on', 'sid:preconditionUnsupported');
-% Preconditioning is disabled in v1.0; should report false
-assert(bestRes_pc.Preconditioned == false, ...
-    'Precondition should be false (disabled in v1.0)');
-fprintf('  Test 6 passed: Precondition option handled (disabled in v1.0).\n');
+% Preconditioning requested but not implemented in v1.0
+assert(ischar(bestRes_pc.Preconditioned) && ...
+    strcmp(bestRes_pc.Preconditioned, 'not_implemented'), ...
+    'Precondition should be ''not_implemented'' when requested');
+fprintf('  Test 6 passed: Precondition option forwarded, reports not_implemented.\n');
 
 fprintf('test_sidLTVdiscTune: ALL TESTS PASSED (validation method)\n');
 

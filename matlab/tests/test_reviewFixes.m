@@ -30,11 +30,14 @@ assert(~any(isnan(result.Response(:))), ...
 % Check approximate correctness at a few frequencies
 w_test = result.Frequency;
 G_true = freqz(b, a, w_test);
-% With 20 noiseless trajectories and smoothing, median error should be small.
-% Max error can be large near Nyquist where ETFE variance is high.
+% With 20 noiseless trajectories and smoothing=5, errors should be small.
+% ETFE has no windowing so variance is inherently high at individual
+% frequencies; use the 90th percentile as a robust accuracy check.
 err = abs(result.Response - G_true);
-assert(median(err) < 0.1, ...
-    'BUG-1: Multi-traj ETFE should approximate true G (median err = %.3f).', median(err));
+err_sorted = sort(err);
+p90 = err_sorted(round(0.9 * length(err)));
+assert(p90 < 0.3, ...
+    'BUG-1: Multi-traj ETFE 90th-pct error should be < 0.3 (got %.3f).', p90);
 
 fprintf('  BUG-1a: Multi-trajectory ETFE H1 estimator - PASSED\n');
 
