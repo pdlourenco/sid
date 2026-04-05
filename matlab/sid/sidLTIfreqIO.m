@@ -254,7 +254,13 @@ function g = freqToImpulse(G, nf, ny, nu)
 
             % Build full-circle: DC, positive freqs, mirror of negative
             Gfull = zeros(Nfft, 1);
-            Gfull(1) = real(Gvec(1));                     % DC approximation
+            % DC: extrapolate from first two bins (DC must be real for
+            % real-valued systems). Linear extrapolation to w=0.
+            if nf >= 2
+                Gfull(1) = real(2 * Gvec(1) - Gvec(2));
+            else
+                Gfull(1) = real(Gvec(1));
+            end
             Gfull(2:nf) = Gvec(1:nf - 1);                % w1 to w_{nf-1}
             Gfull(nf + 1) = real(Gvec(nf));               % Nyquist (real)
             Gfull(nf + 2:Nfft) = conj(Gvec(nf - 1:-1:1)); % mirror

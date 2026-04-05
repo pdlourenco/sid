@@ -34,6 +34,9 @@ function result = sidLTVdisc(X, U, varargin)
 %                          (N-1x1)  — per-step lambda vector
 %                          'auto'   — automatic selection via L-curve
 %                        Default: 'auto'.
+%     'LambdaGrid'     - Candidate lambda values for L-curve auto selection.
+%                        Only used when Lambda is 'auto'. Vector of positive
+%                        scalars. Default: logspace(-3, 15, 50).
 %     'Precondition'   - Apply block-diagonal preconditioning to improve
 %                        numerical stability. Default: false.
 %     'Algorithm'      - Identification algorithm. Currently only 'cosmic'
@@ -127,7 +130,7 @@ function result = sidLTVdisc(X, U, varargin)
 
     % ---- Parse inputs ----
     [X, U, lambda, doPrecondition, algorithm, doUncertainty, ...
-     noiseCov, covMode, N, p, q, L, isVarLen, horizons] = ...
+     noiseCov, covMode, lambdaGrid, N, p, q, L, isVarLen, horizons] = ...
         parseInputs(X, U, varargin{:});
 
     % ---- Build data matrices (SPEC.md §8.3.2) ----
@@ -139,7 +142,7 @@ function result = sidLTVdisc(X, U, varargin)
 
     % ---- Lambda selection (SPEC.md §8.4) ----
     if ischar(lambda) && strcmpi(lambda, 'auto')
-        lambda = lcurveLambda(D, Xl, N, p, q, doPrecondition);
+        lambda = lcurveLambda(D, Xl, N, p, q, lambdaGrid);
     end
 
     if isscalar(lambda)
@@ -223,7 +226,7 @@ end
 % ========================================================================
 
 function [X, U, lambda, doPrecondition, algorithm, doUncertainty, ...
-         noiseCov, covMode, N, p, q, L, isVarLen, horizons] = ...
+         noiseCov, covMode, lambdaGrid, N, p, q, L, isVarLen, horizons] = ...
         parseInputs(X, U, varargin)
 % PARSEINPUTS Validate and parse inputs for sidLTVdisc.
 %   Supports both 3D array input (uniform horizon) and cell array input
@@ -325,6 +328,7 @@ function [X, U, lambda, doPrecondition, algorithm, doUncertainty, ...
 
     % Parse name-value options
     optDefs.Lambda = 'auto';
+    optDefs.LambdaGrid = [];
     optDefs.Precondition = false;
     optDefs.Algorithm = 'cosmic';
     optDefs.Uncertainty = false;
@@ -333,6 +337,7 @@ function [X, U, lambda, doPrecondition, algorithm, doUncertainty, ...
     optParsed = sidParseOptions(optDefs, varargin);
 
     lambda = optParsed.Lambda;
+    lambdaGrid = optParsed.LambdaGrid;
     doPrecondition = optParsed.Precondition;
     algorithm = optParsed.Algorithm;
     doUncertainty = optParsed.Uncertainty;
@@ -424,14 +429,18 @@ function [S, T, lambda] = precondition(S, T, lambda, N, p, q)
     % sidLTVcosmicSolve. The preconditioned S_kk = I means Lbd_k is easier to invert.
 end
 
-function bestLambda = lcurveLambda(D, Xl, N, p, q, doPrecondition)
+function bestLambda = lcurveLambda(D, Xl, N, p, q, lambdaGrid)
 % LCURVELAMBDA Select lambda via L-curve method.
 %
 %   Runs COSMIC for a grid of lambda values, computes the data fidelity
 %   and regularization terms for each, and selects the lambda at the
 %   corner of the L-curve (point of maximum curvature).
 
-    grid = logspace(-3, 15, 50);
+    if isempty(lambdaGrid)
+        grid = logspace(-3, 15, 50);
+    else
+        grid = lambdaGrid(:)';
+    end
     nGrid = length(grid);
     F = zeros(nGrid, 1);   % data fidelity
     R = zeros(nGrid, 1);   % regularization

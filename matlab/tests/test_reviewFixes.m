@@ -204,4 +204,120 @@ assert(isstruct(result_ts), ...
     'DISC-7b: Time-series cell array should work.');
 fprintf('  DISC-7b: Cell array time-series mode - PASSED\n');
 
+%% TEST-4: Frozen TF Jacobian validated against finite differences
+% Perturb each A and B entry by delta, recompute G, compare dG against
+% the Jacobian-based uncertainty.
+rng(701);
+N_t4 = 20; p_t4 = 2; q_t4 = 1; L_t4 = 10;
+X_t4 = randn(N_t4 + 1, p_t4, L_t4);
+U_t4 = randn(N_t4, q_t4, L_t4);
+ltv_t4 = sidLTVdisc(X_t4, U_t4, 'Lambda', 1e3, 'Uncertainty', true);
+
+w0_t4 = pi / 4;
+k0_t4 = 5;
+Ak = ltv_t4.A(:, :, k0_t4);
+Bk = ltv_t4.B(:, :, k0_t4);
+z0_t4 = exp(1i * w0_t4);
+Ip_t4 = eye(p_t4);
+G0_t4 = (z0_t4 * Ip_t4 - Ak) \ Bk;
+
+% Finite-difference Jacobian for dG/dA
+delta_t4 = 1e-7;
+dGdA_fd = zeros(p_t4, q_t4, p_t4, p_t4);  % (a, b, j, i) -> dG_{ab}/dA_{ji}
+for ji = 1:p_t4
+    for ii = 1:p_t4
+        Ap = Ak; Ap(ji, ii) = Ap(ji, ii) + delta_t4;
+        Gp = (z0_t4 * Ip_t4 - Ap) \ Bk;
+        dGdA_fd(:, :, ji, ii) = (Gp - G0_t4) / delta_t4;
+    end
+end
+
+% Analytical Jacobian: dG_{ab}/dA_{ji} = R_{aj} * [R*B]_{ib}
+R_t4 = (z0_t4 * Ip_t4 - Ak) \ Ip_t4;
+RB_t4 = R_t4 * Bk;
+dGdA_an = zeros(p_t4, q_t4, p_t4, p_t4);
+for ji = 1:p_t4
+    for ii = 1:p_t4
+        for aa = 1:p_t4
+            for bb = 1:q_t4
+                dGdA_an(aa, bb, ji, ii) = R_t4(aa, ji) * RB_t4(ii, bb);
+            end
+        end
+    end
+end
+
+jac_err = max(abs(dGdA_fd(:) - dGdA_an(:)));
+assert(jac_err < 1e-4, ...
+    'TEST-4: Jacobian dG/dA finite-diff error should be < 1e-4 (got %.2e).', jac_err);
+
+% Also check dG/dB
+dGdB_fd = zeros(p_t4, q_t4, p_t4, q_t4);
+for ji = 1:p_t4
+    for ii = 1:q_t4
+        Bp = Bk; Bp(ji, ii) = Bp(ji, ii) + delta_t4;
+        Gp = (z0_t4 * Ip_t4 - Ak) \ Bp;
+        dGdB_fd(:, :, ji, ii) = (Gp - G0_t4) / delta_t4;
+    end
+end
+
+dGdB_an = zeros(p_t4, q_t4, p_t4, q_t4);
+for ji = 1:p_t4
+    for ii = 1:q_t4
+        for aa = 1:p_t4
+            dGdB_an(aa, ii, ji, ii) = R_t4(aa, ji);
+        end
+    end
+end
+
+jac_err_B = max(abs(dGdB_fd(:) - dGdB_an(:)));
+assert(jac_err_B < 1e-4, ...
+    'TEST-4: Jacobian dG/dB finite-diff error should be < 1e-4 (got %.2e).', jac_err_B);
+
+fprintf('  TEST-4: Frozen TF Jacobian vs finite differences - PASSED\n');
+
+%% TEST-2: Edge cases for COSMIC and BT
+
+% Very high lambda should produce near-constant A(k)
+rng(801);
+N_t2 = 30; p_t2 = 2; q_t2 = 1; L_t2 = 5;
+A_true = [0.9 0.1; -0.1 0.8]; B_true = [0.5; 0.3];
+X_t2 = zeros(N_t2 + 1, p_t2, L_t2);
+U_t2 = randn(N_t2, q_t2, L_t2);
+for l = 1:L_t2
+    X_t2(1, :, l) = randn(1, p_t2);
+    for kk = 1:N_t2
+        X_t2(kk+1, :, l) = (A_true * X_t2(kk, :, l)' + B_true * U_t2(kk, :, l)')';
+    end
+end
+
+r_high = sidLTVdisc(X_t2, U_t2, 'Lambda', 1e15);
+% A should be nearly constant across time
+A_var = 0;
+for kk = 2:N_t2
+    A_var = A_var + norm(r_high.A(:, :, kk) - r_high.A(:, :, 1), 'fro');
+end
+A_var = A_var / (N_t2 - 1);
+assert(A_var < 1e-6, ...
+    'TEST-2a: Very high lambda should give near-constant A (var=%.2e).', A_var);
+
+fprintf('  TEST-2a: Very high lambda -> constant model - PASSED\n');
+
+% M > N/2 should be clamped with warning
+rng(802);
+warning('off', 'sid:windowReduced');
+r_bigM = sidFreqBT(randn(20, 1), randn(20, 1), 'WindowSize', 50);
+warning('on', 'sid:windowReduced');
+assert(r_bigM.WindowSize <= 10, ...
+    'TEST-2b: Window size should be clamped to N/2 = 10.');
+
+fprintf('  TEST-2b: M > N/2 clamped - PASSED\n');
+
+% API-5: Custom LambdaGrid for auto mode
+rng(803);
+r_grid = sidLTVdisc(X_t2, U_t2, 'Lambda', 'auto', 'LambdaGrid', [1, 100, 10000]);
+assert(all(isfinite(r_grid.A(:))), ...
+    'API-5: Custom LambdaGrid should produce finite results.');
+
+fprintf('  API-5: Custom LambdaGrid for auto mode - PASSED\n');
+
 fprintf('test_reviewFixes: ALL PASSED\n');

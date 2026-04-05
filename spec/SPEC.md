@@ -834,13 +834,13 @@ C(k) = [A(k)ᵀ; B(k)ᵀ] ∈ ℝ⁽ᵖ⁺ᵍ⁾ˣᵖ       k = 0, ..., N-1
 For `L` trajectories at time step `k`:
 
 ```
-D(k) = [X(k)ᵀ  U(k)ᵀ] / sqrt(L) ∈ ℝᴸˣ⁽ᵖ⁺ᵍ⁾       (data matrix)
-X'(k) = X(k+1)ᵀ / sqrt(L) ∈ ℝᴸˣᵖ                    (next-state matrix)
+D(k) = [X(k)ᵀ  U(k)ᵀ] / sqrt(N) ∈ ℝᴸˣ⁽ᵖ⁺ᵍ⁾       (data matrix)
+X'(k) = X(k+1)ᵀ / sqrt(N) ∈ ℝᴸˣᵖ                    (next-state matrix)
 ```
 
-where `X(k) = [x₁(k), x₂(k), ..., x_L(k)]` collects states from all trajectories.
+where `X(k) = [x₁(k), x₂(k), ..., x_L(k)]` collects states from all trajectories and `N` is the number of time steps.
 
-**Normalization:** The `1/sqrt(L)` scaling ensures that `D(k)ᵀD(k)` converges to the empirical covariance as `L → ∞`, making the normal equations (and hence the effective regularization strength `λ`) independent of the number of trajectories. For variable-length trajectories (§8.8), `L` is replaced by `|L(k)|`, the number of active trajectories at step `k`.
+**Normalization:** The `1/sqrt(N)` scaling ensures that `D(k)ᵀD(k)` is the empirical covariance across trajectories divided by `N`, making the effective regularization strength `λ` independent of the time horizon length. For variable-length trajectories (§8.8), the scaling uses `1/sqrt(|L(k)|)` instead, where `|L(k)|` is the number of active trajectories at step `k` — this makes the normal equations independent of trajectory count at each step.
 
 #### 8.3.3 Cost Function
 
