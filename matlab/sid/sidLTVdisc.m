@@ -443,7 +443,7 @@ function bestLambda = lcurveLambda(D, Xl, N, p, q, lambdaGrid)
     end
     nGrid = length(grid);
     F = zeros(nGrid, 1);   % data fidelity
-    R = zeros(nGrid, 1);   % regularization
+    R = zeros(nGrid, 1);   % unweighted variation (for L-curve)
 
     for j = 1:nGrid
         lam = grid(j) * ones(N - 1, 1);
@@ -452,7 +452,7 @@ function bestLambda = lcurveLambda(D, Xl, N, p, q, lambdaGrid)
 
         A = permute(C(1:p, :, :), [2 1 3]);
         B = permute(C(p+1:end, :, :), [2 1 3]);
-        [~, F(j), R(j)] = sidLTVevaluateCost(A, B, D, Xl, lam, N, p, q);
+        [~, F(j), ~, R(j)] = sidLTVevaluateCost(A, B, D, Xl, lam, N, p, q);
     end
 
     % L-curve: find corner of maximum curvature in log-log space

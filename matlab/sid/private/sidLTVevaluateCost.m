@@ -1,7 +1,7 @@
-function [cost, fidelity, reg] = sidLTVevaluateCost(A, B, D, Xl, lambda, N, p, q)
+function [cost, fidelity, reg, variation] = sidLTVevaluateCost(A, B, D, Xl, lambda, N, p, q)
 % SIDLTVEVALUATECOST Compute COSMIC cost function value.
 %
-%   [cost, fidelity, reg] = sidLTVevaluateCost(A, B, D, Xl, lambda, N, p, q)
+%   [cost, fidelity, reg, variation] = sidLTVevaluateCost(A, B, D, Xl, lambda, N, p, q)
 %
 %   Evaluates the total COSMIC cost as the sum of data fidelity and
 %   temporal regularization terms. Handles both 3D array D (uniform
@@ -18,12 +18,13 @@ function [cost, fidelity, reg] = sidLTVevaluateCost(A, B, D, Xl, lambda, N, p, q
 %     q      - Input dimension.
 %
 %   OUTPUTS:
-%     cost     - Total cost = fidelity + reg.
-%     fidelity - (1/2) sum_k ||D(k) C(k) - Xl(k)||^2_F.
-%     reg      - (1/2) sum_k lambda_k ||C(k) - C(k+1)||^2_F.
+%     cost      - Total cost = fidelity + reg.
+%     fidelity  - (1/2) sum_k ||D(k) C(k) - Xl(k)||^2_F.
+%     reg       - (1/2) sum_k lambda_k ||C(k) - C(k+1)||^2_F (weighted).
+%     variation - (1/2) sum_k ||C(k) - C(k+1)||^2_F (unweighted, for L-curve).
 %
 %   EXAMPLES:
-%     [cost, fid, reg] = sidLTVevaluateCost(A, B, D, Xl, lambda, N, p, q);
+%     [cost, fid, reg, var] = sidLTVevaluateCost(A, B, D, Xl, lambda, N, p, q);
 %
 %   ALGORITHM:
 %     1. For each k: fidelity += ||D(k) * [A(k)'; B(k)'] - Xl(k)||^2_F
@@ -73,7 +74,8 @@ function [cost, fidelity, reg] = sidLTVevaluateCost(A, B, D, Xl, lambda, N, p, q
         end
     end
 
-    fidelity = 0.5 * fidelity;
-    reg      = 0.5 * lambda' * priorVec;
-    cost     = fidelity + reg;
+    fidelity  = 0.5 * fidelity;
+    reg       = 0.5 * lambda' * priorVec;
+    variation = 0.5 * sum(priorVec);
+    cost      = fidelity + reg;
 end

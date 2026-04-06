@@ -4,9 +4,10 @@ function [Sigma, dof] = sidEstimateNoiseCov(C, D, Xl, P, covMode, N, p, q)
 %   [Sigma, dof] = sidEstimateNoiseCov(C, D, Xl, P, covMode, N, p, q)
 %
 %   Estimates the (p x p) noise covariance matrix from the residuals of a
-%   COSMIC solution. The data D and Xl are scaled by 1/sqrt(L) (COSMIC
-%   convention). The scaled residuals E_s(k) have noise covariance Sigma/L.
-%   This function returns the UNSCALED noise covariance Sigma.
+%   COSMIC solution. The data D and Xl are scaled by 1/sqrt(N) (COSMIC
+%   convention, where N is the number of time steps). The scaled residuals
+%   E_s(k) have noise covariance Sigma/N. This function returns the
+%   UNSCALED noise covariance Sigma.
 %
 %   INPUTS:
 %     C       - (d x p x N) COSMIC solution matrices.
@@ -100,9 +101,8 @@ function [Sigma, dof] = sidEstimateNoiseCov(C, D, Xl, P, covMode, N, p, q)
         end
     end
 
-    % Unscaled noise covariance: scaled residuals have variance Sigma/L,
-    % so Sigma = L * SSR_scaled / dof. Since D is already scaled by
-    % 1/sqrt(L), we use N (the scale factor) here.
+    % Unscaled noise covariance: scaled residuals have variance Sigma/N
+    % (D is scaled by 1/sqrt(N)), so Sigma = N * SSR_scaled / dof.
     Sigma = N * SSR_scaled / dof;
 
     % Apply covariance mode restriction (SPEC.md §8.9.3)

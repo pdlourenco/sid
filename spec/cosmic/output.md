@@ -424,23 +424,7 @@ Note: $L_k = U_{k-1}^\top$ by symmetry of the Hessian. The sign convention match
 
 **Backward pass** ($k = N-1$ to $0$):
 
-$$
-w(N) = Y_N
-$$
-
-For $k = N-1, \ldots, 0$:
-
-$$
-w(k) = Y_k + \Lambda_k^{-1}\,U_k\,w(k+1)
-$$
-
-Note: the sign in $+\Lambda_k^{-1}\,U_k\,w(k+1)$ accounts for $U_k$ already carrying the negative sign (e.g., $-I_L \otimes I_n$ in the top-left).
-
-Wait — let me be precise. In the backward substitution for a system $\Lambda_k\,w(k) + U_k\,w(k+1) = \tilde{\Theta}_k$, we get $w(k) = \Lambda_k^{-1}(\tilde{\Theta}_k - U_k\,w(k+1)) = Y_k - \Lambda_k^{-1}\,U_k\,w(k+1)$.
-
-Since $U_k$ contains negative entries (e.g., $-I$), the double negative gives a positive contribution, matching the COSMIC backward pass.
-
-**Backward pass** (corrected):
+The forward elimination produces the reduced system $\Lambda_k\,w(k) + U_k\,w(k+1) = \tilde{\Theta}_k$, where $Y_k = \Lambda_k^{-1}\,\tilde{\Theta}_k$. Solving for $w(k)$:
 
 $$
 w(N) = Y_N
@@ -451,6 +435,8 @@ For $k = N-1, \ldots, 0$:
 $$
 w(k) = Y_k - \Lambda_k^{-1}\,U_k\,w(k+1)
 $$
+
+Since $U_k$ contains negative entries (e.g., $-I_L \otimes I_n$ in the top-left), the subtraction of a negative term produces a positive contribution, matching the sign convention of the COSMIC backward pass.
 
 After the backward pass, extract $x_l(k)$ and $B(k)$ from each $w(k)$.
 

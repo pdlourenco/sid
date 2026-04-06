@@ -840,7 +840,7 @@ X'(k) = X(k+1)ᵀ / sqrt(N) ∈ ℝᴸˣᵖ                    (next-state matri
 
 where `X(k) = [x₁(k), x₂(k), ..., x_L(k)]` collects states from all trajectories and `N` is the number of time steps.
 
-**Normalization:** The `1/sqrt(N)` scaling ensures that `D(k)ᵀD(k)` is the empirical covariance across trajectories divided by `N`, making the effective regularization strength `λ` independent of the time horizon length. For variable-length trajectories (§8.8), the scaling uses `1/sqrt(|L(k)|)` instead, where `|L(k)|` is the number of active trajectories at step `k` — this makes the normal equations independent of trajectory count at each step.
+**Normalization:** The `1/sqrt(N)` scaling ensures that `D(k)ᵀD(k)` is the empirical covariance across trajectories divided by `N`, making the effective regularization strength `λ` independent of the time horizon length. The same `1/sqrt(N)` convention applies to variable-length trajectories (§8.8).
 
 #### 8.3.3 Cost Function
 
@@ -929,7 +929,8 @@ When `'Lambda', 'auto'` is specified, `sidLTVdisc` selects λ using the L-curve 
 1. Define a grid of candidate values: `λ_grid = logspace(-3, 15, 50)`.
 2. For each candidate `λ_j`, run COSMIC and record:
    - Data fidelity: `F_j = ||VC - X'||²_F`
-   - Regularization: `R_j = Σ ||λ^{1/2}(C(k) - C(k-1))||²_F`
+   - Unweighted variation: `R_j = Σ_k ||C(k) - C(k-1)||²_F`
+     (The **unweighted** variation is used, not the λ-weighted regularization term, because λ appears in both the solution and the penalty; see `automatic_tuning.md` §2.1.)
 3. Plot `log(R_j)` vs. `log(F_j)`. This traces an L-shaped curve.
 4. Select the λ at the corner of the L — the point of maximum curvature:
    ```
@@ -1103,10 +1104,10 @@ The full `H⁻¹` is `N(p+q) × N(p+q)` — too large to store. But we only need
 
 For a symmetric block tridiagonal matrix, the diagonal blocks of the inverse can be computed via **left and right Schur complements**:
 
-**Step 1: Reconstruct unscaled Hessian diagonal blocks.** The COSMIC solver normalizes data by `1/sqrt(L)` (§8.3.2), so the scaled block diagonal terms `S_scaled(k)` contain `D_s(k)ᵀD_s(k) + reg(k)`. Reconstruct the unscaled blocks:
+**Step 1: Reconstruct unscaled Hessian diagonal blocks.** The COSMIC solver normalizes data by `1/sqrt(N)` (§8.3.2), so the scaled block diagonal terms `S_scaled(k)` contain `D_s(k)ᵀD_s(k) + reg(k)`. Reconstruct the unscaled blocks:
 
 ```
-S(k) = L × (S_scaled(k) - reg(k)) + reg(k)
+S(k) = N × (S_scaled(k) - reg(k)) + reg(k)
 ```
 
 where `reg(k)` is the regularization contribution: `λ₁I` for `k=0`, `λ_{N-1}I` for `k=N-1`, and `(λ_k + λ_{k+1})I` otherwise.
@@ -1141,20 +1142,31 @@ This identity holds because `Λ^L(k)` captures the information from blocks `0..k
 
 **Connection to Kalman smoothing:** The left Schur complement `Λ^L(k)` is analogous to the Kalman filter's predicted information matrix, and the right complement `Λ^R(k)` to a backward information filter. Their combination produces the smoothed covariance, paralleling the Rauch-Tung-Striebel smoother. This is not a coincidence — the Bayesian interpretation of COSMIC's regularized least squares *is* a Kalman smoother applied to the parameter evolution model `C(k+1) = C(k) + w_k`.
 
+**Equivalent backward-only recursion:** An alternative that avoids the right Schur complement pass uses only the left Schur complements `Λ_k = Λ^L(k)` already computed during the COSMIC forward pass:
+
+```
+P(N-1) = Λ_{N-1}⁻¹
+
+For k = N-2, ..., 0:
+    P(k) = (Λ_k - λ_{k+1}² P(k+1))⁻¹
+```
+
+To see the equivalence, note that the right Schur complement satisfies `Λ^R(k) = S(k) - λ_{k+1}² [Λ^R(k+1)]⁻¹`. By induction from the boundary `Λ^R(N-1) = S(N-1)`, the identity `[Λ^R(k)]⁻¹ = P(k)` holds for the backward-only formula above. Substituting into the combine step `P(k) = [Λ^L(k) + Λ^R(k) - S(k)]⁻¹ = [Λ_k + S(k) - λ_{k+1}² P(k+1) - S(k)]⁻¹ = [Λ_k - λ_{k+1}² P(k+1)]⁻¹` confirms the equivalence. See `uncertainty_derivation.md` §5.2 for the full proof. The implementation uses the left-right method for numerical robustness; the backward-only form is equivalent and requires one fewer pass.
+
 #### 8.9.3 Noise Covariance Estimation
 
 The noise model is `w(k) ~ N(0, Σ)` where `Σ ∈ ℝᵖˣᵖ` is the noise covariance matrix. The user may provide `Σ` directly (e.g., from sensor specifications) or let the implementation estimate it from the COSMIC residuals.
 
-**Estimation from residuals.** The scaled residuals `E_s(k) = X'_s(k) - D_s(k) C(k)` have covariance `Σ/L` (due to the `1/sqrt(L)` data scaling). The unscaled noise covariance is:
+**Estimation from residuals.** The scaled residuals `E_s(k) = X'_s(k) - D_s(k) C(k)` have covariance `Σ/N` (due to the `1/sqrt(N)` data scaling). The unscaled noise covariance is:
 
 ```
-Σ̂ = L × (Σ_k E_s(k)ᵀ E_s(k)) / ν
+Σ̂ = N × (Σ_k E_s(k)ᵀ E_s(k)) / ν
 ```
 
 where `ν` is the effective degrees of freedom:
 
 ```
-ν = Σ_k |L(k)| - L × Σ_k trace(D_s(k)ᵀ D_s(k) × P(k))
+ν = Σ_k |L(k)| - N × Σ_k trace(D_s(k)ᵀ D_s(k) × P(k))
 ```
 
 The second term is the hat-matrix trace correction, ensuring that the effective number of free parameters is subtracted. If `ν ≤ 0` (heavily over-parameterized), a conservative fallback `ν = Σ_k |L(k)| - N × d` is used.
@@ -1211,8 +1223,8 @@ The backward pass touches all time steps and is non-causal — it requires the f
 
 ```
 // When new measurement arrives at step k:
-D_k = [x(k)^T  u(k)^T] / sqrt(L)
-X'_k = x(k+1)^T / sqrt(L)
+D_k = [x(k)^T  u(k)^T] / sqrt(N)
+X'_k = x(k+1)^T / sqrt(N)
 S_kk = D_k^T D_k + (λ_k + λ_{k+1}) I
 Θ_k  = D_k^T X'_k
 

@@ -208,100 +208,107 @@ S_{kk}                          P_pred(k)⁻¹ + D(k)ᵀD(k)
 
 ## 4. Verification: Deriving COSMIC from the Kalman Filter
 
-To make the equivalence concrete, we derive COSMIC's forward recursion from the
-Kalman filter equations.
+To make the equivalence concrete, we establish the exact relationship between
+COSMIC's forward Schur complements and the Kalman filter's information matrix.
 
-### 4.1 Information Form of the Predict Step
+### 4.1 The Offset Identity
 
-Start from the filter at step k-1:
+**Claim.** The COSMIC forward Schur complement Λ_k and the Kalman filter
+posterior precision P_filt(k)⁻¹ differ by a constant offset:
 
 ```
-P_filt(k-1)⁻¹ = Λ_{k-1}     (by the notation mapping)
+Λ_k = P_filt(k)⁻¹ + λ_{k+1} I       for k = 0, ..., N-2
+Λ_{N-1} = P_filt(N-1)⁻¹              (no next-step term at the boundary)
 ```
 
-The predicted precision is:
+This offset arises because COSMIC's block diagonal S_{kk} includes the
+regularization coupling to step k+1 (the λ_{k+1} I term), while the Kalman
+filter defers this contribution to the predict step at k+1. The smoother
+outputs are identical because the offset cancels in the backward pass.
+
+### 4.2 Proof by Induction
+
+**Base case (k = 0).** With a diffuse prior (P_filt(-1) → ∞I), the Kalman
+predict step gives P_pred(0)⁻¹ → 0. The information-form update adds the
+data contribution:
+
+```
+P_filt(0)⁻¹ = P_pred(0)⁻¹ + D(0)ᵀD(0) = D(0)ᵀD(0)
+```
+
+COSMIC defines:
+
+```
+Λ_0 = S_{00} = D(0)ᵀD(0) + λ_1 I
+```
+
+Difference: Λ_0 - P_filt(0)⁻¹ = λ_1 I. ✓
+
+**Inductive step.** Assume Λ_{k-1} = P_filt(k-1)⁻¹ + λ_k I for some k ≥ 1.
+
+*Kalman predict-update.* The predicted precision at step k is:
 
 ```
 P_pred(k)⁻¹ = (P_filt(k-1) + (1/λ_k) I)⁻¹
-             = (Λ_{k-1}⁻¹ + (1/λ_k) I)⁻¹
 ```
 
-By the Woodbury identity:
+Applying the matrix inversion lemma with M = P_filt(k-1) and N = (1/λ_k)I:
 
 ```
-(Λ_{k-1}⁻¹ + (1/λ_k) I)⁻¹ = Λ_{k-1} - Λ_{k-1}(Λ_{k-1} + λ_k I)⁻¹ Λ_{k-1}
+P_pred(k)⁻¹ = λ_k I - λ_k² (P_filt(k-1)⁻¹ + λ_k I)⁻¹
 ```
 
-This is not immediately recognizable as COSMIC's recursion. The connection
-becomes clear in the update step.
+By the inductive hypothesis, P_filt(k-1)⁻¹ + λ_k I = Λ_{k-1}, so:
 
-### 4.2 Information Form of the Update Step
+```
+P_pred(k)⁻¹ = λ_k I - λ_k² Λ_{k-1}⁻¹
+```
 
-The updated precision is:
+After the data update:
 
 ```
 P_filt(k)⁻¹ = P_pred(k)⁻¹ + D(k)ᵀD(k)
-             = (Λ_{k-1}⁻¹ + (1/λ_k) I)⁻¹ + D(k)ᵀD(k)
+             = D(k)ᵀD(k) + λ_k I - λ_k² Λ_{k-1}⁻¹
 ```
 
-Now, COSMIC defines:
+*COSMIC recursion:*
 
 ```
 Λ_k = S_{kk} - λ_k² Λ_{k-1}⁻¹
-     = D(k)ᵀD(k) + (λ_k + λ_{k+1})I - λ_k² Λ_{k-1}⁻¹
+     = D(k)ᵀD(k) + (λ_k + λ_{k+1}) I - λ_k² Λ_{k-1}⁻¹
 ```
 
-To see the equivalence, we need to show that the Kalman filter's P_filt(k)⁻¹
-equals COSMIC's Λ_k. Apply the matrix inversion lemma to the predicted
-precision:
+Taking the difference:
 
 ```
-P_pred(k)⁻¹ = (Λ_{k-1}⁻¹ + (1/λ_k) I)⁻¹
+Λ_k - P_filt(k)⁻¹ = λ_{k+1} I     ✓
 ```
 
-Let M = Λ_{k-1}⁻¹ and N = (1/λ_k) I. Then:
+At the boundary k = N-1, S_{N-1,N-1} = D(N-1)ᵀD(N-1) + λ_{N-1} I (no
+λ_N term), and the Kalman update gives P_filt(N-1)⁻¹ = D(N-1)ᵀD(N-1) +
+λ_{N-1} I - λ_{N-1}² Λ_{N-2}⁻¹ = Λ_{N-1}. So the offset vanishes at the
+last step.  ∎
+
+### 4.3 Consequences for the Smoother
+
+The offset λ_{k+1} I cancels exactly in the backward pass. To see this, note
+that the COSMIC backward recursion:
 
 ```
-(M + N)⁻¹ = N⁻¹ - N⁻¹(M⁻¹ + N⁻¹)⁻¹ N⁻¹
-           = λ_k I - λ_k² (Λ_{k-1} + λ_k I)⁻¹
+C(k) = Y_k + λ_{k+1} Λ_k⁻¹ C(k+1)
 ```
 
-So:
+and the RTS backward recursion:
 
 ```
-P_filt(k)⁻¹ = λ_k I - λ_k² (Λ_{k-1} + λ_k I)⁻¹ + D(k)ᵀD(k)
+Ĉ_smooth(k) = Ĉ_filt(k) + G(k) [Ĉ_smooth(k+1) - Ĉ_pred(k+1)]
 ```
 
-Meanwhile, COSMIC's Λ_k with the boundary terms included is:
-
-```
-Λ_k = D(k)ᵀD(k) + (λ_k + λ_{k+1})I - λ_k² Λ_{k-1}⁻¹
-```
-
-These don't look identical because of the λ_{k+1} I term. The discrepancy
-is because COSMIC's forward pass "pre-loads" the connection to step k+1 into
-Λ_k via the S_{kk} term, while the Kalman filter only accounts for the
-connection to step k (through the predict step) and defers the connection to
-k+1 to the next predict step.
-
-To reconcile: COSMIC's Λ_k includes the contribution from the regularization
-term connecting k to k+1 (the λ_{k+1} I in S_{kk}). The Kalman filter
-incorporates this contribution during the *next* predict step, when P_filt(k)
-is inflated by (1/λ_{k+1}) I. The two approaches are algebraically equivalent
-in the sense that the smoother outputs agree, but the intermediate filter
-quantities differ by the "pre-loading" of the next regularization term.
-
-**Alternative exact correspondence:** If we define a modified Kalman filter that
-includes the next-step regularization in the update (by adding λ_{k+1} I to the
-update precision), the intermediate quantities match COSMIC exactly:
-
-```
-Λ_k = P_pred(k)⁻¹ + D(k)ᵀD(k) + λ_{k+1} I
-```
-
-This is equivalent to the standard filter because the extra λ_{k+1} I added
-at step k is subtracted at step k+1's predict step. The smoother output is
-identical either way.
+both combine the forward estimate at k with a correction proportional to the
+backward innovation at k+1. The smoother gain G(k) = P_filt(k) P_pred(k+1)⁻¹
+absorbs the offset, so the smoother outputs (Ĉ_smooth(k), P_smooth(k)) are
+algebraically identical to the COSMIC outputs (C(k), P(k)). The equivalence
+is exact, not approximate.
 
 
 ## 5. Online Operation
