@@ -19,7 +19,7 @@ function W = sidHannWin(M)
 %     W = sidHannWin(30);  % Hann window for lags 0..30
 %
 %   SPECIFICATION:
-%     SPEC.md §2.2 — Hann Window for Spectral Analysis
+%     SPEC.md §2.4 — Hann Lag Window
 %
 %   See also: sidCov, sidWindowedDFT, sidUncertainty
 %

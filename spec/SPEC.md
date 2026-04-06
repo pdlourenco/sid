@@ -113,6 +113,8 @@ R̂_xz^ens(τ) = (1/L) Σ_{l=1}^{L} R̂_xz^(l)(τ)
 
 where `R̂_xz^(l)(τ)` is the biased covariance from trajectory `l`. The averaging is performed at the covariance level, before windowing and Fourier transformation. This preserves the H1 estimator structure (ratio of averaged spectra, not average of ratios).
 
+### 2.4 Hann Lag Window
+
 The Hann (Hanning) window of size `M`:
 
 ```
@@ -264,7 +266,7 @@ For the Hann window, this evaluates to:
 C_W = 1 + 2 × Σ_{τ=1}^{M} [0.5 × (1 + cos(πτ/M))]²
 ```
 
-which can be computed in closed form as `C_W = (3/4)×(2M) + 1/2 = (3M + 1)/2`, but the implementation should compute it numerically from the actual window values to avoid any discrepancy.
+which evaluates in closed form to `C_W = 3M/4`. This follows from `Σ_{τ=1}^{M} cos(πτ/M) = -1` and `Σ_{τ=1}^{M} cos²(πτ/M) = M/2`, giving `C_W = 1 + 0.5(3M/2 - 2) = 3M/4`. The implementation computes `C_W` numerically from the actual window values.
 
 ### 3.2 Coherence
 
@@ -400,6 +402,10 @@ When no input is present, the ETFE reduces to the **periodogram**:
 ```
 Φ̂_y(ω_k) = (1/N) × |Y(ω_k)|²
 ```
+
+### 4.5 Uncertainty
+
+The ETFE has no closed-form asymptotic variance formula: the periodogram is an inconsistent estimator whose variance does not decrease with `N`. The `ResponseStd` and `NoiseSpectrumStd` fields are set to `NaN`. For uncertainty quantification, use `sidFreqBT` (which smooths via the lag window) or apply optional smoothing (§4.2) and estimate variance empirically.
 
 ---
 
@@ -543,13 +549,13 @@ Within each segment of length `L`, apply the Welch method (equivalent to `tfesti
       ```
    b. Compute FFTs: `Y_j(m) = FFT(y_j)`, `U_j(m) = FFT(u_j)`.
 
-3. Average the cross-spectral and auto-spectral periodograms:
+3. Average the cross-spectral and auto-spectral periodograms over `J` sub-segments (and `L` trajectories when multi-trajectory data is available):
    ```
-   Φ̂_yu(ω) = (1/J) Σ_j Y_j(ω) conj(U_j(ω)) / S₁
-   Φ̂_u(ω)  = (1/J) Σ_j |U_j(ω)|² / S₁
-   Φ̂_y(ω)  = (1/J) Σ_j |Y_j(ω)|² / S₁
+   Φ̂_yu(ω) = (2 / (J_total × S₁)) Σ_{j,l} Y_{j,l}(ω) conj(U_{j,l}(ω))
+   Φ̂_u(ω)  = (2 / (J_total × S₁)) Σ_{j,l} |U_{j,l}(ω)|²
+   Φ̂_y(ω)  = (2 / (J_total × S₁)) Σ_{j,l} |Y_{j,l}(ω)|²
    ```
-   where `S₁ = Σ_n w(n)²` is the window power normalization.
+   where `S₁ = Σ_n w(n)²` is the window power normalization, `J_total = J × L` is the total number of averaged periodograms, and the factor of 2 converts to one-sided spectra (positive frequencies only, excluding DC). This factor cancels in the transfer function ratio `Ĝ = Φ̂_yu / Φ̂_u` but is needed for correct spectral magnitudes.
 
 4. Form `Ĝ(ω) = Φ̂_yu(ω) / Φ̂_u(ω)`.
 5. Form `Φ̂_v(ω)` and `γ̂²(ω)` as in the BT case.
@@ -572,7 +578,7 @@ where `ν = 2J × (1 - c_overlap)` is the equivalent degrees of freedom, and `c_
 | Variance control | `M` (smaller M → lower variance) | Number of sub-segments `J` (more → lower variance) |
 | Guaranteed non-negative spectrum | Yes (biased covariance estimator) | Yes (averaged periodograms) |
 | Custom frequency grid | Yes (direct DFT path) | No (FFT bins only) |
-| Normalization | System ID convention (no Ts factor) | PSD convention (includes Ts) |
+| Normalization | System ID convention (no Ts factor) | System ID convention (no Ts factor) within `sidFreqMap`; standalone `tfestimate` includes Ts |
 | Best for | Smooth spectra, custom frequencies | Standard analysis, `tfestimate` compatibility |
 
 **Default choice:** `'bt'` is the default because it matches the `sid` package's primary use case (system identification with `sidFreqBT`-compatible output) and supports custom frequency grids. Users coming from `tfestimate` should use `'welch'`.

@@ -22,7 +22,7 @@ function X = sidDFT(x, freqs, useFFT)
 %     X = sidDFT(x, freqs, true);
 %
 %   SPECIFICATION:
-%     SPEC.md §2.4 — Discrete Fourier Transform
+%     SPEC.md §4.1 — ETFE (DFT computation)
 %
 %   See also: sidWindowedDFT, sidFreqETFE
 %

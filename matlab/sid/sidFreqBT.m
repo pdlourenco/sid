@@ -158,10 +158,10 @@ function result = sidFreqBT(y, u, varargin)
         Ruy = sidCov(u, y, M);                   % (M+1 x nu x ny) negative lags
     end
 
-    % ---- Hann lag window (SPEC.md §2.2) ----
+    % ---- Hann lag window (SPEC.md §2.4) ----
     W = sidHannWin(M);                            % (M+1 x 1) for lags 0..M
 
-    % ---- Windowed DFT: covariances -> spectral estimates (SPEC.md §2.4) ----
+    % ---- Windowed DFT: covariances -> spectral estimates (SPEC.md §2.5) ----
     % Phi_y(w) = sum_{tau} W(tau) * R_yy(tau) * e^{-jw*tau}
     PhiY = sidWindowedDFT(Ryy, W, freqs, useFFT, Ryy); % (nf x ny x ny)
 
@@ -170,7 +170,7 @@ function result = sidFreqBT(y, u, varargin)
         PhiYU = sidWindowedDFT(Ryu, W, freqs, useFFT, Ruy); % (nf x ny x nu)
     end
 
-    % ---- Form transfer function and noise spectrum (SPEC.md §2.4) ----
+    % ---- Form transfer function and noise spectrum (SPEC.md §2.6–2.7) ----
     if isTimeSeries
         G = [];
         PhiV = real(PhiY);

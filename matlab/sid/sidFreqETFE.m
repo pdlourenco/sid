@@ -331,7 +331,7 @@ function result = sidFreqETFE(y, u, varargin)
         Coh = [];
     end
 
-    % ---- Uncertainty (SPEC.md §4.4) ----
+    % ---- Uncertainty (SPEC.md §4.5) ----
     % ETFE has no closed-form asymptotic variance — return NaN.
     if isTimeSeries
         GStd = [];
