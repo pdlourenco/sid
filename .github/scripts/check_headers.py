@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Validate MATLAB function headers against the CONTRIBUTING.md standard.
 
-Checks library functions in the repo root and internal/ directory.
+Checks library functions in the repo root and private/ directory.
 Skips examples/ and tests/ (scripts, not functions).
 
 Exit codes:
@@ -19,7 +19,7 @@ import sys
 # ---------------------------------------------------------------------------
 
 # Directories to scan (relative to repo root)
-SCAN_DIRS = ["matlab/sid", "matlab/sid/internal"]
+SCAN_DIRS = ["matlab/sid", "matlab/sid/private"]
 
 # Files exempt from SPECIFICATION check
 SPEC_EXEMPT = set()

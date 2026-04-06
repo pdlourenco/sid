@@ -1575,7 +1575,7 @@ X_hat = sidLTVStateEst(Y, U, A, B, H, 'R', R_meas, 'Q', Q_proc);
 
 The `sidLTVdiscIO` implementation is decomposed into reusable layers:
 
-- **`internal/sidLTVblkTriSolve`**: Generic block tridiagonal forward-backward solver. Uses cell arrays for non-uniform block sizes. Shared by `sidLTVStateEst` and `sidLTVdiscIOInit`.
+- **`private/sidLTVblkTriSolve`**: Generic block tridiagonal forward-backward solver. Uses cell arrays for non-uniform block sizes. Used by `sidLTVStateEst` for the RTS smoother's block tridiagonal system.
 - **`sidLTIfreqIO`** (§8.13): LTI realization from I/O frequency response. Used by `sidLTVdiscIO` to initialise the alternating loop when `rank(H) < n`.
 - **`sidLTVStateEst`**: User-facing batch state smoother. Builds per-trajectory blocks per Appendix A and calls `sidLTVblkTriSolve`.
 - **`sidLTVdiscIO`**: Orchestrator. When `rank(H) = n`, recovers states via weighted LS and runs a single COSMIC step. When `rank(H) < n`, calls `sidLTIfreqIO` for initialisation, then alternates between the COSMIC step (reusing `sidLTVbuildDataMatrices`, `sidLTVbuildBlockTerms`, `sidLTVcosmicSolve`) and `sidLTVStateEst` until convergence.

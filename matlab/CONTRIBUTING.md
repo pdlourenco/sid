@@ -10,7 +10,7 @@ Octave before submitting — the CI pipeline checks both platforms automatically
 
 ## Function Header Standard
 
-Every `.m` function file (public and internal) **must** follow the canonical
+Every `.m` function file (public and private) **must** follow the canonical
 header template below. This ensures consistency, enables MATLAB `help` to
 display useful documentation, and keeps a clear link between code and the
 algorithm specification.
@@ -142,9 +142,11 @@ sid [Domain] [Method/Variant]
 
 Examples: `sidFreqBT`, `sidLTVdisc`, `sidBodePlot`, `sidModelOrder`.
 
-Internal helper functions live in the `sid/internal/` directory and use the same
+Internal helper functions live in the `sid/private/` directory and use the same
 `sid` prefix with camelCase (e.g., `sidCov`, `sidValidateData`,
-`sidLTVcosmicSolve`).
+`sidLTVcosmicSolve`). MATLAB's `private` directory mechanism makes these
+functions available to all functions in `sid/` without requiring them on the
+path, and invisible to end users.
 
 ---
 

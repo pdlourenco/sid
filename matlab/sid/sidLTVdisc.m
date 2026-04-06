@@ -483,4 +483,4 @@ function bestLambda = lcurveLambda(D, Xl, N, p, q, lambdaGrid)
 end
 
 % Local functions estimateNoiseCov and extractStd have been moved to
-% shared internal helpers: sidEstimateNoiseCov.m and sidExtractStd.m
+% shared private helpers: sidEstimateNoiseCov.m and sidExtractStd.m

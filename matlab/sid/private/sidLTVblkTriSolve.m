@@ -51,7 +51,7 @@ function [w, Lbd] = sidLTVblkTriSolve(S, U, Theta)
 %   SPECIFICATION:
 %     docs/cosmic_output.md — Appendices A and B
 %
-%   See also: sidLTVcosmicSolve, sidLTVdiscIOInit, sidLTVStateEst
+%   See also: sidLTVcosmicSolve, sidLTVStateEst
 %
 %   Changelog:
 %   2026-04-01: First version by Pedro Lourenço.

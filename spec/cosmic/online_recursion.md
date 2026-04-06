@@ -477,10 +477,10 @@ trajectory's data as it arrives.
 
 ```
 sidLtvCosmicOnline.m              % Streaming Kalman filter in parameter space
-internal/sidLtvCosmicPredict.m    % One predict step: P̄ = P + (1/λ)I
-internal/sidLtvCosmicUpdate.m     % One update step: incorporate D(k), X'(k)
-internal/sidLtvCosmicSmooth.m     % RTS backward pass over stored filter output
-internal/sidLtvCosmicInnovation.m % Innovation computation and NIS diagnostic
+private/sidLtvCosmicPredict.m    % One predict step: P̄ = P + (1/λ)I
+private/sidLtvCosmicUpdate.m     % One update step: incorporate D(k), X'(k)
+private/sidLtvCosmicSmooth.m     % RTS backward pass over stored filter output
+private/sidLtvCosmicInnovation.m % Innovation computation and NIS diagnostic
 ```
 
 ### 8.2 API

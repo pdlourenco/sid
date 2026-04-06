@@ -22,7 +22,17 @@ end
 runner__matlabDir = fileparts(runner__thisDir);
 runner__sidDir = fullfile(runner__matlabDir, 'sid');
 addpath(runner__sidDir);
-addpath(fullfile(runner__sidDir, 'internal'));
+% MATLAB ignores addpath on directories named 'private'. Copy to a
+% temporary non-private-named directory for test-only access. Uses only
+% cross-platform MATLAB builtins (copyfile, rmdir) — no OS calls.
+runner__privateDir = fullfile(runner__sidDir, 'private');
+runner__shimDir = fullfile(runner__thisDir, 'private_test_shim');
+if exist(runner__shimDir, 'dir')
+    rmdir(runner__shimDir, 's');
+end
+mkdir(runner__shimDir);
+copyfile(fullfile(runner__privateDir, '*.m'), runner__shimDir);
+addpath(runner__shimDir);
 
 % Auto-discover test files matching test_*.m
 runner__listing = dir(fullfile(runner__thisDir, 'test_*.m'));
@@ -40,21 +50,32 @@ runner__passed = 0;
 runner__failed = 0;
 runner__failedNames = {};
 
-for runner__k = 1:runner__nTests
-    try
-        run(fullfile(runner__thisDir, [runner__testFiles{runner__k} '.m']));
-        runner__passed = runner__passed + 1;
-    catch runner__e
-        runner__failed = runner__failed + 1;
-        runner__failedNames{end+1} = runner__testFiles{runner__k}; %#ok<SAGROW>
-        fprintf('  *** %s: FAILED ***\n', runner__testFiles{runner__k});
-        fprintf('      Error: %s\n', runner__e.message);
-        % Emit GitHub Actions annotation so the error appears in CI check-run output
-        fprintf('::error title=%s::%s\n', ...
-            runner__testFiles{runner__k}, ...
-            strrep(runner__e.message, newline, ' '));
+try
+    for runner__k = 1:runner__nTests
+        try
+            run(fullfile(runner__thisDir, [runner__testFiles{runner__k} '.m']));
+            runner__passed = runner__passed + 1;
+        catch runner__e
+            runner__failed = runner__failed + 1;
+            runner__failedNames{end+1} = runner__testFiles{runner__k}; %#ok<SAGROW>
+            fprintf('  *** %s: FAILED ***\n', runner__testFiles{runner__k});
+            fprintf('      Error: %s\n', runner__e.message);
+            % Emit GitHub Actions annotation so the error appears in CI check-run output
+            fprintf('::error title=%s::%s\n', ...
+                runner__testFiles{runner__k}, ...
+                strrep(runner__e.message, newline, ' '));
+        end
     end
+catch runner__fatalErr
+    % Ensure shim cleanup even on unexpected errors
+    rmpath(runner__shimDir);
+    rmdir(runner__shimDir, 's');
+    rethrow(runner__fatalErr);
 end
+
+% Clean up temporary test shim directory
+rmpath(runner__shimDir);
+rmdir(runner__shimDir, 's');
 
 fprintf('\n=== Test Summary ===\n');
 fprintf('  Total:  %d\n', runner__nTests);

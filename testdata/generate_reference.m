@@ -13,7 +13,6 @@ thisDir = fileparts(mfilename('fullpath'));
 rootDir = fileparts(thisDir);
 sidDir = fullfile(rootDir, 'matlab', 'sid');
 addpath(sidDir);
-addpath(fullfile(sidDir, 'internal'));
 
 % ---- Test case 1: SISO Blackman-Tukey ----
 fprintf('Generating reference_siso_bt.json...\n');

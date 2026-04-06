@@ -19,7 +19,6 @@ end
 runner__matlabDir = fileparts(runner__thisDir);
 runner__sidDir = fullfile(runner__matlabDir, 'sid');
 addpath(runner__sidDir);
-addpath(fullfile(runner__sidDir, 'internal'));
 
 % Auto-discover example files matching example*.m
 runner__listing = dir(fullfile(runner__thisDir, 'example*.m'));

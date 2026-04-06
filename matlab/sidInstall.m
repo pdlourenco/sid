@@ -3,7 +3,9 @@ function sidInstall()
 %
 %   sidInstall
 %
-%   Adds the sid root folder and the internal subfolder to the path.
+%   Adds the sid root folder to the MATLAB/Octave path. Private helper
+%   functions in sid/private/ are available automatically via MATLAB's
+%   private directory mechanism and do not need to be on the path.
 %   Run this once per session, or add the following to your startup.m:
 %
 %       run('/path/to/sid-matlab/matlab/sidInstall.m')
@@ -31,8 +33,6 @@ function sidInstall()
     rootDir = fileparts(mfilename('fullpath'));
     sidDir  = fullfile(rootDir, 'sid');
     addpath(sidDir);
-    addpath(fullfile(sidDir, 'internal'));
     fprintf('sid: added to path.\n');
     fprintf('  %s\n', sidDir);
-    fprintf('  %s\n', fullfile(sidDir, 'internal'));
 end

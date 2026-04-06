@@ -276,7 +276,7 @@ function result = addUncertainty( ...
 end
 
 % Local functions estimateNoiseCovLocal and extractStdLocal have been
-% replaced by shared internal helpers: sidEstimateNoiseCov.m and
+% replaced by shared private helpers: sidEstimateNoiseCov.m and
 % sidExtractStd.m
 
 function [Y, U, H, lambda, R, maxIter, tol, mu, muTol, doTrustRegion, ...
