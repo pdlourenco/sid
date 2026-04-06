@@ -1070,24 +1070,32 @@ The total horizon `N` is `max(N1, N2, ..., N_L)`. Time steps with fewer active t
 
 #### 8.9.1 Bayesian Interpretation
 
-Under Gaussian noise `w(k) ~ N(0, σ² I)` on the state measurements, the COSMIC cost function is the negative log-posterior of a Bayesian model:
+Under Gaussian noise `w(k) ~ N(0, Σ)` on the state measurements, where `Σ ∈ ℝᵖˣᵖ` is a general symmetric positive definite noise covariance matrix, the COSMIC cost function is the negative log-posterior of a Bayesian model:
 
-- **Likelihood:** `p(X' | C) ∝ exp(-h(C) / σ²)` — the data fidelity term.
-- **Prior:** `p(C) ∝ exp(-g(C) / σ²)` — the smoothness regularizer is a Gaussian prior on consecutive differences of `C(k)` with precision `λ_k / σ²`.
+- **Likelihood:** `p(X' | C, Σ) ∝ exp(-(1/2) Σ_k tr(Σ⁻¹ E(k)ᵀ E(k)))` — the data fidelity term.
+- **Prior:** `p(C | Σ) ∝ exp(-(1/2) Σ_k λ_k tr(Σ⁻¹ ΔC(k)ᵀ ΔC(k)))` — the smoothness regularizer is a matrix-normal Gaussian prior on consecutive differences of `C(k)`.
 
-The posterior is Gaussian:
+The factor `Σ⁻¹` is common to both terms and cancels in the MAP normal equations (see `uncertainty_derivation.md` §2.3). The MAP estimate `C*` is therefore independent of `Σ`.
 
-```
-p(C | X') = N(C*, H⁻¹ σ²)
-```
-
-where `C*` is the COSMIC solution (the MAP estimate) and `H` is the Hessian:
+The posterior is matrix-normal:
 
 ```
-H = V^T V + F^T Υ F
+C(k) | data, Σ  ~  MN(Ĉ(k), P(k), Σ)
 ```
 
-This is exactly the block tridiagonal matrix `LM` from the COSMIC derivation. The posterior covariance is `Σ = σ² H⁻¹`.
+where `Ĉ(k)` is the COSMIC solution (MAP estimate), `P(k) ∈ ℝᵈˣᵈ` is the row covariance, and `Σ` is the column covariance (noise covariance). In vectorized form:
+
+```
+Cov(vec(C(k))) = Σ ⊗ P(k)
+```
+
+where `P(k) = [A⁻¹]_{kk}` is the k-th diagonal block of the inverse Hessian:
+
+```
+A = V^T V + F^T Υ F
+```
+
+This is exactly the block tridiagonal matrix `LM` from the COSMIC derivation. `P(k)` depends only on the data geometry and regularization, not on `Σ`.
 
 #### 8.9.2 Diagonal Block Extraction via Left-Right Schur Complements
 
@@ -1266,13 +1274,13 @@ and propagate the posterior covariance `Σ_kk` to obtain `σ_cosmic(ω, k)` via 
 ∂G_{ab}/∂B_{ji} = R_{aj} × δ_{ib}
 ```
 
-Since `C(k) = [A(k)ᵀ; B(k)ᵀ]` and `Cov(vec(C(k))) = Σ ⊗ P(k)`, the element-wise variance is:
+Since `C(k) = [A(k)ᵀ; B(k)ᵀ]` and `Cov(vec(C(k))) = Σ ⊗ P(k)`, the Jacobian for entry `G_{ab}` has rank-1 structure `J_{ab} = v rₐ` where `v = [Gk(:,b); eᵦ] ∈ ℝᵈ` (`Gk = R B`, `eᵦ` is the b-th unit vector in `ℝᵍ`) and `rₐ = R(a,:) ∈ ℂ¹ˣᵖ`. The exact first-order variance is:
 
 ```
-Var(G_{ab}) = Σ_{r,j} |∂G_{ab}/∂C_{rj}|² × Σ_{jj} × P(k)_{rr}
+Var(G_{ab}) = (vᴴ P(k) v) × (rₐ Σ rₐᴴ)
 ```
 
-where rows `r = 1..p` correspond to `A` columns and rows `r = p+1..d` to `B` columns.
+This uses the full `P(k)` and full `Σ` via two scalar quadratic forms. Cost: `O(d² + p²)` per entry.
 
 The criterion: **find the largest λ whose COSMIC posterior bands are consistent with the non-parametric bands.**
 

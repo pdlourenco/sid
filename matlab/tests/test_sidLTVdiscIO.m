@@ -909,4 +909,60 @@ assert(res_rd.Iterations > 0, ...
 fprintf('  Test 25 passed: rank-deficient square H forces EM (%d iters).\n', ...
     res_rd.Iterations);
 
+%% Test 26: CovarianceMode option — diagonal (default)
+rng(126);
+n26 = 2; q26 = 1; py26 = 2; N26 = 20; L26 = 5;
+A26 = [0.9 0.1; -0.1 0.8]; B26 = [0.5; 0.3]; H26 = eye(2);
+X26 = zeros(N26+1, n26, L26); U26 = randn(N26, q26, L26);
+Y26 = zeros(N26+1, py26, L26);
+for l = 1:L26
+    X26(1, :, l) = randn(1, n26);
+    Y26(1, :, l) = (H26 * X26(1, :, l)')';
+    for k = 1:N26
+        X26(k+1, :, l) = (A26 * X26(k, :, l)' + B26 * U26(k, :, l)')' ...
+            + 0.02 * randn(1, n26);
+        Y26(k+1, :, l) = (H26 * X26(k+1, :, l)')';
+    end
+end
+
+res26d = sidLTVdiscIO(Y26, U26, H26, 'Lambda', 1e3, ...
+    'CovarianceMode', 'diagonal');
+Sig26d = res26d.NoiseCov;
+offDiag26d = Sig26d - diag(diag(Sig26d));
+assert(max(abs(offDiag26d(:))) < 1e-15, ...
+    'Diagonal mode should produce diagonal NoiseCov');
+fprintf('  Test 26 passed: CovarianceMode diagonal.\n');
+
+%% Test 27: CovarianceMode option — full
+res26f = sidLTVdiscIO(Y26, U26, H26, 'Lambda', 1e3, ...
+    'CovarianceMode', 'full');
+Sig26f = res26f.NoiseCov;
+assert(isequal(size(Sig26f), [n26, n26]), 'Full mode NoiseCov dims');
+% Full mode may have off-diagonals (no assertion on zeros)
+assert(all(isfinite(Sig26f(:))), 'Full mode NoiseCov should be finite');
+fprintf('  Test 27 passed: CovarianceMode full.\n');
+
+%% Test 28: CovarianceMode option — isotropic
+res26i = sidLTVdiscIO(Y26, U26, H26, 'Lambda', 1e3, ...
+    'CovarianceMode', 'isotropic');
+Sig26i = res26i.NoiseCov;
+assert(abs(Sig26i(1,1) - Sig26i(2,2)) < 1e-15, ...
+    'Isotropic mode should have equal diagonal entries');
+offDiag26i = Sig26i - diag(diag(Sig26i));
+assert(max(abs(offDiag26i(:))) < 1e-15, ...
+    'Isotropic mode should be scalar * I');
+fprintf('  Test 28 passed: CovarianceMode isotropic.\n');
+
+%% Test 29: Invalid CovarianceMode errors
+threw = false;
+try
+    sidLTVdiscIO(Y26, U26, H26, 'Lambda', 1e3, 'CovarianceMode', 'bad');
+catch e
+    threw = true;
+    assert(~isempty(strfind(e.identifier, 'badCovMode')), ...
+        'Expected sid:badCovMode error, got %s', e.identifier);
+end
+assert(threw, 'Invalid CovarianceMode should throw an error');
+fprintf('  Test 29 passed: invalid CovarianceMode throws error.\n');
+
 fprintf('test_sidLTVdiscIO: all tests passed.\n');

@@ -45,21 +45,41 @@ for runner__k = 1:length(runner__testFiles)
     runner__testFiles{runner__k} = runner__testFiles{runner__k}(1:end-2);
 end
 
-runner__nTests = length(runner__testFiles);
-runner__passed = 0;
-runner__failed = 0;
+runner__nFiles = length(runner__testFiles);
+runner__filesPassed = 0;
+runner__filesFailed = 0;
 runner__failedNames = {};
+runner__totalCases = 0;
+runner__passedCases = 0;
 
 try
-    for runner__k = 1:runner__nTests
+    for runner__k = 1:runner__nFiles
         try
-            run(fullfile(runner__thisDir, [runner__testFiles{runner__k} '.m']));
-            runner__passed = runner__passed + 1;
+            runner__out = evalc( ...
+                sprintf('run(''%s'')', ...
+                    fullfile(runner__thisDir, ...
+                        [runner__testFiles{runner__k} '.m'])));
+            fprintf('%s', runner__out);
+            runner__filesPassed = runner__filesPassed + 1;
+            % Count individual test cases from "Test N passed" lines
+            runner__caseCount = length(regexp(runner__out, ...
+                'Test \d+ passed', 'match'));
+            runner__totalCases = runner__totalCases + runner__caseCount;
+            runner__passedCases = runner__passedCases + runner__caseCount;
         catch runner__e
-            runner__failed = runner__failed + 1;
+            runner__filesFailed = runner__filesFailed + 1;
             runner__failedNames{end+1} = runner__testFiles{runner__k}; %#ok<SAGROW>
             fprintf('  *** %s: FAILED ***\n', runner__testFiles{runner__k});
             fprintf('      Error: %s\n', runner__e.message);
+            % Count any tests that passed before the failure
+            if exist('runner__out', 'var')
+                runner__caseCount = length(regexp(runner__out, ...
+                    'Test \d+ passed', 'match'));
+            else
+                runner__caseCount = 0;
+            end
+            runner__totalCases = runner__totalCases + runner__caseCount + 1;
+            runner__passedCases = runner__passedCases + runner__caseCount;
             % Emit GitHub Actions annotation so the error appears in CI check-run output
             fprintf('::error title=%s::%s\n', ...
                 runner__testFiles{runner__k}, ...
@@ -78,18 +98,21 @@ rmpath(runner__shimDir);
 rmdir(runner__shimDir, 's');
 
 fprintf('\n=== Test Summary ===\n');
-fprintf('  Total:  %d\n', runner__nTests);
-fprintf('  Passed: %d\n', runner__passed);
-fprintf('  Failed: %d\n', runner__failed);
+fprintf('  Files:  %d passed, %d failed (%d total)\n', ...
+    runner__filesPassed, runner__filesFailed, runner__nFiles);
+fprintf('  Cases:  %d passed, %d failed (%d total)\n', ...
+    runner__passedCases, runner__totalCases - runner__passedCases, ...
+    runner__totalCases);
 
-if runner__failed > 0
+if runner__filesFailed > 0
     fprintf('\n  Failed tests:\n');
     for runner__k = 1:length(runner__failedNames)
         fprintf('    - %s\n', runner__failedNames{runner__k});
     end
     fprintf('\n');
-    error('sid:testsFailed', '%d of %d test suites failed.', ...
-        runner__failed, runner__nTests);
+    error('sid:testsFailed', '%d of %d test files failed (%d/%d cases passed).', ...
+        runner__filesFailed, runner__nFiles, ...
+        runner__passedCases, runner__totalCases);
 else
     fprintf('\n  ALL TESTS PASSED\n\n');
 end

@@ -128,4 +128,80 @@ assert(max(abs(frz_ts.FrequencyHz - expected_hz)) < 1e-12, ...
     'FrequencyHz should be w / (2*pi*Ts)');
 fprintf('  Test 7 passed: SampleTime affects FrequencyHz correctly.\n');
 
+%% Test 8: Exact variance formula matches brute-force Kronecker product
+% Verify the rank-1 compact formula against a full double sum over
+% Cov(vec(C(k))) = Sigma kron P(k) with non-diagonal Sigma and P.
+rng(2008);
+p = 2; q = 1; N = 15; L = 8;
+A_true = [0.9 0.1; -0.1 0.8]; B_true = [0.5; 0.3];
+X = zeros(N+1, p, L); U = randn(N, q, L);
+for l = 1:L
+    X(1, :, l) = randn(1, p);
+    for k = 1:N
+        noise = [0.02; 0.08] .* randn(p, 1);  % anisotropic noise
+        X(k+1, :, l) = (A_true * X(k, :, l)' + B_true * U(k, :, l)')' + noise';
+    end
+end
+ltv = sidLTVdisc(X, U, 'Lambda', 1e3, 'Uncertainty', true, ...
+    'CovarianceMode', 'full');
+frz = sidLTVdiscFrozen(ltv, 'Frequencies', [0.5; 1.5], 'TimeSteps', [5; 10]);
+
+% Brute-force: Var(G_{ab}) = J^H (Sigma kron P) J for each (a,b,w,k)
+d = p + q;
+Sigma = ltv.NoiseCov;
+maxRelErr = 0;
+for ik = 1:2
+    ki = [5; 10];
+    Pk = ltv.P(:, :, ki(ik));
+    Ak = ltv.A(:, :, ki(ik));
+    Bk = ltv.B(:, :, ki(ik));
+    Ip = eye(p);
+    for iw = 1:2
+        ww = [0.5; 1.5];
+        z = exp(1i * ww(iw));
+        R = (z * Ip - Ak) \ Ip;
+        Gk = R * Bk;
+
+        for a = 1:p
+            for b = 1:q
+                % Full Kronecker double sum
+                v_bf = 0;
+                for r = 1:d
+                    for j = 1:p
+                        % dG_{ab}/dC_{rj}
+                        if r <= p
+                            dG_rj = R(a, j) * Gk(r, b);
+                        elseif r == p + b
+                            dG_rj = R(a, j);
+                        else
+                            dG_rj = 0;
+                        end
+                        for s = 1:d
+                            for l2 = 1:p
+                                if s <= p
+                                    dG_sl = R(a, l2) * Gk(s, b);
+                                elseif s == p + b
+                                    dG_sl = R(a, l2);
+                                else
+                                    dG_sl = 0;
+                                end
+                                v_bf = v_bf + conj(dG_rj) * dG_sl ...
+                                    * Sigma(j, l2) * Pk(r, s);
+                            end
+                        end
+                    end
+                end
+                var_bf = real(v_bf);
+                var_impl = frz.ResponseStd(iw, a, b, ik)^2;
+                relErr = abs(var_bf - var_impl) / max(var_bf, 1e-30);
+                maxRelErr = max(maxRelErr, relErr);
+            end
+        end
+    end
+end
+assert(maxRelErr < 1e-10, ...
+    'Exact formula should match brute-force (maxRelErr=%.2e)', maxRelErr);
+fprintf('  Test 8 passed: exact variance matches brute-force Kronecker (maxRelErr=%.2e).\n', ...
+    maxRelErr);
+
 fprintf('test_sidLTVdiscFrozen: ALL TESTS PASSED\n');

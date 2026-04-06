@@ -38,6 +38,10 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
 %     'MaxIter'         - Maximum alternating iterations. Default: 50.
 %     'Tolerance'       - Convergence tolerance on relative cost change.
 %                         Default: 1e-6.
+%     'CovarianceMode'  - How to estimate noise covariance. Options:
+%                           'diagonal'  - diagonal Sigma (default)
+%                           'full'      - full n x n covariance
+%                           'isotropic' - scalar * I_n
 %     'TrustRegion'     - Trust-region parameter mu_0 in [0, 1], or 'off'.
 %                         Default: 'off'.
 %     'TrustRegionTol'  - Minimum mu before final pass. Default: 1e-6.
@@ -94,6 +98,7 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
 %   See also: sidLTIfreqIO, sidLTVdisc, sidLTVStateEst, sidLTVdiscFrozen
 %
 %   Changelog:
+%   2026-04-06: Expose CovarianceMode option (was hardcoded 'diagonal').
 %   2026-04-01: First version by Pedro Lourenço.
 %
 %  -----------------------------------------------------------------------
@@ -109,7 +114,7 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
 
     % ---- Parse inputs ----
     [Y, U, H, lambda, R, maxIter, tol, mu, muTol, doTrustRegion, ...
-     N, n, py, q, L, isVarLen, horizons] = ...
+     covMode, N, n, py, q, L, isVarLen, horizons] = ...
         parseInputs(Y, U, H, varargin{:});
 
     % ---- Precompute ----
@@ -141,7 +146,8 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
             A, B, X_hat, H, R, J, 0, lambda, ...
             N, n, py, q, L, isVarLen, horizons);
         result = addUncertainty( ...
-            result, S_c, D_c, Xl_c, C_c, lambda, N, n, q, isVarLen, horizons);
+            result, S_c, D_c, Xl_c, C_c, lambda, N, n, q, covMode, ...
+            isVarLen, horizons);
         return;
     end
 
@@ -215,7 +221,8 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
 
     % ---- Bayesian uncertainty from final COSMIC step (SPEC.md §8.12.9) ----
     result = addUncertainty( ...
-        result, S_c, D_c, Xl_c, C_c, lambda, N, n, q, isVarLen, horizons);
+        result, S_c, D_c, Xl_c, C_c, lambda, N, n, q, covMode, ...
+        isVarLen, horizons);
 
 end
 
@@ -249,7 +256,7 @@ function result = packResult( ...
 end
 
 function result = addUncertainty( ...
-    result, S, D, Xl, C, lambda, N, n, q, isVarLen, horizons)
+    result, S, D, Xl, C, lambda, N, n, q, covMode, isVarLen, horizons)
 % ADDUNCERTAINTY Append Bayesian uncertainty fields (SPEC.md §8.12.9).
 %
 %   Computes AStd, BStd from the block-tridiagonal Hessian inverse,
@@ -260,8 +267,8 @@ function result = addUncertainty( ...
     % Diagonal blocks of the Hessian inverse (SPEC.md §8.9.2)
     P = sidLTVuncertaintyBackwardPass(S, lambda, N, d);
 
-    % Noise covariance from COSMIC residuals (diagonal mode)
-    [Sigma, dof] = sidEstimateNoiseCov(C, D, Xl, P, 'diagonal', N, n, q);
+    % Noise covariance from COSMIC residuals
+    [Sigma, dof] = sidEstimateNoiseCov(C, D, Xl, P, covMode, N, n, q);
 
     % Standard deviations of A(k) and B(k) entries
     [AStd, BStd] = sidExtractStd(P, Sigma, N, n, q);
@@ -280,7 +287,7 @@ end
 % sidExtractStd.m
 
 function [Y, U, H, lambda, R, maxIter, tol, mu, muTol, doTrustRegion, ...
-          N, n, py, q, L, isVarLen, horizons] = parseInputs(Y, U, H, varargin)
+          covMode, N, n, py, q, L, isVarLen, horizons] = parseInputs(Y, U, H, varargin)
 % PARSEINPUTS Validate and parse inputs for sidLTVdiscIO.
 %   Supports both 3D array input (uniform horizon) and cell array input
 %   (variable-length trajectories).
@@ -368,6 +375,7 @@ function [Y, U, H, lambda, R, maxIter, tol, mu, muTol, doTrustRegion, ...
     defs.Tolerance = 1e-6;
     defs.TrustRegion = 'off';
     defs.TrustRegionTol = 1e-6;
+    defs.CovarianceMode = 'diagonal';
     opts = sidParseOptions(defs, varargin);
     lambda = opts.Lambda;
     R = opts.R;
@@ -399,6 +407,14 @@ function [Y, U, H, lambda, R, maxIter, tol, mu, muTol, doTrustRegion, ...
     % Validate R
     if ~isequal(size(R), [py, py])
         error('sid:dimMismatch', 'R must be (%d x %d).', py, py);
+    end
+
+    % Validate CovarianceMode
+    covMode = lower(opts.CovarianceMode);
+    if ~ismember(covMode, {'full', 'diagonal', 'isotropic'})
+        error('sid:badCovMode', ...
+            ['CovarianceMode must be ''full'', ''diagonal'', ' ...
+            'or ''isotropic''. Got ''%s''.'], opts.CovarianceMode);
     end
 end
 

@@ -50,6 +50,7 @@ function result = sidLTVdiscFrozen(ltvResult, varargin)
 %   See also: sidLTVdisc, sidBodePlot, sidMapPlot
 %
 %   Changelog:
+%   2026-04-06: Use exact Kronecker variance via rank-1 Jacobian factorization.
 %   2026-03-29: First version by Pedro Lourenço.
 %
 %  -----------------------------------------------------------------------
@@ -122,44 +123,35 @@ function result = sidLTVdiscFrozen(ltvResult, varargin)
         if hasUncertainty
             Pk = ltvResult.P(:, :, ki);   % (d x d), d = p+q
             Sigma = ltvResult.NoiseCov;    % (p x p)
-            sigDiag = diag(Sigma);         % (p x 1)
-            pDiag = diag(Pk);              % (d x 1)
+            d = p + q;
 
             for iw = 1:nf
                 z = exp(1i * w(iw));
-                R = (z * Ip - Ak) \ Ip;    % (p x p)
+                R = (z * Ip - Ak) \ Ip;    % (p x p) resolvent
                 Gk = R * Bk;               % (p x q)
 
-                % First-order uncertainty propagation (SPEC.md §8.6):
-                % Cov(vec(C(k))) = Sigma kron P(k), so
-                % Var(G_{ab}) = sum_{r,j} |dG_{ab}/dC_{rj}|^2 * Sigma_{jj} * P_{rr}
-                %
-                % Jacobians: dG_{ab}/dA_{ji} = R_{aj} * [R*B]_{ib}
-                %            dG_{ab}/dB_{ji} = R_{aj} * delta_{ib}
+                % Exact first-order uncertainty propagation (SPEC.md §8.11.1):
+                % The Jacobian J_{ab} = dG_{ab}/dvec(C) has rank-1 structure
+                % J_{ab} = v * r_a where v = [Gk(:,b); e_b], r_a = R(a,:).
+                % Var(G_{ab}) = (v^H P(k) v) * (r_a Sigma r_a^H)
+
+                % Sigma quadratic form for each output row
+                sigQuad = zeros(p, 1);      % (p x 1) real
+                for a = 1:p
+                    ra = R(a, :);           % (1 x p) complex
+                    sigQuad(a) = real(ra * Sigma * ra');
+                end
+
                 varG = zeros(p, q);
                 for b = 1:q
-                    for a = 1:p
-                        v = 0;
-                        % Contribution from A entries: dG_{ab}/dA_{ji} = R_{aj} * Gk_{ib}
-                        % where Gk = R*B (already computed).
-                        % C(k) stores A' in rows 1:p, so A_{ji} = C_{i,j}, row index i, col j
-                        % Var(C_{i,j}) = Sigma_{jj} * P_{ii}
-                        for j = 1:p
-                            for i = 1:p
-                                dG = R(a, j) * Gk(i, b);
-                                v = v + abs(dG)^2 * sigDiag(j) * pDiag(i);
-                            end
-                        end
-                        % Contribution from B entries: dG_{ab}/dB_{ji} = R_{aj} * delta_{ib}
-                        % C(k) stores B' in rows p+1:d, so B_{ji} = C_{p+i,j}, row p+i, col j
-                        % Var(C_{p+i,j}) = Sigma_{jj} * P_{p+i,p+i}
-                        for j = 1:p
-                            dG = R(a, j);
-                            v = v + abs(dG)^2 * sigDiag(j) * pDiag(p + b);
-                        end
-                        varG(a, b) = v;
-                    end
+                    % v = [Gk(:,b); e_b] where e_b is b-th unit in R^q
+                    v = zeros(d, 1);
+                    v(1:p) = Gk(:, b);
+                    v(p + b) = 1;
+                    pQuad = real(v' * Pk * v);  % scalar, real
+                    varG(:, b) = pQuad * sigQuad;
                 end
+
                 GStd(iw, :, :, ik) = sqrt(varG);
             end
         end
