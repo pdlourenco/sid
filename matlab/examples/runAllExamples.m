@@ -1,7 +1,7 @@
-%% runAllExamples - Run all examples and report pass/fail summary
+%% runAllExamples - Run all examples and report completion summary
 %
 % Discovers and runs all example*.m scripts in this directory, then reports
-% a pass/fail summary. Designed for headless CI execution (all figures are
+% a completion summary. Designed for headless CI execution (all figures are
 % closed after each example). New examples are picked up automatically —
 % no manifest to edit.
 %
@@ -32,7 +32,7 @@ for runner__k = 1:length(runner__exampleFiles)
 end
 
 runner__nExamples = length(runner__exampleFiles);
-runner__passed = 0;
+runner__completed = 0;
 runner__failed = 0;
 runner__failedNames = {};
 runner__completedSections = 0;
@@ -44,7 +44,7 @@ for runner__k = 1:runner__nExamples
     try
         run(fullfile(runner__thisDir, [runner__exampleFiles{runner__k} '.m']));
         close all;
-        runner__passed = runner__passed + 1;
+        runner__completed = runner__completed + 1;
         runner__completedSections = runner__completedSections + runner__nCompleted;
         runner__totalSections = runner__totalSections + runner__nCompleted;
         fprintf('  %s: OK (%d sections)\n', runner__exampleFiles{runner__k}, ...
@@ -66,8 +66,8 @@ for runner__k = 1:runner__nExamples
 end
 
 fprintf('\n=== Examples Summary ===\n');
-fprintf('  Files:    %d passed, %d failed (%d total)\n', ...
-    runner__passed, runner__failed, runner__nExamples);
+fprintf('  Files:    %d completed, %d failed (%d total)\n', ...
+    runner__completed, runner__failed, runner__nExamples);
 fprintf('  Sections: %d completed, %d failed (%d total)\n', ...
     runner__completedSections, ...
     runner__totalSections - runner__completedSections, ...
@@ -82,5 +82,5 @@ if runner__failed > 0
     error('sid:examplesFailed', '%d of %d examples failed.', ...
         runner__failed, runner__nExamples);
 else
-    fprintf('\n  ALL EXAMPLES PASSED\n\n');
+    fprintf('\n  ALL EXAMPLES COMPLETED\n\n');
 end
