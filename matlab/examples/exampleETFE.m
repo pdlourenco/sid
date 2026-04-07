@@ -5,6 +5,8 @@
 % frequency resolution but high variance. Optional smoothing reduces
 % variance at the cost of resolution.
 
+runner__nCompleted = 0;
+
 %% Generate test data
 % True system: G(z) = 1 / (1 - 0.8 z^{-1})  (first-order, pole at 0.8)
 
@@ -13,6 +15,9 @@ N = 1024;
 u = randn(N, 1);
 y_clean = filter(1, [1 -0.8], u);
 y = y_clean + 0.3 * randn(N, 1);
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Generate test data.\n', runner__nCompleted);
 
 %% Basic ETFE (no smoothing)
 % The raw ETFE has maximum resolution but is very noisy.
@@ -23,6 +28,9 @@ result = sidFreqETFE(y, u);
 figure;
 sidBodePlot(result);
 title('ETFE - Raw (No Smoothing)');
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Basic ETFE (no smoothing).\n', runner__nCompleted);
 
 %% Effect of smoothing
 % Smoothing averages nearby frequency bins using a Hann window of odd length S.
@@ -47,6 +55,9 @@ title('ETFE Smoothing Comparison');
 legend('show', 'Location', 'southwest');
 grid on;
 hold off;
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Effect of smoothing.\n', runner__nCompleted);
 
 %% Known FIR system: pure delay
 % For y(t) = u(t-1), the true transfer function is G(z) = z^{-1}.
@@ -77,6 +88,9 @@ legend('ETFE', 'True', 'Location', 'southwest');
 grid on;
 hold off;
 
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Known FIR system: pure delay.\n', runner__nCompleted);
+
 %% Time-series mode: periodogram
 % With no input signal, sidFreqETFE computes the periodogram of the output.
 
@@ -87,6 +101,9 @@ result_ts = sidFreqETFE(y_ts, []);
 figure;
 sidSpectrumPlot(result_ts);
 title('Periodogram of AR(1) Process');
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Time-series mode: periodogram.\n', runner__nCompleted);
 
 %% Custom frequency grid and Hz display
 % Use a logarithmic frequency grid and plot in Hz.
@@ -105,3 +122,8 @@ result_hz = sidFreqETFE(y_hz, u_hz, 'Smoothing', 11, ...
 figure;
 sidBodePlot(result_hz, 'FrequencyUnit', 'Hz');
 title('ETFE with Log Frequency Grid (Hz)');
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Custom frequency grid and Hz display.\n', runner__nCompleted);
+
+fprintf('exampleETFE: %d/%d sections completed\n', runner__nCompleted, runner__nCompleted);

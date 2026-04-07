@@ -7,6 +7,8 @@
 %
 % Functions demonstrated: sidFreqBT, sidFreqMap, sidSpectrogram, sidLTVdisc
 
+runner__nCompleted = 0;
+
 %% 1. LTI Ensemble Averaging — Tighter Confidence Bands
 % Generate L=10 trajectories of a known second-order system.
 % Compare sidFreqBT with 1 vs 10 trajectories.
@@ -41,6 +43,11 @@ title('Single Trajectory');
 subplot(2, 1, 2);
 sidBodePlot(rL, 'Confidence', 3);
 title(sprintf('Ensemble of %d Trajectories', L));
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: %s.\n', ...
+    runner__nCompleted, ...
+    '1. LTI Ensemble Averaging — Tighter Confidence Bands');
 
 %% 2. LTV Time-Varying Map — Sharper Transition Detection
 % System with a step change at t=N/2: pole shifts from 0.85 to 0.5.
@@ -78,6 +85,11 @@ subplot(1, 2, 2);
 sidMapPlot(rL_map, 'PlotType', 'magnitude');
 title(sprintf('Ensemble of %d Trajectories', L));
 
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: %s.\n', ...
+    runner__nCompleted, ...
+    '2. LTV Time-Varying Map — Sharper Transition Detection');
+
 %% 3. Spectrogram Averaging — Chirp in Noise
 % A chirp signal buried in noise. Single trajectory: barely visible.
 % 8 trajectories averaged: chirp track emerges clearly.
@@ -103,6 +115,11 @@ title('Single Trajectory');
 subplot(1, 2, 2);
 sidSpectrogramPlot(rL_spec);
 title(sprintf('Ensemble of %d Trajectories', L));
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: %s.\n', ...
+    runner__nCompleted, ...
+    '3. Spectrogram Averaging — Chirp in Noise');
 
 %% 4. COSMIC + sidFreqMap Consistency
 % Use the same multi-trajectory dataset for both COSMIC (state-space)
@@ -140,3 +157,9 @@ fprintf('sidFreqMap ensemble with %d trajectories: %d segments.\n', ...
 fprintf('Both COSMIC and sidFreqMap use the same %d-trajectory dataset.\n', L_traj);
 
 fprintf('\nDone. Multi-trajectory examples completed.\n');
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: 4. COSMIC + sidFreqMap Consistency.\n', runner__nCompleted);
+
+fprintf('exampleMultiTrajectory: %d/%d sections completed\n', ...
+    runner__nCompleted, runner__nCompleted);

@@ -5,6 +5,8 @@
 % segments. Useful for detecting time-varying dynamics (e.g., drifting
 % poles, changing gains).
 
+runner__nCompleted = 0;
+
 %% LTI baseline: constant system
 % For a time-invariant system, the frequency map should be constant along
 % the time axis.
@@ -19,6 +21,9 @@ result_lti = sidFreqMap(y, u, 'SegmentLength', 512);
 figure;
 sidMapPlot(result_lti, 'PlotType', 'magnitude');
 title('LTI System: Magnitude Should Be Constant Along Time');
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: LTI baseline: constant system.\n', runner__nCompleted);
 
 %% Time-varying system: drifting pole
 % Simulate a first-order system x(k+1) = a(k)*x(k) + u(k) where the
@@ -42,12 +47,18 @@ figure;
 sidMapPlot(result_tv, 'PlotType', 'magnitude');
 title('Time-Varying System: Pole Drifts from 0.5 to 0.95');
 
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Time-varying system: drifting pole.\n', runner__nCompleted);
+
 %% Coherence map
 % Coherence shows how the signal-to-noise ratio evolves over time.
 
 figure;
 sidMapPlot(result_tv, 'PlotType', 'coherence');
 title('Coherence Map');
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Coherence map.\n', runner__nCompleted);
 
 %% BT vs Welch algorithm
 % sidFreqMap supports two algorithms:
@@ -66,6 +77,9 @@ subplot(1,2,2);
 sidMapPlot(result_welch, 'PlotType', 'magnitude');
 title('Welch Algorithm');
 
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: BT vs Welch algorithm.\n', runner__nCompleted);
+
 %% Segment length and overlap tuning
 % Shorter segments = better time resolution but worse frequency resolution.
 % More overlap = smoother time axis but more computation.
@@ -81,6 +95,9 @@ title('Short Segments (L=256): Good Time Resolution');
 subplot(1,2,2);
 sidMapPlot(result_long, 'PlotType', 'magnitude');
 title('Long Segments (L=1024): Good Freq Resolution');
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Segment length and overlap tuning.\n', runner__nCompleted);
 
 %% Time-series mode: evolving output spectrum
 % With u=[], sidFreqMap estimates how the output spectrum changes over time.
@@ -99,3 +116,9 @@ result_ts = sidFreqMap(y_ts, [], 'SegmentLength', 512);
 figure;
 sidMapPlot(result_ts, 'PlotType', 'spectrum');
 title('Time-Series: Output Spectrum Evolves as AR(1) Pole Drifts');
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: %s.\n', ...
+    runner__nCompleted, 'Time-series mode: evolving output spectrum');
+
+fprintf('exampleFreqMap: %d/%d sections completed\n', runner__nCompleted, runner__nCompleted);

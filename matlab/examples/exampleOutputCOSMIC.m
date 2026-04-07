@@ -12,6 +12,8 @@
 %   3. Construct observation matrix H
 %   4. Identify LTV system matrices using sidLTVdiscIO
 
+runner__nCompleted = 0;
+
 %% System setup
 % A 4th-order LTI system with 2 measured outputs (py = 2, n = 4).
 
@@ -31,6 +33,9 @@ B_true = [1; 0.3; 0.5; 0.1];
 % Observation matrix: measure states 1 and 3
 H_obs = [1 0 0 0
          0 0 1 0];
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: System setup.\n', runner__nCompleted);
 
 %% Simulate trajectories
 N = 80;   % time steps per trajectory
@@ -55,20 +60,32 @@ end
 fprintf('Simulated %d trajectories of length %d.\n', L, N);
 fprintf('True state dimension: n = %d, observed: py = %d.\n', n, py);
 
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Simulate trajectories.\n', runner__nCompleted);
+
 %% Step 1: Estimate frequency response
 % Use the first trajectory for frequency response estimation.
 % Trim Y to match U length (sidFreqBT requires equal-length signals).
 G = sidFreqBT(Y(1:N,:,1), U(:,:,1), 'WindowSize', 20);
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Step 1: Estimate frequency response.\n', runner__nCompleted);
 
 %% Step 2: Model order determination
 % sidModelOrder estimates n from the Hankel singular values.
 [n_est, sv] = sidModelOrder(G, 'Plot', true);
 fprintf('Estimated model order: n = %d (true = %d).\n', n_est, n);
 
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Step 2: Model order determination.\n', runner__nCompleted);
+
 %% Step 3: Construct observation matrix
 % In practice, H encodes which states are measured.
 % Here we use the true H since we know which channels correspond to which states.
 H_use = H_obs;
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Step 3: Construct observation matrix.\n', runner__nCompleted);
 
 %% Step 4: Identify LTV system from partial observations
 fprintf('Running Output-COSMIC identification...\n');
@@ -77,6 +94,11 @@ result = sidLTVdiscIO(Y, U, H_use, 'Lambda', 1e5);
 fprintf('Converged in %d iterations.\n', result.Iterations);
 fprintf('Final cost: %.4f\n', result.Cost(end));
 
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: %s.\n', ...
+    runner__nCompleted, ...
+    'Step 4: Identify LTV system from partial observations');
+
 %% Compare recovered A to true A
 A_mean = mean(result.A, 3);
 B_mean = mean(result.B, 3);
@@ -84,6 +106,9 @@ errA = norm(A_mean - A_true, 'fro') / norm(A_true, 'fro');
 errB = norm(B_mean - B_true, 'fro') / norm(B_true, 'fro');
 fprintf('A recovery error (relative Frobenius): %.4f\n', errA);
 fprintf('B recovery error (relative Frobenius): %.4f\n', errB);
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Compare recovered A to true A.\n', runner__nCompleted);
 
 %% Plot: recovered A(1,1) over time vs true value
 figure;
@@ -96,6 +121,11 @@ title('Output-COSMIC: Recovered Dynamics (LTI Case)');
 legend('show');
 grid on;
 hold off;
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: %s.\n', ...
+    runner__nCompleted, ...
+    'Plot: recovered A(1,1) over time vs true value');
 
 %% Plot: estimated vs true states (trajectory 1)
 figure;
@@ -116,6 +146,11 @@ legend('show'); xlabel('k'); ylabel('x_2(k)');
 title('State Recovery: Hidden State');
 grid on; hold off;
 
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: %s.\n', ...
+    runner__nCompleted, ...
+    'Plot: estimated vs true states (trajectory 1)');
+
 %% Plot: convergence history
 figure;
 semilogy(1:length(result.Cost), result.Cost, 'b-o', 'MarkerSize', 4);
@@ -123,6 +158,9 @@ xlabel('Iteration');
 ylabel('Cost J');
 title('Output-COSMIC: Convergence');
 grid on;
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Plot: convergence history.\n', runner__nCompleted);
 
 %% Model validation with sidCompare and sidResidual
 % Validate the identified model using the estimated states as reference.
@@ -149,6 +187,10 @@ end
 obs_err = norm(Y_recon(:) - Y(:)) / norm(Y(:));
 fprintf('Observation reconstruction error: %.4f\n', obs_err);
 
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: %s.\n', ...
+    runner__nCompleted, 'Model validation with sidCompare and sidResidual');
+
 %% Frozen transfer function (if available)
 % Compute the frozen transfer function at the midpoint and plot.
 midResult = struct();
@@ -165,3 +207,8 @@ midResult.Method = 'sidLTVdisc';
 midResult.Cost = [0, 0, 0];
 
 fprintf('\nExample completed successfully.\n');
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Frozen transfer function (if available).\n', runner__nCompleted);
+
+fprintf('exampleOutputCOSMIC: %d/%d sections completed\n', runner__nCompleted, runner__nCompleted);

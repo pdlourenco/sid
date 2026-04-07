@@ -4,6 +4,8 @@
 % signals. It computes the STFT and visualizes how frequency content
 % evolves over time.
 
+runner__nCompleted = 0;
+
 %% Chirp signal: frequency sweep
 % A signal whose instantaneous frequency increases linearly from 50 Hz
 % to 150 Hz over 5 seconds.
@@ -21,6 +23,9 @@ figure;
 sidSpectrogramPlot(result);
 title('Chirp Signal: 50 Hz to 150 Hz');
 
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Chirp signal: frequency sweep.\n', runner__nCompleted);
+
 %% Window length trade-off
 % Short window: good time resolution, poor frequency resolution.
 % Long window: poor time resolution, good frequency resolution.
@@ -36,6 +41,9 @@ title('Short Window (L=64)');
 subplot(1,2,2);
 sidSpectrogramPlot(r_long);
 title('Long Window (L=512)');
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Window length trade-off.\n', runner__nCompleted);
 
 %% Window types
 % Different windows affect the trade-off between main lobe width and
@@ -61,6 +69,9 @@ subplot(1,3,3);
 sidSpectrogramPlot(r_rect);
 title('Rectangular Window');
 
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Window types.\n', runner__nCompleted);
+
 %% Multi-channel signal
 % Two channels: channel 1 has a chirp, channel 2 has a fixed sinusoid.
 
@@ -78,6 +89,9 @@ subplot(1,2,2);
 sidSpectrogramPlot(result_mc, 'Channel', 2);
 title('Channel 2: Fixed 100 Hz');
 
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Multi-channel signal.\n', runner__nCompleted);
+
 %% Log frequency scale and NFFT zero-padding
 
 r_zp = sidSpectrogram(x_chirp, 'WindowLength', 128, 'NFFT', 1024, ...
@@ -86,6 +100,9 @@ r_zp = sidSpectrogram(x_chirp, 'WindowLength', 128, 'NFFT', 1024, ...
 figure;
 sidSpectrogramPlot(r_zp, 'FrequencyScale', 'log');
 title('Log Frequency Scale with Zero-Padding (NFFT=1024)');
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Log frequency scale and NFFT zero-padding.\n', runner__nCompleted);
 
 %% Accessing raw STFT data
 % result.Power contains the one-sided PSD, result.PowerDB is in dB,
@@ -96,3 +113,8 @@ fprintf('  Time points:      %d\n', length(result.Time));
 fprintf('  Frequency bins:   %d\n', length(result.Frequency));
 fprintf('  Power size:       [%s]\n', num2str(size(result.Power)));
 fprintf('  Complex size:     [%s]\n', num2str(size(result.Complex)));
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Accessing raw STFT data.\n', runner__nCompleted);
+
+fprintf('exampleSpectrogram: %d/%d sections completed\n', runner__nCompleted, runner__nCompleted);

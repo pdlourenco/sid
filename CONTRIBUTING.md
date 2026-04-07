@@ -53,9 +53,19 @@ Runners sort discovered files alphabetically and execute them in order.
 common failure mode where a new test exists but is never executed because
 it was not added to a manifest.
 
-Each language's contributing guide documents the discovery mechanism in
-detail. When starting a new language port, implement the runner with
-auto-discovery from day one.
+### Templates
+
+Each language provides template files for tests and examples. Copy the
+template when creating a new file — it includes the runner instrumentation
+variables that enable per-file progress tracking in CI output.
+
+| Language | Test template | Example template |
+|----------|--------------|-----------------|
+| MATLAB/Octave | `matlab/tests/test_template.m` | `matlab/examples/example_template.m` |
+
+Each language's contributing guide documents the discovery mechanism and
+templates in detail. When starting a new language port, implement the runner
+with auto-discovery from day one and provide starter templates.
 
 ## CI
 

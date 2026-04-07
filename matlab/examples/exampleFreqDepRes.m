@@ -5,6 +5,8 @@
 % (e.g., resonances) that need fine resolution at some frequencies but not
 % others. Replaces MATLAB's spafdr.
 
+runner__nCompleted = 0;
+
 %% Generate test data: second-order resonant system
 % Poles at 0.9*exp(+/-j*pi/4) create a resonance peak near w = pi/4.
 
@@ -15,6 +17,10 @@ b = 1;
 a_coeff = [1, -2*0.9*cos(pi/4), 0.9^2];
 u = randn(N, 1);
 y = filter(b, a_coeff, u) + 0.1 * randn(N, 1);
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: %s.\n', ...
+    runner__nCompleted, 'Generate test data: second-order resonant system');
 
 %% Fixed-window sidFreqBT: the resolution-variance trade-off
 % Small M (=15): smooth but misses the resonance peak.
@@ -38,6 +44,11 @@ legend('show', 'Location', 'southwest');
 grid on;
 hold off;
 
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: %s.\n', ...
+    runner__nCompleted, ...
+    'Fixed-window sidFreqBT: the resolution-variance trade-off');
+
 %% Scalar resolution with sidFreqBTFDR
 % Resolution R sets the window size as M = round(2*pi / R).
 % Smaller R = finer resolution (larger window).
@@ -47,6 +58,9 @@ result_fdr = sidFreqBTFDR(y, u, 'Resolution', 0.2, 'SampleTime', Ts);
 figure;
 sidBodePlot(result_fdr);
 title('sidFreqBTFDR with Scalar Resolution R = 0.2');
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Scalar resolution with sidFreqBTFDR.\n', runner__nCompleted);
 
 %% Per-frequency resolution vector
 % Use fine resolution near the resonance (low frequencies) and coarse
@@ -79,6 +93,9 @@ legend('show', 'Location', 'southwest');
 grid on;
 hold off;
 
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Per-frequency resolution vector.\n', runner__nCompleted);
+
 %% Compare BT vs BTFDR side by side
 % BTFDR adapts to capture the peak while keeping variance low elsewhere.
 
@@ -99,3 +116,8 @@ title('Blackman-Tukey: Fixed vs Frequency-Dependent Resolution');
 legend('show', 'Location', 'southwest');
 grid on;
 hold off;
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Compare BT vs BTFDR side by side.\n', runner__nCompleted);
+
+fprintf('exampleFreqDepRes: %d/%d sections completed\n', runner__nCompleted, runner__nCompleted);

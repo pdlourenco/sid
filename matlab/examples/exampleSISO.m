@@ -3,6 +3,8 @@
 % This example demonstrates how to estimate the frequency response of a
 % simple SISO system and plot the results with confidence bands.
 
+runner__nCompleted = 0;
+
 %% Generate test data
 % True system: G(z) = 1 / (1 - 0.9 z^{-1})
 % This is a stable first-order system with a pole at z = 0.9.
@@ -14,16 +16,29 @@ y_clean = filter(1, [1 -0.9], u);  % Noiseless output
 noise = 0.1 * randn(N, 1);         % Measurement noise
 y = y_clean + noise;                % Noisy output
 
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Generate test data.\n', runner__nCompleted);
+
 %% Estimate frequency response using Blackman-Tukey
 result = sidFreqBT(y, u, 'SampleTime', Ts);
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: %s.\n', ...
+    runner__nCompleted, 'Estimate frequency response using Blackman-Tukey');
 
 %% Plot Bode diagram
 figure;
 sidBodePlot(result);
 
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Plot Bode diagram.\n', runner__nCompleted);
+
 %% Plot noise spectrum
 figure;
 sidSpectrumPlot(result);
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Plot noise spectrum.\n', runner__nCompleted);
 
 %% Compare different window sizes
 % Larger window = finer resolution but more variance.
@@ -44,6 +59,9 @@ legend('show');
 grid on;
 hold off;
 
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Compare different window sizes.\n', runner__nCompleted);
+
 %% Preprocessing: detrend data before estimation
 % Add a drift to the data and show that detrending improves results.
 y_drift = y + 0.01 * (1:N)';  % add linear drift
@@ -60,6 +78,10 @@ result_dt = sidFreqBT(y_dt, u_dt, 'SampleTime', Ts);
 fprintf('Without detrend: max |G| at low freq = %.2f\n', max(abs(result_raw.Response)));
 fprintf('With detrend:    max |G| at low freq = %.2f\n', max(abs(result_dt.Response)));
 
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: %s.\n', ...
+    runner__nCompleted, 'Preprocessing: detrend data before estimation');
+
 %% Model validation: residual analysis
 resid = sidResidual(result, y, u);
 if resid.WhitenessPass
@@ -73,9 +95,16 @@ else
     fprintf('Independence test: FAIL\n');
 end
 
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Model validation: residual analysis.\n', runner__nCompleted);
+
 %% Model validation: compare predicted vs measured
 comp = sidCompare(result, y, u);
 fprintf('NRMSE fit: %.1f%%\n', comp.Fit);
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: %s.\n', ...
+    runner__nCompleted, 'Model validation: compare predicted vs measured');
 
 %% Time series mode (no input)
 % Estimate the output power spectrum of an AR(1) process.
@@ -85,3 +114,8 @@ result_ts = sidFreqBT(y_ts, []);
 figure;
 sidSpectrumPlot(result_ts);
 title('AR(1) Output Spectrum');
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Time series mode (no input).\n', runner__nCompleted);
+
+fprintf('exampleSISO: %d/%d sections completed\n', runner__nCompleted, runner__nCompleted);

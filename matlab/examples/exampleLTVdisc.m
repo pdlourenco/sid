@@ -7,6 +7,8 @@
 %
 % It also demonstrates sidLTVdiscTune for automatic regularization tuning.
 
+runner__nCompleted = 0;
+
 %% LTI system recovery
 % First, verify that sidLTVdisc correctly identifies a known LTI system
 % where A and B are constant.
@@ -35,6 +37,9 @@ A_mean = mean(result_lti.A, 3);
 fprintf('True A:\n');  disp(A_true);
 fprintf('Mean recovered A:\n');  disp(A_mean);
 fprintf('Recovery error: %.4f\n', norm(A_mean - A_true, 'fro'));
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: LTI system recovery.\n', runner__nCompleted);
 
 %% LTV system: time-varying pole
 % The (1,1) entry of A ramps from 0.5 to 0.9 over time.
@@ -71,6 +76,9 @@ legend('show');
 grid on;
 hold off;
 
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: LTV system: time-varying pole.\n', runner__nCompleted);
+
 %% Automatic lambda selection (L-curve)
 % With 'Lambda', 'auto', sidLTVdisc uses the L-curve method to find the
 % regularization that best balances data fidelity and smoothness.
@@ -89,6 +97,9 @@ title('Manual vs Automatic Lambda');
 legend('show');
 grid on;
 hold off;
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Automatic lambda selection (L-curve).\n', runner__nCompleted);
 
 %% Multi-trajectory benefit
 % More trajectories provide more information and reduce estimation error.
@@ -124,6 +135,9 @@ title('Effect of Number of Trajectories');
 legend('show');
 grid on;
 hold off;
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Multi-trajectory benefit.\n', runner__nCompleted);
 
 %% Validation-based lambda tuning with sidLTVdiscTune
 % Split trajectories into training and validation sets, then search over
@@ -164,11 +178,18 @@ ylabel('Validation RMSE');
 title('Lambda Tuning: Validation Loss Curve');
 grid on;
 
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: %s.\n', ...
+    runner__nCompleted, 'Validation-based lambda tuning with sidLTVdiscTune');
+
 %% Preconditioning for numerical stability
 % Block-diagonal preconditioning can improve conditioning of the solve.
 
 result_pre = sidLTVdisc(X_tv, U_tv, 'Lambda', 1e4, 'Precondition', true);
 fprintf('\nPreconditioned: %d\n', result_pre.Preconditioned);
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Preconditioning for numerical stability.\n', runner__nCompleted);
 
 %% Cost decomposition
 % result.Cost = [total, data_fidelity, regularization]
@@ -179,6 +200,9 @@ fprintf('  Data fidelity:  %.4f\n', result_tv.Cost(2));
 fprintf('  Regularization: %.4f\n', result_tv.Cost(3));
 fprintf('  Check: %.4e (should be ~0)\n', ...
     result_tv.Cost(1) - result_tv.Cost(2) - result_tv.Cost(3));
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Cost decomposition.\n', runner__nCompleted);
 
 %% Uncertainty quantification
 % Enable Bayesian posterior uncertainty to get standard deviations for each
@@ -209,6 +233,9 @@ title('LTV Identification with Uncertainty Bands');
 legend('show', 'Location', 'southeast');
 grid on;
 hold off;
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: Uncertainty quantification.\n', runner__nCompleted);
 
 %% Frozen transfer function with sidLTVdiscFrozen
 % Compute the instantaneous frequency response G(w,k) = (e^{jw}I - A(k))^{-1} B(k)
@@ -254,6 +281,10 @@ legend('show');
 grid on;
 hold off;
 
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: %s.\n', ...
+    runner__nCompleted, 'Frozen transfer function with sidLTVdiscFrozen');
+
 %% 6. Frequency-Based Lambda Tuning (no validation data needed)
 %
 % sidLTVdiscTune with 'Method','frequency' selects lambda by comparing
@@ -286,6 +317,11 @@ grid on;
 
 fprintf('\nFrequency-based tuning complete.\n');
 
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: %s.\n', ...
+    runner__nCompleted, ...
+    '6. Frequency-Based Lambda Tuning (no validation data needed)');
+
 %% Model validation with sidCompare and sidResidual
 % Compare COSMIC model predictions against the training data.
 
@@ -302,3 +338,10 @@ if resid.WhitenessPass
 else
     fprintf('Residual whiteness test: FAIL (model may need refinement)\n');
 end
+
+runner__nCompleted = runner__nCompleted + 1;
+fprintf('  Section %d completed: %s.\n', ...
+    runner__nCompleted, 'Model validation with sidCompare and sidResidual');
+
+fprintf('exampleLTVdisc: %d/%d sections completed\n', ...
+    runner__nCompleted, runner__nCompleted);

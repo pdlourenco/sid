@@ -262,3 +262,17 @@ table.
 Example scripts (`examples/`) and test scripts (`tests/`) use `%%` section
 markers and do not require the full function header template. They should
 have a brief `%%` title and description at the top.
+
+### Templates
+
+Copy the appropriate template when creating new examples or tests:
+
+| Type | Template | Key variable |
+|------|----------|-------------|
+| Test | [`tests/test_template.m`](tests/test_template.m) | `runner__nPassed` |
+| Example | [`examples/example_template.m`](examples/example_template.m) | `runner__nCompleted` |
+
+The templates include the instrumentation variables that the runners use to
+track per-file progress (section counts for examples, assertion counts for
+tests). Following the template ensures your file integrates with the CI
+summary output automatically.
