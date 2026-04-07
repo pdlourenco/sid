@@ -40,7 +40,7 @@ semilogx(w, 20*log10(abs(G_true)), 'k--', 'LineWidth', 1.5, 'DisplayName', 'True
 xlabel('Frequency (rad/sample)');
 ylabel('Magnitude (dB)');
 title('Fixed Window: Resolution vs Variance Trade-off');
-legend('show', 'Location', 'southwest');
+legend('Location', 'southwest');
 grid on;
 hold off;
 
@@ -89,7 +89,7 @@ semilogx(w, 20*log10(abs(G_true)), 'k--', 'LineWidth', 1.5, ...
 xlabel('Frequency (rad/sample)');
 ylabel('Magnitude (dB)');
 title('BTFDR with Per-Frequency Resolution');
-legend('show', 'Location', 'southwest');
+legend('Location', 'southwest');
 grid on;
 hold off;
 
@@ -113,7 +113,7 @@ semilogx(r_bt.Frequency, 20*log10(abs(G_true)), 'k--', 'LineWidth', 1.5, ...
 xlabel('Frequency (rad/sample)');
 ylabel('Magnitude (dB)');
 title('Blackman-Tukey: Fixed vs Frequency-Dependent Resolution');
-legend('show', 'Location', 'southwest');
+legend('Location', 'southwest');
 grid on;
 hold off;
 

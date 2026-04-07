@@ -49,7 +49,7 @@ semilogx(w, 20*log10(abs(G_true)), ...
 xlabel('Frequency (rad/sample)');
 ylabel('Magnitude (dB)');
 title('Method Comparison: Bode Magnitude');
-legend('show', 'Location', 'southwest');
+legend('Location', 'southwest');
 grid on;
 hold off;
 
@@ -68,7 +68,7 @@ semilogx(w, 10*log10(abs(r_fdr.NoiseSpectrum)), 'r', 'DisplayName', 'BTFDR');
 xlabel('Frequency (rad/sample)');
 ylabel('Noise Spectrum (dB)');
 title('Noise Spectrum Comparison');
-legend('show');
+legend;
 grid on;
 hold off;
 
@@ -96,7 +96,7 @@ semilogx(w_log, 20*log10(abs(G_true_log)), 'k--', 'LineWidth', 1.5, ...
 xlabel('Frequency (rad/sample)');
 ylabel('Magnitude (dB)');
 title('Log Frequency Grid (200 Points)');
-legend('show', 'Location', 'southwest');
+legend('Location', 'southwest');
 grid on;
 hold off;
 
@@ -127,7 +127,7 @@ semilogx(w_ts, 10*log10(Phi_true), 'k--', 'LineWidth', 1.5, ...
 xlabel('Frequency (rad/sample)');
 ylabel('Power Spectrum (dB)');
 title('Time-Series: Periodogram vs Blackman-Tukey');
-legend('show', 'Location', 'southwest');
+legend('Location', 'southwest');
 grid on;
 hold off;
 

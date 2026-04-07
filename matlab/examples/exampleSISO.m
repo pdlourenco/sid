@@ -55,7 +55,7 @@ semilogx(freq, 20*log10(abs(r100.Response)), 'g', 'DisplayName', 'M = 100');
 xlabel('Frequency (rad/s)');
 ylabel('Magnitude (dB)');
 title('Effect of Window Size on Frequency Resolution');
-legend('show');
+legend;
 grid on;
 hold off;
 

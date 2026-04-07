@@ -50,7 +50,7 @@ hold off;
 ylabel('Coherence \gamma^2');
 xlabel('Frequency (rad/sample)');
 title('Squared Coherence');
-legend('show', 'Location', 'southwest');
+legend('Location', 'southwest');
 ylim([0 1]);
 grid on;
 
@@ -92,7 +92,7 @@ hold off;
 ylabel('Coherence \gamma^2');
 xlabel('Frequency (rad/sample)');
 title('Effect of Noise Level on Coherence');
-legend('show', 'Location', 'southwest');
+legend('Location', 'southwest');
 ylim([0 1]);
 grid on;
 

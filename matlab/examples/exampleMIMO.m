@@ -48,7 +48,7 @@ hold on;
 semilogx(w, 20*log10(abs(G1_true)), 'k--', 'DisplayName', 'True');
 ylabel('Magnitude (dB)');
 title('Channel 1: G_1(z) = 1/(1 - 0.5z^{-1})');
-legend('show');
+legend;
 grid on;
 hold off;
 
@@ -59,7 +59,7 @@ semilogx(w, 20*log10(abs(G2_true)), 'k--', 'DisplayName', 'True');
 ylabel('Magnitude (dB)');
 xlabel('Frequency (rad/sample)');
 title('Channel 2: G_2(z) = 0.3/(1 - 0.7z^{-1})');
-legend('show');
+legend;
 grid on;
 hold off;
 
@@ -82,7 +82,7 @@ semilogx(w, 10*log10(diag22), 'r', 'DisplayName', '\Phi_{v,22}');
 xlabel('Frequency (rad/sample)');
 ylabel('Noise Spectrum (dB)');
 title('Diagonal Elements of Noise Spectral Matrix');
-legend('show');
+legend;
 grid on;
 hold off;
 

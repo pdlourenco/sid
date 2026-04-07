@@ -52,7 +52,7 @@ semilogx(w, 20*log10(abs(G_true)), 'k--', 'LineWidth', 1.5, 'DisplayName', 'True
 xlabel('Frequency (rad/sample)');
 ylabel('Magnitude (dB)');
 title('ETFE Smoothing Comparison');
-legend('show', 'Location', 'southwest');
+legend('Location', 'southwest');
 grid on;
 hold off;
 

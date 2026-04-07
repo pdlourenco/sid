@@ -118,7 +118,7 @@ plot(xlim, [A_true(1,1) A_true(1,1)], 'k--', 'LineWidth', 1.5, 'DisplayName', 'T
 xlabel('Time step k');
 ylabel('A_{11}(k)');
 title('Output-COSMIC: Recovered Dynamics (LTI Case)');
-legend('show');
+legend;
 grid on;
 hold off;
 
@@ -134,7 +134,7 @@ plot(0:N, X(:,1,1), 'k-', 'LineWidth', 1.5, 'DisplayName', 'True x_1');
 hold on;
 plot(0:N, result.X(:,1,1), 'b--', 'DisplayName', 'Estimated x_1');
 plot(0:N, Y(:,1,1), 'r.', 'MarkerSize', 4, 'DisplayName', 'Measurement y_1');
-legend('show'); xlabel('k'); ylabel('x_1(k)');
+legend; xlabel('k'); ylabel('x_1(k)');
 title('State Recovery: Observed State');
 grid on; hold off;
 
@@ -142,7 +142,7 @@ subplot(2,1,2);
 plot(0:N, X(:,2,1), 'k-', 'LineWidth', 1.5, 'DisplayName', 'True x_2');
 hold on;
 plot(0:N, result.X(:,2,1), 'b--', 'DisplayName', 'Estimated x_2');
-legend('show'); xlabel('k'); ylabel('x_2(k)');
+legend; xlabel('k'); ylabel('x_2(k)');
 title('State Recovery: Hidden State');
 grid on; hold off;
 

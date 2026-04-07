@@ -72,7 +72,7 @@ plot(1:N, a_ramp, 'k--', 'LineWidth', 1.5, 'DisplayName', 'True A_{11}(k)');
 xlabel('Time step k');
 ylabel('A_{11}(k)');
 title('LTV Identification: Time-Varying Pole Recovery');
-legend('show');
+legend;
 grid on;
 hold off;
 
@@ -94,7 +94,7 @@ plot(1:N, a_ramp, 'k--', 'LineWidth', 1.5, 'DisplayName', 'True');
 xlabel('Time step k');
 ylabel('A_{11}(k)');
 title('Manual vs Automatic Lambda');
-legend('show');
+legend;
 grid on;
 hold off;
 
@@ -132,7 +132,7 @@ plot(1:N, a_ramp, 'k--', 'LineWidth', 1.5, 'DisplayName', 'True');
 xlabel('Time step k');
 ylabel('A_{11}(k)');
 title('Effect of Number of Trajectories');
-legend('show');
+legend;
 grid on;
 hold off;
 
@@ -230,7 +230,7 @@ plot(kk, a_ramp, 'k--', 'LineWidth', 1.5, 'DisplayName', 'True A_{11}(k)');
 xlabel('Time step k');
 ylabel('A_{11}(k)');
 title('LTV Identification with Uncertainty Bands');
-legend('show', 'Location', 'southeast');
+legend('Location', 'southeast');
 grid on;
 hold off;
 
@@ -277,7 +277,7 @@ semilogx(w, 20*log10(abs(G_last)), 'Color', colors{end}, 'LineWidth', 1.5, ...
 xlabel('Frequency (rad/sample)');
 ylabel('|G(w,k)| (dB)');
 title('Frozen Transfer Function at Selected Time Steps');
-legend('show');
+legend;
 grid on;
 hold off;
 
