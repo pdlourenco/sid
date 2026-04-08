@@ -58,3 +58,95 @@ class FreqResult:
 
     method: str
     """Estimation method identifier (``'freq_bt'``, ``'freq_etfe'``, ``'freq_btfdr'``)."""
+
+
+@dataclass(frozen=True)
+class SpectrogramResult:
+    """Result from short-time FFT spectrogram (spectrogram)."""
+
+    time: np.ndarray
+    """Center time of each segment in seconds, shape ``(K,)``."""
+
+    frequency: np.ndarray
+    """Frequency vector in Hz, shape ``(n_bins,)``."""
+
+    frequency_rad: np.ndarray
+    """Frequency vector in rad/s, shape ``(n_bins,)``."""
+
+    power: np.ndarray
+    """Power spectral density, shape ``(n_bins, K)`` or ``(n_bins, K, n_ch)``."""
+
+    power_db: np.ndarray
+    """Power in dB (``10 * log10(power)``), same shape."""
+
+    complex_stft: np.ndarray
+    """Complex STFT coefficients, same shape."""
+
+    sample_time: float
+    """Sample time in seconds."""
+
+    window_length: int
+    """Segment length L."""
+
+    overlap: int
+    """Overlap P between segments."""
+
+    nfft: int
+    """FFT length."""
+
+    num_trajectories: int
+    """Number of trajectories used."""
+
+    method: str
+    """Always ``'spectrogram'``."""
+
+
+@dataclass(frozen=True)
+class FreqMapResult:
+    """Result from time-varying frequency response map (freq_map)."""
+
+    time: np.ndarray
+    """Center time of each segment in seconds, shape ``(K,)``."""
+
+    frequency: np.ndarray
+    """Frequency vector in rad/sample, shape ``(nf,)``."""
+
+    frequency_hz: np.ndarray
+    """Frequency vector in Hz, shape ``(nf,)``."""
+
+    response: np.ndarray | None
+    """Time-varying frequency response, shape ``(nf, K)`` or ``(nf, K, ny, nu)``.
+    ``None`` in time-series mode."""
+
+    response_std: np.ndarray | None
+    """Standard deviation of response, same shape."""
+
+    noise_spectrum: np.ndarray
+    """Time-varying noise spectrum, shape ``(nf, K)`` or ``(nf, K, ny, ny)``."""
+
+    noise_spectrum_std: np.ndarray
+    """Standard deviation of noise spectrum."""
+
+    coherence: np.ndarray | None
+    """Squared coherence, shape ``(nf, K)``.  SISO only; ``None`` otherwise."""
+
+    sample_time: float
+    """Sample time in seconds."""
+
+    segment_length: int
+    """Segment length L."""
+
+    overlap: int
+    """Overlap P between segments."""
+
+    window_size: int | None
+    """BT lag window size M, or ``None`` for Welch."""
+
+    algorithm: str
+    """``'bt'`` or ``'welch'``."""
+
+    num_trajectories: int
+    """Number of trajectories used."""
+
+    method: str
+    """Always ``'freq_map'``."""
