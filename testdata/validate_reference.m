@@ -15,7 +15,18 @@ fprintf('=== Cross-language reference validation ===\n\n');
 
 thisDir = fileparts(mfilename('fullpath'));
 rootDir = fileparts(thisDir);
-addpath(fullfile(rootDir, 'matlab', 'sid'));
+sidDir = fullfile(rootDir, 'matlab', 'sid');
+addpath(sidDir);
+% MATLAB ignores addpath on directories named 'private'. Copy to a
+% temporary non-private-named directory so private helpers are accessible.
+privateDir = fullfile(sidDir, 'private');
+shimDir = fullfile(thisDir, 'private_shim');
+if exist(shimDir, 'dir')
+    rmdir(shimDir, 's');
+end
+mkdir(shimDir);
+copyfile(fullfile(privateDir, '*.m'), shimDir);
+addpath(shimDir);
 
 files = dir(fullfile(thisDir, 'reference_*.json'));
 if isempty(files)
@@ -54,6 +65,10 @@ for i = 1:numel(files)
         failures{end+1} = name;
     end
 end
+
+% Clean up shim directory
+rmpath(shimDir);
+rmdir(shimDir, 's');
 
 fprintf('\n=== %d passed, %d failed ===\n', nPass, nFail);
 if nFail > 0

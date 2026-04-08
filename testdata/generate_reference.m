@@ -13,6 +13,16 @@ thisDir = fileparts(mfilename('fullpath'));
 rootDir = fileparts(thisDir);
 sidDir = fullfile(rootDir, 'matlab', 'sid');
 addpath(sidDir);
+% MATLAB ignores addpath on directories named 'private'. Copy to a
+% temporary non-private-named directory so private helpers are accessible.
+privateDir = fullfile(sidDir, 'private');
+shimDir = fullfile(thisDir, 'private_shim');
+if exist(shimDir, 'dir')
+    rmdir(shimDir, 's');
+end
+mkdir(shimDir);
+copyfile(fullfile(privateDir, '*.m'), shimDir);
+addpath(shimDir);
 
 % ---- Test case 1: SISO Blackman-Tukey ----
 fprintf('Generating reference_siso_bt.json...\n');
@@ -128,6 +138,10 @@ ref5.tolerance = struct('A_rel', 1e-10, 'B_rel', 1e-10);
 writeJSON(fullfile(thisDir, 'reference_ltv_cosmic.json'), ref5);
 
 fprintf('\n=== All reference data generated ===\n');
+
+% Clean up shim directory
+rmpath(shimDir);
+rmdir(shimDir, 's');
 
 
 function writeJSON(filepath, data)
