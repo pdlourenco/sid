@@ -35,18 +35,24 @@ from __future__ import annotations
 __version__ = "1.0.0"
 
 from sid._exceptions import SidError
-from sid._results import FreqResult
+from sid._results import FreqMapResult, FreqResult, SpectrogramResult
 from sid.detrend import detrend
 from sid.freq_bt import freq_bt
 from sid.freq_btfdr import freq_btfdr
 from sid.freq_etfe import freq_etfe
+from sid.freq_map import freq_map
+from sid.spectrogram import spectrogram
 
 __all__ = [
     "__version__",
+    "FreqMapResult",
     "FreqResult",
     "SidError",
+    "SpectrogramResult",
     "detrend",
     "freq_bt",
     "freq_btfdr",
     "freq_etfe",
+    "freq_map",
+    "spectrogram",
 ]

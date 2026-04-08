@@ -366,3 +366,148 @@ class TestCrossValidationBTFDR:
             rtol=ref["tolerance"]["NoiseSpectrum_rel"],
             err_msg="BTFDR noise spectrum mismatch vs MATLAB reference",
         )
+
+
+class TestCrossValidationSpectrogram:
+    """Spectrogram: reference_spectrogram.json."""
+
+    def test_spectrogram_time(self):
+        ref = _load("reference_spectrogram.json")
+        x = _to_array(ref["input"], "x")
+        wl = ref["params"]["WindowLength"]
+        ov = ref["params"]["Overlap"]
+        ts = ref["params"]["SampleTime"]
+
+        from sid.spectrogram import spectrogram
+
+        result = spectrogram(x, window_length=wl, overlap=ov, sample_time=ts)
+
+        expected_time = _to_array(ref["output"], "Time")
+        np.testing.assert_allclose(
+            result.time,
+            expected_time.ravel(),
+            rtol=ref["tolerance"]["Time_rel"],
+            err_msg="Spectrogram time vector mismatch vs MATLAB reference",
+        )
+
+    def test_spectrogram_power(self):
+        ref = _load("reference_spectrogram.json")
+        x = _to_array(ref["input"], "x")
+        wl = ref["params"]["WindowLength"]
+        ov = ref["params"]["Overlap"]
+        ts = ref["params"]["SampleTime"]
+
+        from sid.spectrogram import spectrogram
+
+        result = spectrogram(x, window_length=wl, overlap=ov, sample_time=ts)
+
+        expected_power = _to_array(ref["output"], "Power")
+        np.testing.assert_allclose(
+            result.power.ravel(),
+            expected_power.ravel(),
+            rtol=ref["tolerance"]["Power_rel"],
+            err_msg="Spectrogram power mismatch vs MATLAB reference",
+        )
+
+    def test_spectrogram_frequency(self):
+        ref = _load("reference_spectrogram.json")
+        x = _to_array(ref["input"], "x")
+        wl = ref["params"]["WindowLength"]
+        ov = ref["params"]["Overlap"]
+        ts = ref["params"]["SampleTime"]
+
+        from sid.spectrogram import spectrogram
+
+        result = spectrogram(x, window_length=wl, overlap=ov, sample_time=ts)
+
+        expected_freq = _to_array(ref["output"], "Frequency")
+        np.testing.assert_allclose(
+            result.frequency,
+            expected_freq.ravel(),
+            rtol=1e-12,
+            err_msg="Spectrogram frequency mismatch vs MATLAB reference",
+        )
+
+
+class TestCrossValidationFreqMap:
+    """FreqMap BT: reference_freqmap_bt.json."""
+
+    def test_freqmap_response(self):
+        ref = _load("reference_freqmap_bt.json")
+        y = _to_array(ref["input"], "y")
+        u = _to_array(ref["input"], "u")
+        seg_len = ref["params"]["SegmentLength"]
+        ov = ref["params"]["Overlap"]
+        ws = ref["params"]["WindowSize"]
+
+        from sid.freq_map import freq_map
+
+        result = freq_map(y, u, segment_length=seg_len, overlap=ov, window_size=ws, algorithm="bt")
+
+        expected_resp = _to_complex(ref["output"], "Response")
+        np.testing.assert_allclose(
+            result.response.ravel(),
+            expected_resp.ravel(),
+            rtol=ref["tolerance"]["Response_rel"],
+            err_msg="FreqMap BT response mismatch vs MATLAB reference",
+        )
+
+    def test_freqmap_noise_spectrum(self):
+        ref = _load("reference_freqmap_bt.json")
+        y = _to_array(ref["input"], "y")
+        u = _to_array(ref["input"], "u")
+        seg_len = ref["params"]["SegmentLength"]
+        ov = ref["params"]["Overlap"]
+        ws = ref["params"]["WindowSize"]
+
+        from sid.freq_map import freq_map
+
+        result = freq_map(y, u, segment_length=seg_len, overlap=ov, window_size=ws, algorithm="bt")
+
+        expected_ns = _to_array(ref["output"], "NoiseSpectrum")
+        np.testing.assert_allclose(
+            result.noise_spectrum.ravel(),
+            expected_ns.ravel(),
+            rtol=ref["tolerance"]["NoiseSpectrum_rel"],
+            err_msg="FreqMap BT noise spectrum mismatch vs MATLAB reference",
+        )
+
+    def test_freqmap_coherence(self):
+        ref = _load("reference_freqmap_bt.json")
+        y = _to_array(ref["input"], "y")
+        u = _to_array(ref["input"], "u")
+        seg_len = ref["params"]["SegmentLength"]
+        ov = ref["params"]["Overlap"]
+        ws = ref["params"]["WindowSize"]
+
+        from sid.freq_map import freq_map
+
+        result = freq_map(y, u, segment_length=seg_len, overlap=ov, window_size=ws, algorithm="bt")
+
+        expected_coh = _to_array(ref["output"], "Coherence")
+        np.testing.assert_allclose(
+            result.coherence.ravel(),
+            expected_coh.ravel(),
+            rtol=1e-10,
+            err_msg="FreqMap BT coherence mismatch vs MATLAB reference",
+        )
+
+    def test_freqmap_time(self):
+        ref = _load("reference_freqmap_bt.json")
+        y = _to_array(ref["input"], "y")
+        u = _to_array(ref["input"], "u")
+        seg_len = ref["params"]["SegmentLength"]
+        ov = ref["params"]["Overlap"]
+        ws = ref["params"]["WindowSize"]
+
+        from sid.freq_map import freq_map
+
+        result = freq_map(y, u, segment_length=seg_len, overlap=ov, window_size=ws, algorithm="bt")
+
+        expected_time = _to_array(ref["output"], "Time")
+        np.testing.assert_allclose(
+            result.time,
+            expected_time.ravel(),
+            rtol=1e-12,
+            err_msg="FreqMap BT time vector mismatch vs MATLAB reference",
+        )

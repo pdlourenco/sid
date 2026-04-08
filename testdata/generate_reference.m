@@ -171,6 +171,51 @@ ref4.tolerance = struct('Response_rel', 1e-10, 'NoiseSpectrum_rel', 1e-10);
 
 writeJSON(fullfile(thisDir, 'reference_siso_btfdr.json'), ref4);
 
+% ---- Test case 4b: SISO Spectrogram ----
+fprintf('Generating reference_spectrogram.json...\n');
+rng(47);
+N_sp = 2000;
+Ts_sp = 0.001;
+x_sp = randn(N_sp, 1);
+r_sp = sidSpectrogram(x_sp, 'WindowLength', 128, 'Overlap', 64, 'SampleTime', Ts_sp);
+
+ref_sp = struct();
+ref_sp.function_name = 'sidSpectrogram';
+ref_sp.params = struct('WindowLength', 128, 'Overlap', 64, 'SampleTime', Ts_sp);
+ref_sp.input = struct('x', x_sp);
+ref_sp.output = struct( ...
+    'Time', r_sp.Time, ...
+    'Frequency', r_sp.Frequency, ...
+    'Power', r_sp.Power);
+ref_sp.tolerance = struct('Time_rel', 1e-12, 'Power_rel', 1e-10);
+
+writeJSON(fullfile(thisDir, 'reference_spectrogram.json'), ref_sp);
+
+% ---- Test case 4c: SISO FreqMap (BT) ----
+fprintf('Generating reference_freqmap_bt.json...\n');
+rng(48);
+N_fm = 4000;
+u_fm = randn(N_fm, 1);
+y_fm = filter([1], [1 -0.9], u_fm) + 0.1 * randn(N_fm, 1);
+r_fm = sidFreqMap(y_fm, u_fm, 'SegmentLength', 512, 'Overlap', 256, ...
+                               'WindowSize', 25);
+
+ref_fm = struct();
+ref_fm.function_name = 'sidFreqMap';
+ref_fm.params = struct('SegmentLength', 512, 'Overlap', 256, 'WindowSize', 25, ...
+                       'SampleTime', 1.0, 'Algorithm', 'bt');
+ref_fm.input = struct('y', y_fm, 'u', u_fm);
+ref_fm.output = struct( ...
+    'Time', r_fm.Time, ...
+    'Frequency', r_fm.Frequency, ...
+    'Response_real', real(r_fm.Response), ...
+    'Response_imag', imag(r_fm.Response), ...
+    'NoiseSpectrum', r_fm.NoiseSpectrum, ...
+    'Coherence', r_fm.Coherence);
+ref_fm.tolerance = struct('Response_rel', 1e-10, 'NoiseSpectrum_rel', 1e-10);
+
+writeJSON(fullfile(thisDir, 'reference_freqmap_bt.json'), ref_fm);
+
 % ---- Test case 5: LTV COSMIC ----
 fprintf('Generating reference_ltv_cosmic.json...\n');
 rng(46);

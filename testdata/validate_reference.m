@@ -95,8 +95,15 @@ function result = callSidFunction(funcName, input, params)
     switch funcName
         case {'sidFreqBT', 'sidFreqETFE', 'sidFreqBTFDR'}
             result = feval(funcName, input.y, input.u, args{:});
+        case 'sidSpectrogram'
+            result = sidSpectrogram(input.x, args{:});
+        case 'sidFreqMap'
+            result = sidFreqMap(input.y, input.u, args{:});
         case 'sidLTVdisc'
             result = feval(funcName, input.X, input.U, args{:});
+        case 'internals'
+            % Internal helpers validated separately — skip dispatch
+            result = struct();
         otherwise
             error('Unknown function: %s', funcName);
     end
