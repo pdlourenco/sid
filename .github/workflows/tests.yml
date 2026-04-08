@@ -52,6 +52,7 @@ jobs:
       - name: Set up MATLAB with toolboxes
         uses: matlab-actions/setup-matlab@v2.7.0
         with:
+          release: R2025a
           products: System_Identification_Toolbox Signal_Processing_Toolbox
 
       - name: Run test suite
