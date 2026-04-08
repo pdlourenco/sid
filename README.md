@@ -1,7 +1,10 @@
 # sid — Open-Source System Identification Toolbox
 
-![Tests](https://github.com/pdlourenco/sid-matlab/actions/workflows/tests.yml/badge.svg)
-![Lint](https://github.com/pdlourenco/sid-matlab/actions/workflows/lint.yml/badge.svg)
+![MATLAB/Octave Tests](https://github.com/pdlourenco/sid-matlab/actions/workflows/tests.yml/badge.svg)
+![MATLAB/Octave Lint](https://github.com/pdlourenco/sid-matlab/actions/workflows/lint.yml/badge.svg)
+![Python Tests](https://github.com/pdlourenco/sid-matlab/actions/workflows/python-tests.yml/badge.svg)
+![Python Lint](https://github.com/pdlourenco/sid-matlab/actions/workflows/python-lint.yml/badge.svg)
+![Cross-Language Validation](https://github.com/pdlourenco/sid-matlab/actions/workflows/cross-validate.yml/badge.svg)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **sid** is a free, open-source toolbox for **system identification** — covering

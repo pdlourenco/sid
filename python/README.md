@@ -1,5 +1,8 @@
 # sid — Python Implementation
 
+![Python Tests](https://github.com/pdlourenco/sid-matlab/actions/workflows/python-tests.yml/badge.svg)
+![Python Lint](https://github.com/pdlourenco/sid-matlab/actions/workflows/python-lint.yml/badge.svg)
+
 Python implementation of the sid system identification toolbox. Numerically
 identical to the MATLAB/Octave reference implementation — every public function
 produces the same output to within floating-point tolerance.
