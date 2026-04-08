@@ -150,3 +150,77 @@ class FreqMapResult:
 
     method: str
     """Always ``'freq_map'``."""
+
+
+@dataclass(frozen=True)
+class LTVResult:
+    """Result from LTV state-space identification (ltv_disc).
+
+    Contains the identified time-varying system matrices A(k), B(k) and
+    optional Bayesian uncertainty estimates.  All array shapes use the
+    convention ``(rows, cols, time)`` consistent with MATLAB's
+    ``(:, :, k)`` indexing.
+    """
+
+    a: np.ndarray
+    """Time-varying dynamics matrices, shape ``(p, p, N)``."""
+
+    b: np.ndarray
+    """Time-varying input matrices, shape ``(p, q, N)``."""
+
+    a_std: np.ndarray | None
+    """Standard deviation of ``a`` entries, shape ``(p, p, N)``.
+    ``None`` when uncertainty was not requested."""
+
+    b_std: np.ndarray | None
+    """Standard deviation of ``b`` entries, shape ``(p, q, N)``.
+    ``None`` when uncertainty was not requested."""
+
+    p_cov: np.ndarray | None
+    """Row-wise posterior covariance blocks, shape ``(d, d, N)`` where
+    ``d = p + q``.  ``None`` when uncertainty was not requested."""
+
+    noise_cov: np.ndarray | None
+    """Noise covariance matrix, shape ``(p, p)``.
+    ``None`` when uncertainty was not requested."""
+
+    noise_cov_estimated: bool | None
+    """``True`` if ``noise_cov`` was estimated from residuals,
+    ``False`` if user-provided.  ``None`` when uncertainty was not
+    requested."""
+
+    noise_variance: float | None
+    """Scalar noise variance ``trace(noise_cov) / p``.
+    ``None`` when uncertainty was not requested."""
+
+    degrees_of_freedom: float | None
+    """Effective degrees of freedom used in noise covariance estimation.
+    ``NaN`` when ``noise_cov`` was user-provided.  ``None`` when
+    uncertainty was not requested."""
+
+    lambda_: np.ndarray
+    """Regularization values used, shape ``(N-1,)``."""
+
+    cost: np.ndarray
+    """Cost vector ``[total, fidelity, regularization]``, shape ``(3,)``."""
+
+    data_length: int
+    """Number of time steps *N*."""
+
+    state_dim: int
+    """State dimension *p*."""
+
+    input_dim: int
+    """Input dimension *q*."""
+
+    num_trajectories: int
+    """Number of trajectories *L*."""
+
+    algorithm: str
+    """Identification algorithm (``'cosmic'``)."""
+
+    preconditioned: bool
+    """Whether block-diagonal preconditioning was applied."""
+
+    method: str
+    """Always ``'ltv_disc'``."""

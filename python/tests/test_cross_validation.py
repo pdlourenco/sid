@@ -511,3 +511,133 @@ class TestCrossValidationFreqMap:
             rtol=1e-12,
             err_msg="FreqMap BT time vector mismatch vs MATLAB reference",
         )
+
+
+class TestCrossValidationLTVCosmic:
+    """LTV COSMIC: reference_ltv_cosmic.json."""
+
+    def test_cosmic_a(self):
+        ref = _load("reference_ltv_cosmic.json")
+        X = _to_array(ref["input"], "X")
+        U = _to_array(ref["input"], "U")
+        lam = ref["params"]["Lambda"]
+
+        from sid.ltv_disc import ltv_disc
+
+        result = ltv_disc(X, U, lambda_=lam)
+
+        expected_A = _to_array(ref["output"], "A")
+        np.testing.assert_allclose(
+            result.a.ravel(),
+            expected_A.ravel(),
+            rtol=ref["tolerance"]["A_rel"],
+            atol=1e-10,
+            err_msg="COSMIC A matrices mismatch vs MATLAB reference",
+        )
+
+    def test_cosmic_b(self):
+        ref = _load("reference_ltv_cosmic.json")
+        X = _to_array(ref["input"], "X")
+        U = _to_array(ref["input"], "U")
+        lam = ref["params"]["Lambda"]
+
+        from sid.ltv_disc import ltv_disc
+
+        result = ltv_disc(X, U, lambda_=lam)
+
+        expected_B = _to_array(ref["output"], "B")
+        np.testing.assert_allclose(
+            result.b.ravel(),
+            expected_B.ravel(),
+            rtol=ref["tolerance"]["B_rel"],
+            atol=1e-10,
+            err_msg="COSMIC B matrices mismatch vs MATLAB reference",
+        )
+
+    def test_cosmic_cost(self):
+        ref = _load("reference_ltv_cosmic.json")
+        X = _to_array(ref["input"], "X")
+        U = _to_array(ref["input"], "U")
+        lam = ref["params"]["Lambda"]
+
+        from sid.ltv_disc import ltv_disc
+
+        result = ltv_disc(X, U, lambda_=lam)
+
+        expected_cost = _to_array(ref["output"], "Cost")
+        np.testing.assert_allclose(
+            result.cost,
+            expected_cost.ravel(),
+            rtol=ref["tolerance"]["Cost_rel"],
+            atol=1e-10,
+            err_msg="COSMIC cost mismatch vs MATLAB reference",
+        )
+
+
+class TestCrossValidationTestMSD:
+    """Test MSD system: reference_test_msd.json."""
+
+    def test_msd_matrices(self):
+        ref = _load("reference_test_msd.json")
+        from sid._internal.test_msd import test_msd
+
+        m = _to_array(ref["input"], "m").ravel()
+        k_spring = _to_array(ref["input"], "k_spring").ravel()
+        c_damp = _to_array(ref["input"], "c_damp").ravel()
+        F = _to_array(ref["input"], "F")
+        Ts = float(ref["input"]["Ts"])
+
+        Ad, Bd = test_msd(m, k_spring, c_damp, F, Ts)
+
+        expected_Ad = _to_array(ref["output"], "Ad")
+        expected_Bd = _to_array(ref["output"], "Bd")
+        np.testing.assert_allclose(Ad, expected_Ad, rtol=1e-9, err_msg="MSD Ad mismatch vs MATLAB")
+        np.testing.assert_allclose(Bd, expected_Bd, rtol=1e-9, err_msg="MSD Bd mismatch vs MATLAB")
+
+
+class TestCrossValidationCosmicInternals:
+    """COSMIC internals: reference_cosmic_internals.json."""
+
+    def test_cosmic_internals(self):
+        ref = _load("reference_cosmic_internals.json")
+        X = _to_array(ref["input"], "X")
+        U = _to_array(ref["input"], "U")
+        if U.ndim == 1:
+            U = U[:, np.newaxis]
+        lam_val = float(ref["input"]["lambda"])
+
+        from sid._internal.ltv_build_data_matrices import build_data_matrices
+        from sid._internal.ltv_build_block_terms import build_block_terms
+        from sid._internal.ltv_cosmic_solve import cosmic_solve
+        from sid._internal.ltv_evaluate_cost import evaluate_cost
+
+        N = X.shape[0] - 1
+        p = X.shape[1]
+        q = U.shape[1]
+        L = 1
+        X3 = X[:, :, np.newaxis]
+        U3 = U[:, :, np.newaxis]
+        lam = lam_val * np.ones(N - 1)
+
+        D, Xl = build_data_matrices(X3, U3, N, p, q, L)
+        S, T = build_block_terms(D, Xl, lam, N, p, q)
+        C, _ = cosmic_solve(S, T, lam, N, p, q)
+
+        # Extract A, B
+        A_est = C[:p, :, :].transpose(1, 0, 2)
+        B_est = C[p:, :, :].transpose(1, 0, 2)
+        cost, fid, reg, _ = evaluate_cost(A_est, B_est, D, Xl, lam, N, p, q)
+
+        expected_cost = float(ref["output"]["cost"])
+        expected_fid = float(ref["output"]["fidelity"])
+        expected_reg = float(ref["output"]["regularization"])
+
+        np.testing.assert_allclose(
+            cost, expected_cost, rtol=1e-6, atol=1e-10, err_msg="COSMIC cost mismatch"
+        )
+        np.testing.assert_allclose(
+            fid, expected_fid, rtol=1e-6, atol=1e-10, err_msg="COSMIC fidelity mismatch"
+        )
+        np.testing.assert_allclose(
+            reg, expected_reg, rtol=1e-6, atol=1e-10, err_msg="COSMIC regularization mismatch"
+        )
