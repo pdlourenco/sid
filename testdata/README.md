@@ -20,8 +20,22 @@ set of test cases. Each JSON file contains:
 - `output` — expected outputs at 16 significant digits
 - `tolerance` — per-field relative tolerances for cross-language comparison
 
+## Validating against reference data
+
+Each language validates its own outputs against the committed JSON files:
+
+```matlab
+% MATLAB / Octave
+run('testdata/validate_reference.m')
+```
+
+The validator reads each `reference_*.json`, calls the corresponding sid
+function with the stored input data, and checks that outputs match within
+the specified tolerances.  This runs automatically in CI via
+`cross-validate.yml` (currently Octave; Python and Julia will be added
+in future phases).
+
 ## Format
 
-All numeric arrays are stored as flat JSON arrays of numbers formatted with
-`sprintf('%.16e', ...)` to preserve full double precision. Complex arrays
-are split into `_real` and `_imag` components.
+All numeric arrays are stored as JSON arrays of numbers with full double
+precision.  Complex arrays are split into `_real` and `_imag` components.

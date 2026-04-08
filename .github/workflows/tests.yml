@@ -60,3 +60,25 @@ jobs:
         uses: matlab-actions/run-command@v2.4.1
         with:
           command: run('matlab/examples/runAllExamples.m')
+
+      - name: Generate cross-language reference data
+        uses: matlab-actions/run-command@v2.4.1
+        with:
+          command: run('testdata/generate_reference.m')
+
+      - name: Verify reference data matches committed versions
+        run: |
+          if git diff --quiet testdata/*.json 2>/dev/null; then
+            echo "Reference data is up to date."
+          else
+            echo "::error::Reference data out of date. Run generate_reference.m locally and commit the updated JSON files."
+            git diff --stat testdata/
+            exit 1
+          fi
+
+      - name: Upload reference data
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reference-data
+          path: testdata/*.json
