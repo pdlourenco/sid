@@ -66,6 +66,10 @@ def sid_uncertainty(
     --------
     >>> g_std, phi_v_std = sid_uncertainty(G, phi_v, coh, N, W)  # doctest: +SKIP
 
+    Notes
+    -----
+    **Specification:** SPEC.md §3 -- Uncertainty Estimation
+
     See Also
     --------
     sid.freq_bt : Main function that calls this for uncertainty estimation.

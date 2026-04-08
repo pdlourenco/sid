@@ -44,6 +44,10 @@ def sid_dft(x: np.ndarray, freqs: np.ndarray, use_fft: bool) -> np.ndarray:
     --------
     >>> X = sid_dft(x, freqs, use_fft=True)  # doctest: +SKIP
 
+    Notes
+    -----
+    **Specification:** SPEC.md §4.1 -- ETFE (DFT computation)
+
     See Also
     --------
     sid._internal.windowed_dft.windowed_dft : Windowed DFT of covariances.

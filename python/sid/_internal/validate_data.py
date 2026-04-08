@@ -64,6 +64,10 @@ def validate_data(
     --------
     >>> y, u, N, ny, nu, is_ts, n_traj = validate_data(y, u)  # doctest: +SKIP
 
+    Notes
+    -----
+    **Specification:** (Input validation -- not yet in SPEC.md)
+
     See Also
     --------
     sid.freq_bt : Main function that uses this validator.

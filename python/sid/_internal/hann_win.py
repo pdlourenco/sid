@@ -39,6 +39,10 @@ def hann_win(M: int) -> np.ndarray:
     >>> W[0]  # doctest: +SKIP
     1.0
 
+    Notes
+    -----
+    **Specification:** SPEC.md §2.4 -- Hann Lag Window
+
     See Also
     --------
     sid._internal.cov.sid_cov : Uses this window for lag windowing.

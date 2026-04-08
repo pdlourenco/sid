@@ -48,6 +48,10 @@ def sid_cov(x: np.ndarray, z: np.ndarray, max_lag: int) -> np.ndarray:
     --------
     >>> R = sid_cov(x, x, 30)  # doctest: +SKIP
 
+    Notes
+    -----
+    **Specification:** SPEC.md §2.3 -- Covariance Estimation
+
     See Also
     --------
     sid._internal.hann_win.hann_win : Hann window applied to covariances.

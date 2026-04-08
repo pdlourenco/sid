@@ -36,6 +36,10 @@ def is_default_freqs(freqs: np.ndarray) -> bool:
     >>> is_default_freqs(np.arange(1, 129) * np.pi / 128)  # doctest: +SKIP
     True
 
+    Notes
+    -----
+    **Specification:** SPEC.md §2.2 -- Default Frequency Grid
+
     See Also
     --------
     sid.freq_bt : Uses this to choose FFT vs direct DFT path.

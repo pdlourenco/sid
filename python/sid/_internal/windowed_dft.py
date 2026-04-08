@@ -63,6 +63,10 @@ def windowed_dft(
     --------
     >>> Phi = windowed_dft(R, W, freqs, use_fft=True)  # doctest: +SKIP
 
+    Notes
+    -----
+    **Specification:** SPEC.md §2.5 -- Windowed Spectral Estimates
+
     See Also
     --------
     sid._internal.cov.sid_cov : Computes the covariances fed to this function.
