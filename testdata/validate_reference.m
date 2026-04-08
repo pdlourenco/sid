@@ -1,12 +1,15 @@
-%% validate_reference - Validate sid outputs against reference data
+function validate_reference()
+%VALIDATE_REFERENCE Validate sid outputs against reference data.
 %
-% Reads each reference_*.json file, calls the corresponding sid function
-% with the stored input data, and verifies outputs match within tolerance.
-% Designed to run under any engine (Octave, Python, Julia) to validate
-% cross-language numerical equivalence.
+%   validate_reference
 %
-% Usage:
-%   run('testdata/validate_reference.m')
+%   Reads each reference_*.json file, calls the corresponding sid function
+%   with the stored input data, and verifies outputs match within tolerance.
+%   Designed to run under any engine (Octave, Python, Julia) to validate
+%   cross-language numerical equivalence.
+%
+%   Usage:
+%     run('testdata/validate_reference.m')
 
 fprintf('=== Cross-language reference validation ===\n\n');
 
@@ -55,6 +58,8 @@ end
 fprintf('\n=== %d passed, %d failed ===\n', nPass, nFail);
 if nFail > 0
     error('Validation failed for: %s', strjoin(failures, ', '));
+end
+
 end
 
 
