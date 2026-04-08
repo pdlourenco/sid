@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools >= 68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sid-toolbox"
+version = "1.0.0"
+description = "System Identification Toolbox"
+license = "MIT"
+requires-python = ">= 3.10"
+dependencies = [
+    "numpy >= 1.22",
+    "scipy >= 1.8",
+]
+
+[project.optional-dependencies]
+plot = ["matplotlib >= 3.5"]
+dev = [
+    "pytest >= 7.0",
+    "matplotlib >= 3.5",
+    "nbmake >= 1.0",
+    "ruff",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
