@@ -37,5 +37,30 @@ jobs:
           name: reference-data
           path: testdata/*.json
 
-  # Future: validate-python job (Phase 2)
+  validate-python:
+    name: Validate Python port
+    needs: generate-reference
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install sid Python package
+        run: pip install -e "./python[dev]"
+
+      - name: Download reference data
+        uses: actions/download-artifact@v4
+        with:
+          name: reference-data
+          path: testdata/
+
+      - name: Run cross-validation tests
+        run: python -m pytest python/tests/test_cross_validation.py -v
+
   # Future: validate-julia job (Phase 3)

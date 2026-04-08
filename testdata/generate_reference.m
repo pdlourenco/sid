@@ -36,6 +36,63 @@ ref1.tolerance = struct('Response_rel', 1e-10, 'NoiseSpectrum_rel', 1e-10);
 
 writeJSON(fullfile(thisDir, 'reference_siso_bt.json'), ref1);
 
+% ---- Test case 1b: SISO Blackman-Tukey (time series mode) ----
+fprintf('Generating reference_timeseries_bt.json...\n');
+rng(42);
+N_ts = 500;
+y_ts = filter([1], [1 -0.9 0.2], randn(N_ts, 1));
+r1b = sidFreqBT(y_ts, [], 'WindowSize', 30);
+
+ref1b = struct();
+ref1b.function_name = 'sidFreqBT';
+ref1b.params = struct('WindowSize', 30, 'SampleTime', 1.0, 'mode', 'timeseries');
+ref1b.input = struct('y', y_ts);
+ref1b.output = struct( ...
+    'Frequency', r1b.Frequency, ...
+    'NoiseSpectrum', r1b.NoiseSpectrum, ...
+    'NoiseSpectrumStd', r1b.NoiseSpectrumStd);
+ref1b.tolerance = struct('NoiseSpectrum_rel', 1e-10);
+
+writeJSON(fullfile(thisDir, 'reference_timeseries_bt.json'), ref1b);
+
+% ---- Test case 1c: Internal helpers (cov, windowed DFT, uncertainty) ----
+fprintf('Generating reference_internals.json...\n');
+rng(42);
+N_int = 100;
+x_int = randn(N_int, 1);
+z_int = randn(N_int, 1);
+M_int = 20;
+
+% Biased covariance
+R_xx = sidCov(x_int, x_int, M_int);
+R_xz = sidCov(x_int, z_int, M_int);
+
+% Hann window
+W_int = sidHannWin(M_int);
+
+% Windowed DFT (auto-spectrum, default freqs)
+freqs_int = (1:128)' * pi / 128;
+Phi_xx = sidWindowedDFT(R_xx, W_int, freqs_int, true, R_xx);
+
+% Windowed DFT (cross-spectrum)
+R_zx = sidCov(z_int, x_int, M_int);
+Phi_xz = sidWindowedDFT(R_xz, W_int, freqs_int, true, R_zx);
+
+ref_int = struct();
+ref_int.function_name = 'internals';
+ref_int.input = struct('x', x_int, 'z', z_int, 'M', M_int);
+ref_int.output = struct( ...
+    'R_xx', R_xx, ...
+    'R_xz', R_xz, ...
+    'W', W_int, ...
+    'Phi_xx_real', real(Phi_xx), ...
+    'Phi_xx_imag', imag(Phi_xx), ...
+    'Phi_xz_real', real(Phi_xz), ...
+    'Phi_xz_imag', imag(Phi_xz));
+ref_int.tolerance = struct('R_rel', 1e-12, 'Phi_rel', 1e-10);
+
+writeJSON(fullfile(thisDir, 'reference_internals.json'), ref_int);
+
 % ---- Test case 2: MIMO Blackman-Tukey ----
 fprintf('Generating reference_mimo_bt.json...\n');
 rng(43);

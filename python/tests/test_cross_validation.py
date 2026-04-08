@@ -1,0 +1,296 @@
+# Copyright (c) 2026 Pedro Lourenco. All rights reserved.
+# This code is released under the MIT License. See LICENSE file in the
+# project root for full license information.
+#
+# This module is part of the Open Source System Identification Toolbox (SID).
+# https://github.com/pdlourenco/sid-matlab
+
+"""Cross-language validation tests using MATLAB-generated reference data.
+
+These tests load JSON reference vectors produced by
+``testdata/generate_reference.m`` (run in MATLAB CI) and verify that the
+Python implementation produces numerically identical results.
+
+The JSON files contain the actual input data (not RNG seeds), so results
+are deterministic and RNG-independent.  Tests are skipped when the JSON
+files are not available (e.g. before the first MATLAB CI run).
+"""
+
+from __future__ import annotations
+
+import json
+import pathlib
+
+import numpy as np
+import pytest
+
+import sid
+from sid._internal.cov import sid_cov
+from sid._internal.hann_win import hann_win
+from sid._internal.windowed_dft import windowed_dft
+
+TESTDATA = pathlib.Path(__file__).resolve().parent.parent.parent / "testdata"
+
+
+def _load(name: str) -> dict:
+    """Load a JSON reference file, or skip the test if missing."""
+    path = TESTDATA / name
+    if not path.exists():
+        pytest.skip(f"Reference file {name} not found (run MATLAB CI first)")
+    with open(path) as f:
+        return json.load(f)
+
+
+def _to_array(data, key: str) -> np.ndarray:
+    """Convert a JSON field to a numpy array."""
+    return np.array(data[key], dtype=np.float64)
+
+
+def _to_complex(data, base_key: str) -> np.ndarray:
+    """Reconstruct complex array from _real and _imag JSON fields."""
+    re = np.array(data[base_key + "_real"], dtype=np.float64)
+    im = np.array(data[base_key + "_imag"], dtype=np.float64)
+    return re + 1j * im
+
+
+class TestCrossValidationSISO:
+    """SISO Blackman-Tukey: reference_siso_bt.json."""
+
+    def test_siso_bt_response(self):
+        ref = _load("reference_siso_bt.json")
+        y = _to_array(ref["input"], "y")
+        u = _to_array(ref["input"], "u")
+        ws = ref["params"]["WindowSize"]
+        ts = ref["params"]["SampleTime"]
+
+        result = sid.freq_bt(y, u, window_size=ws, sample_time=ts)
+
+        expected_resp = _to_complex(ref["output"], "Response")
+        np.testing.assert_allclose(
+            result.response,
+            expected_resp.ravel(),
+            rtol=ref["tolerance"]["Response_rel"],
+            err_msg="SISO BT response mismatch vs MATLAB reference",
+        )
+
+    def test_siso_bt_frequency(self):
+        ref = _load("reference_siso_bt.json")
+        y = _to_array(ref["input"], "y")
+        u = _to_array(ref["input"], "u")
+        ws = ref["params"]["WindowSize"]
+
+        result = sid.freq_bt(y, u, window_size=ws)
+
+        expected_freq = _to_array(ref["output"], "Frequency")
+        np.testing.assert_allclose(
+            result.frequency,
+            expected_freq.ravel(),
+            rtol=1e-12,
+            err_msg="SISO BT frequency grid mismatch",
+        )
+
+    def test_siso_bt_noise_spectrum(self):
+        ref = _load("reference_siso_bt.json")
+        y = _to_array(ref["input"], "y")
+        u = _to_array(ref["input"], "u")
+        ws = ref["params"]["WindowSize"]
+
+        result = sid.freq_bt(y, u, window_size=ws)
+
+        expected_ns = _to_array(ref["output"], "NoiseSpectrum")
+        np.testing.assert_allclose(
+            result.noise_spectrum,
+            expected_ns.ravel(),
+            rtol=ref["tolerance"]["NoiseSpectrum_rel"],
+            err_msg="SISO BT noise spectrum mismatch vs MATLAB reference",
+        )
+
+    def test_siso_bt_coherence(self):
+        ref = _load("reference_siso_bt.json")
+        y = _to_array(ref["input"], "y")
+        u = _to_array(ref["input"], "u")
+        ws = ref["params"]["WindowSize"]
+
+        result = sid.freq_bt(y, u, window_size=ws)
+
+        expected_coh = _to_array(ref["output"], "Coherence")
+        np.testing.assert_allclose(
+            result.coherence,
+            expected_coh.ravel(),
+            rtol=1e-10,
+            err_msg="SISO BT coherence mismatch vs MATLAB reference",
+        )
+
+
+class TestCrossValidationMIMO:
+    """MIMO Blackman-Tukey: reference_mimo_bt.json."""
+
+    def test_mimo_bt_response(self):
+        ref = _load("reference_mimo_bt.json")
+        y = _to_array(ref["input"], "y")
+        u = _to_array(ref["input"], "u")
+        ws = ref["params"]["WindowSize"]
+
+        result = sid.freq_bt(y, u, window_size=ws)
+
+        expected_resp = _to_complex(ref["output"], "Response")
+        # MATLAB stores as (nf x ny x nu); JSON flattens row-major
+        # Reshape to match
+        nf = result.response.shape[0]
+        ny = result.response.shape[1]
+        nu = result.response.shape[2]
+        expected_3d = expected_resp.reshape(nf, ny, nu)
+
+        np.testing.assert_allclose(
+            result.response,
+            expected_3d,
+            rtol=ref["tolerance"]["Response_rel"],
+            err_msg="MIMO BT response mismatch vs MATLAB reference",
+        )
+
+    def test_mimo_bt_noise_spectrum(self):
+        ref = _load("reference_mimo_bt.json")
+        y = _to_array(ref["input"], "y")
+        u = _to_array(ref["input"], "u")
+        ws = ref["params"]["WindowSize"]
+
+        result = sid.freq_bt(y, u, window_size=ws)
+
+        expected_ns = _to_array(ref["output"], "NoiseSpectrum")
+        nf = result.noise_spectrum.shape[0]
+        ny = result.noise_spectrum.shape[1]
+        expected_3d = expected_ns.reshape(nf, ny, ny)
+
+        np.testing.assert_allclose(
+            result.noise_spectrum,
+            expected_3d,
+            rtol=ref["tolerance"]["NoiseSpectrum_rel"],
+            err_msg="MIMO BT noise spectrum mismatch vs MATLAB reference",
+        )
+
+
+class TestCrossValidationTimeSeries:
+    """Time-series Blackman-Tukey: reference_timeseries_bt.json."""
+
+    def test_timeseries_bt_noise_spectrum(self):
+        ref = _load("reference_timeseries_bt.json")
+        y = _to_array(ref["input"], "y")
+        ws = ref["params"]["WindowSize"]
+
+        result = sid.freq_bt(y, None, window_size=ws)
+
+        expected_ns = _to_array(ref["output"], "NoiseSpectrum")
+        np.testing.assert_allclose(
+            result.noise_spectrum,
+            expected_ns.ravel(),
+            rtol=ref["tolerance"]["NoiseSpectrum_rel"],
+            err_msg="Time-series BT noise spectrum mismatch vs MATLAB reference",
+        )
+
+    def test_timeseries_bt_noise_spectrum_std(self):
+        ref = _load("reference_timeseries_bt.json")
+        y = _to_array(ref["input"], "y")
+        ws = ref["params"]["WindowSize"]
+
+        result = sid.freq_bt(y, None, window_size=ws)
+
+        expected_std = _to_array(ref["output"], "NoiseSpectrumStd")
+        np.testing.assert_allclose(
+            result.noise_spectrum_std,
+            expected_std.ravel(),
+            rtol=1e-10,
+            err_msg="Time-series BT noise spectrum std mismatch vs MATLAB reference",
+        )
+
+
+class TestCrossValidationInternals:
+    """Internal helper functions: reference_internals.json."""
+
+    def test_covariance_auto(self):
+        ref = _load("reference_internals.json")
+        x = _to_array(ref["input"], "x").ravel()
+        M = int(ref["input"]["M"])
+
+        x2d = x[:, np.newaxis]
+        R = sid_cov(x2d, x2d, M)
+
+        expected = _to_array(ref["output"], "R_xx").ravel()
+        np.testing.assert_allclose(
+            R,
+            expected,
+            rtol=ref["tolerance"]["R_rel"],
+            err_msg="Auto-covariance mismatch vs MATLAB reference",
+        )
+
+    def test_covariance_cross(self):
+        ref = _load("reference_internals.json")
+        x = _to_array(ref["input"], "x").ravel()
+        z = _to_array(ref["input"], "z").ravel()
+        M = int(ref["input"]["M"])
+
+        R = sid_cov(x[:, np.newaxis], z[:, np.newaxis], M)
+
+        expected = _to_array(ref["output"], "R_xz").ravel()
+        np.testing.assert_allclose(
+            R,
+            expected,
+            rtol=ref["tolerance"]["R_rel"],
+            err_msg="Cross-covariance mismatch vs MATLAB reference",
+        )
+
+    def test_hann_window(self):
+        ref = _load("reference_internals.json")
+        M = int(ref["input"]["M"])
+
+        W = hann_win(M)
+
+        expected = _to_array(ref["output"], "W").ravel()
+        np.testing.assert_allclose(
+            W,
+            expected,
+            rtol=1e-15,
+            err_msg="Hann window mismatch vs MATLAB reference",
+        )
+
+    def test_windowed_dft_auto(self):
+        ref = _load("reference_internals.json")
+        x = _to_array(ref["input"], "x").ravel()
+        M = int(ref["input"]["M"])
+
+        x2d = x[:, np.newaxis]
+        R = sid_cov(x2d, x2d, M)
+        W = hann_win(M)
+        freqs = np.arange(1, 129) * np.pi / 128
+
+        Phi = windowed_dft(R, W, freqs, True, R)
+
+        expected = _to_complex(ref["output"], "Phi_xx")
+        np.testing.assert_allclose(
+            Phi,
+            expected.ravel(),
+            rtol=ref["tolerance"]["Phi_rel"],
+            err_msg="Auto-spectrum windowed DFT mismatch vs MATLAB reference",
+        )
+
+    def test_windowed_dft_cross(self):
+        ref = _load("reference_internals.json")
+        x = _to_array(ref["input"], "x").ravel()
+        z = _to_array(ref["input"], "z").ravel()
+        M = int(ref["input"]["M"])
+
+        x2d = x[:, np.newaxis]
+        z2d = z[:, np.newaxis]
+        R_xz = sid_cov(x2d, z2d, M)
+        R_zx = sid_cov(z2d, x2d, M)
+        W = hann_win(M)
+        freqs = np.arange(1, 129) * np.pi / 128
+
+        Phi = windowed_dft(R_xz, W, freqs, True, R_zx)
+
+        expected = _to_complex(ref["output"], "Phi_xz")
+        np.testing.assert_allclose(
+            Phi,
+            expected.ravel(),
+            rtol=ref["tolerance"]["Phi_rel"],
+            err_msg="Cross-spectrum windowed DFT mismatch vs MATLAB reference",
+        )

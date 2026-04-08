@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
 from sid._internal.hann_win import hann_win
 from sid._internal.uncertainty import sid_uncertainty
@@ -62,9 +61,7 @@ class TestSidUncertainty:
     def test_mimo_no_phi_u(self) -> None:
         """MIMO with Coh=None and PhiU=None gives GStd = NaN array."""
         rng = np.random.default_rng(42)
-        G_mimo = rng.standard_normal((10, 2, 3)) + 1j * rng.standard_normal(
-            (10, 2, 3)
-        )
+        G_mimo = rng.standard_normal((10, 2, 3)) + 1j * rng.standard_normal((10, 2, 3))
         PhiV_mimo = np.abs(rng.standard_normal((10, 2, 2)))
         GStd, _ = sid_uncertainty(G_mimo, PhiV_mimo, None, 200, hann_win(10))
         assert GStd.shape == G_mimo.shape

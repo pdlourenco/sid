@@ -147,12 +147,8 @@ class TestFreqBT:
         G_true = 1.0 / (1.0 - 0.9 * np.exp(-1j * w))
         idx = [9, 29, 59, 99]  # 0-based versions of MATLAB [10,30,60,100]
         for k in idx:
-            rel_err = abs(abs(result.response[k]) - abs(G_true[k])) / abs(
-                G_true[k]
-            )
-            assert rel_err < 0.15, (
-                f"Magnitude mismatch at freq index {k}: relErr={rel_err:.3f}"
-            )
+            rel_err = abs(abs(result.response[k]) - abs(G_true[k])) / abs(G_true[k])
+            assert rel_err < 0.15, f"Magnitude mismatch at freq index {k}: relErr={rel_err:.3f}"
 
     def test_multi_trajectory(self) -> None:
         """Multi-trajectory: num_trajectories==L, error < single-traj."""
@@ -161,8 +157,8 @@ class TestFreqBT:
         L = 8
         u_3d = rng.standard_normal((N, 1, L))
         y_3d = np.zeros((N, 1, L))
-        for l in range(L):
-            y_3d[:, 0, l] = lfilter([1], [1, -0.9], u_3d[:, 0, l]) + (
+        for traj in range(L):
+            y_3d[:, 0, traj] = lfilter([1], [1, -0.9], u_3d[:, 0, traj]) + (
                 0.3 * rng.standard_normal(N)
             )
 
@@ -176,9 +172,7 @@ class TestFreqBT:
         G_true = 1.0 / (1.0 - 0.9 * np.exp(-1j * w))
         err_mt = np.median(np.abs(np.abs(res_mt.response) - np.abs(G_true)))
         err_st = np.median(np.abs(np.abs(res_st.response) - np.abs(G_true)))
-        assert err_mt < err_st, (
-            f"Multi-traj error {err_mt:.4f} should be < single {err_st:.4f}"
-        )
+        assert err_mt < err_st, f"Multi-traj error {err_mt:.4f} should be < single {err_st:.4f}"
 
     def test_error_m_less_than_2(self) -> None:
         """window_size=1 raises SidError."""

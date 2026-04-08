@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
 from sid._internal.cov import sid_cov
 from sid._internal.hann_win import hann_win
@@ -33,9 +32,7 @@ class TestWindowedDFT:
         Phi_fft = windowed_dft(R, W, freqs, use_fft=True)
         Phi_direct = windowed_dft(R, W, freqs, use_fft=False)
 
-        rel_err = np.max(np.abs(Phi_fft - Phi_direct)) / np.max(
-            np.abs(Phi_direct)
-        )
+        rel_err = np.max(np.abs(Phi_fft - Phi_direct)) / np.max(np.abs(Phi_direct))
         np.testing.assert_allclose(rel_err, 0.0, atol=1e-10)
 
     def test_auto_spectrum_real(self) -> None:
