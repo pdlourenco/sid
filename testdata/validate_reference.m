@@ -15,7 +15,19 @@ fprintf('=== Cross-language reference validation ===\n\n');
 
 thisDir = fileparts(mfilename('fullpath'));
 rootDir = fileparts(thisDir);
-addpath(fullfile(rootDir, 'matlab', 'sid'));
+sidDir = fullfile(rootDir, 'matlab', 'sid');
+addpath(sidDir);
+% MATLAB ignores addpath on directories named 'private'. Copy to a
+% temporary non-private-named directory so private helpers are accessible.
+privateDir = fullfile(sidDir, 'private');
+shimDir = fullfile(thisDir, 'private_shim');
+if exist(shimDir, 'dir')
+    rmdir(shimDir, 's');
+end
+mkdir(shimDir);
+copyfile(fullfile(privateDir, '*.m'), shimDir);
+addpath(shimDir);
+cleanupObj = onCleanup(@() cleanupShim(shimDir));
 
 files = dir(fullfile(thisDir, 'reference_*.json'));
 if isempty(files)
@@ -66,6 +78,15 @@ end
 % -----------------------------------------------------------------------
 %  Local functions
 % -----------------------------------------------------------------------
+
+function cleanupShim(shimDir)
+%CLEANUPSHIM Remove the temporary shim directory from the path and disk.
+    if exist(shimDir, 'dir')
+        rmpath(shimDir);
+        rmdir(shimDir, 's');
+    end
+end
+
 
 function result = callSidFunction(funcName, input, params)
 %CALLSIDFUNCTION Dispatch to the right sid function with stored args.

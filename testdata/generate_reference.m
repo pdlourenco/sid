@@ -1,10 +1,13 @@
-%% generate_reference - Generate cross-language reference data
+function generate_reference()
+%GENERATE_REFERENCE Generate cross-language reference data.
 %
-% Produces JSON files with canonical test vectors for validating numerical
-% equivalence across MATLAB, Python, and Julia implementations.
+%   generate_reference
 %
-% Usage:
-%   run('testdata/generate_reference.m')
+%   Produces JSON files with canonical test vectors for validating numerical
+%   equivalence across MATLAB, Python, and Julia implementations.
+%
+%   Usage:
+%     run('testdata/generate_reference.m')
 
 fprintf('=== Generating cross-language reference data ===\n\n');
 
@@ -13,6 +16,17 @@ thisDir = fileparts(mfilename('fullpath'));
 rootDir = fileparts(thisDir);
 sidDir = fullfile(rootDir, 'matlab', 'sid');
 addpath(sidDir);
+% MATLAB ignores addpath on directories named 'private'. Copy to a
+% temporary non-private-named directory so private helpers are accessible.
+privateDir = fullfile(sidDir, 'private');
+shimDir = fullfile(thisDir, 'private_shim');
+if exist(shimDir, 'dir')
+    rmdir(shimDir, 's');
+end
+mkdir(shimDir);
+copyfile(fullfile(privateDir, '*.m'), shimDir);
+addpath(shimDir);
+cleanupObj = onCleanup(@() cleanupShim(shimDir));
 
 % ---- Test case 1: SISO Blackman-Tukey ----
 fprintf('Generating reference_siso_bt.json...\n');
@@ -185,6 +199,17 @@ ref5.tolerance = struct('A_rel', 1e-10, 'B_rel', 1e-10);
 writeJSON(fullfile(thisDir, 'reference_ltv_cosmic.json'), ref5);
 
 fprintf('\n=== All reference data generated ===\n');
+
+end
+
+
+function cleanupShim(shimDir)
+%CLEANUPSHIM Remove the temporary shim directory from the path and disk.
+    if exist(shimDir, 'dir')
+        rmpath(shimDir);
+        rmdir(shimDir, 's');
+    end
+end
 
 
 function writeJSON(filepath, data)
