@@ -132,25 +132,39 @@ function [ok, messages] = compareOutputs(result, expected, tolerance)
             continue;
         end
 
-        % Relative error (guard against division by zero)
-        denom = max(abs(expVec), 1e-300);
-        relErr = max(abs(actVec - expVec) ./ denom);
-
-        % Look up tolerance (default 1e-6 for cross-engine comparison)
+        % Look up tolerances (default rtol 1e-6, atol 0 for cross-engine)
         if isfield(tolerance, tolField)
-            tol = tolerance.(tolField);
+            rtol = tolerance.(tolField);
         else
-            tol = 1e-6;
+            rtol = 1e-6;
         end
 
-        if relErr > tol
+        atolField = strrep(tolField, '_rel', '_atol');
+        if isfield(tolerance, atolField)
+            atol = tolerance.(atolField);
+        else
+            atol = 0;
+        end
+
+        % allclose check: |actual - expected| <= atol + rtol * |expected|
+        absDiff = abs(actVec - expVec);
+        thresh  = atol + rtol * abs(expVec);
+        worstIdx = find(absDiff - thresh == max(absDiff - thresh), 1);
+
+        % Report the effective relative error for logging (using the
+        % allclose denominator so small entries don't dominate).
+        denom = max(abs(expVec), max(atol, 1e-300));
+        relErr = max(absDiff ./ denom);
+
+        if any(absDiff > thresh)
             ok = false;
             messages{end+1} = sprintf( ...
-                '  %s: max relative error %.2e exceeds tolerance %.2e', ...
-                name, relErr, tol);
+                '  %s: element %d |diff|=%.2e exceeds atol(%.0e)+rtol(%.0e)*|exp|(%.2e) = %.2e', ...
+                name, worstIdx, absDiff(worstIdx), atol, rtol, ...
+                abs(expVec(worstIdx)), thresh(worstIdx));
         else
-            fprintf('    %s: max relative error %.2e (tol %.2e)\n', ...
-                name, relErr, tol);
+            fprintf('    %s: max relative error %.2e (rtol %.0e, atol %.0e)\n', ...
+                name, relErr, rtol, atol);
         end
     end
 end
