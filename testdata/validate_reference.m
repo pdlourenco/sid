@@ -49,7 +49,12 @@ for i = 1:numel(files)
     ref = jsondecode(fileread(filepath));
 
     % Call the sid function with stored inputs and params
-    result = callSidFunction(ref.function_name, ref.input, ref.params);
+    if isfield(ref, 'params')
+        params = ref.params;
+    else
+        params = struct();
+    end
+    result = callSidFunction(ref.function_name, ref.input, params);
 
     % Compare each output field within tolerance
     [ok, msgs] = compareOutputs(result, ref.output, ref.tolerance);
@@ -94,9 +99,29 @@ function result = callSidFunction(funcName, input, params)
 
     switch funcName
         case {'sidFreqBT', 'sidFreqETFE', 'sidFreqBTFDR'}
-            result = feval(funcName, input.y, input.u, args{:});
+            if isfield(input, 'u')
+                u = input.u;
+            else
+                u = [];
+            end
+            result = feval(funcName, input.y, u, args{:});
         case 'sidLTVdisc'
             result = feval(funcName, input.X, input.U, args{:});
+        case 'internals'
+            x = input.x; z = input.z; M = input.M;
+            R_xx = sidCov(x, x, M);
+            R_xz = sidCov(x, z, M);
+            W    = sidHannWin(M);
+            freqs = (1:128)' * pi / 128;
+            Phi_xx = sidWindowedDFT(R_xx, W, freqs, true, R_xx);
+            R_zx   = sidCov(z, x, M);
+            Phi_xz = sidWindowedDFT(R_xz, W, freqs, true, R_zx);
+            result = struct( ...
+                'R_xx', R_xx, 'R_xz', R_xz, 'W', W, ...
+                'Phi_xx_real', real(Phi_xx), ...
+                'Phi_xx_imag', imag(Phi_xx), ...
+                'Phi_xz_real', real(Phi_xz), ...
+                'Phi_xz_imag', imag(Phi_xz));
         otherwise
             error('Unknown function: %s', funcName);
     end
@@ -106,6 +131,9 @@ end
 function args = structToNameValue(s)
 %STRUCTTONAMEVALUE Convert struct fields to {'Name', value, ...} cell array.
     fields = fieldnames(s);
+    % Filter out metadata-only fields not accepted by sid functions
+    meta = {'mode'};
+    fields = fields(~ismember(fields, meta));
     args = cell(1, 2 * numel(fields));
     for i = 1:numel(fields)
         args{2*i - 1} = fields{i};
