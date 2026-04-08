@@ -2,6 +2,7 @@
 
 ![Python Tests](https://github.com/pdlourenco/sid-matlab/actions/workflows/python-tests.yml/badge.svg)
 ![Python Lint](https://github.com/pdlourenco/sid-matlab/actions/workflows/python-lint.yml/badge.svg)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/pdlourenco/sid-matlab/main?labpath=python/examples)
 
 Python implementation of the sid system identification toolbox. Numerically
 identical to the MATLAB/Octave reference implementation — every public function
@@ -135,11 +136,14 @@ inline plots:
 | `example_multi_trajectory.ipynb` | Multi-trajectory ensemble averaging |
 | `example_output_cosmic.ipynb` | Partial-observation Output-COSMIC |
 
-Launch any notebook with:
+Launch any notebook locally:
 
 ```bash
 jupyter notebook python/examples/example_siso.ipynb
 ```
+
+Or try them online — click the **Binder** badge above to launch a ready-to-run
+Jupyter environment in the browser (no installation required).
 
 ## Compatibility
 
