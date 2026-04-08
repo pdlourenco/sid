@@ -1,1 +1,10 @@
 matlab/tests/private_test_shim/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+.pytest_cache/
