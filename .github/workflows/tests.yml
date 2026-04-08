@@ -1,4 +1,4 @@
-name: Tests
+name: MATLAB/Octave tests
 
 on:
   workflow_dispatch:
@@ -10,6 +10,9 @@ on:
     branches: [main]
     paths:
       - 'matlab/**.m'
+
+permissions:
+  contents: write
 
 jobs:
   octave:
@@ -60,3 +63,16 @@ jobs:
         uses: matlab-actions/run-command@v2.4.1
         with:
           command: run('matlab/examples/runAllExamples.m')
+
+      - name: Generate cross-language reference data
+        uses: matlab-actions/run-command@v2.4.1
+        with:
+          command: run('testdata/generate_reference.m')
+
+      - name: Commit reference data if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add testdata/*.json
+          git diff --staged --quiet || git commit -m "Update cross-language reference data [skip ci]"
+          git push
