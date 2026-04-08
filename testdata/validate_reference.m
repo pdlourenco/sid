@@ -27,6 +27,7 @@ end
 mkdir(shimDir);
 copyfile(fullfile(privateDir, '*.m'), shimDir);
 addpath(shimDir);
+cleanupObj = onCleanup(@() cleanupShim(shimDir));
 
 files = dir(fullfile(thisDir, 'reference_*.json'));
 if isempty(files)
@@ -66,10 +67,6 @@ for i = 1:numel(files)
     end
 end
 
-% Clean up shim directory
-rmpath(shimDir);
-rmdir(shimDir, 's');
-
 fprintf('\n=== %d passed, %d failed ===\n', nPass, nFail);
 if nFail > 0
     error('Validation failed for: %s', strjoin(failures, ', '));
@@ -81,6 +78,15 @@ end
 % -----------------------------------------------------------------------
 %  Local functions
 % -----------------------------------------------------------------------
+
+function cleanupShim(shimDir)
+%CLEANUPSHIM Remove the temporary shim directory from the path and disk.
+    if exist(shimDir, 'dir')
+        rmpath(shimDir);
+        rmdir(shimDir, 's');
+    end
+end
+
 
 function result = callSidFunction(funcName, input, params)
 %CALLSIDFUNCTION Dispatch to the right sid function with stored args.
