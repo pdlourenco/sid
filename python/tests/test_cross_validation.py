@@ -218,7 +218,7 @@ class TestCrossValidationInternals:
         np.testing.assert_allclose(
             R,
             expected,
-            rtol=ref["tolerance"]["R_rel"],
+            rtol=ref["tolerance"]["R_xx_rel"],
             err_msg="Auto-covariance mismatch vs MATLAB reference",
         )
 
@@ -234,7 +234,7 @@ class TestCrossValidationInternals:
         np.testing.assert_allclose(
             R,
             expected,
-            rtol=ref["tolerance"]["R_rel"],
+            rtol=ref["tolerance"]["R_xz_rel"],
             err_msg="Cross-covariance mismatch vs MATLAB reference",
         )
 
@@ -268,7 +268,7 @@ class TestCrossValidationInternals:
         np.testing.assert_allclose(
             Phi,
             expected.ravel(),
-            rtol=ref["tolerance"]["Phi_rel"],
+            rtol=ref["tolerance"]["Phi_xx_real_rel"],
             err_msg="Auto-spectrum windowed DFT mismatch vs MATLAB reference",
         )
 
@@ -291,7 +291,7 @@ class TestCrossValidationInternals:
         np.testing.assert_allclose(
             Phi,
             expected.ravel(),
-            rtol=ref["tolerance"]["Phi_rel"],
+            rtol=ref["tolerance"]["Phi_xz_real_rel"],
             err_msg="Cross-spectrum windowed DFT mismatch vs MATLAB reference",
         )
 
