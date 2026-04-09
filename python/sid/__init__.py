@@ -43,6 +43,7 @@ from sid._results import (
     LTVResult,
     SpectrogramResult,
 )
+from sid.bode_plot import bode_plot
 from sid.compare import compare
 from sid.detrend import detrend
 from sid.freq_bt import freq_bt
@@ -50,6 +51,7 @@ from sid.freq_btfdr import freq_btfdr
 from sid.freq_etfe import freq_etfe
 from sid.freq_map import freq_map
 from sid.lti_freq_io import lti_freq_io
+from sid.map_plot import map_plot
 from sid.ltv_disc import ltv_disc
 from sid.ltv_disc_frozen import ltv_disc_frozen
 from sid.ltv_disc_io import ltv_disc_io
@@ -58,6 +60,8 @@ from sid.ltv_state_est import ltv_state_est
 from sid.model_order import model_order
 from sid.residual import residual
 from sid.spectrogram import spectrogram
+from sid.spectrogram_plot import spectrogram_plot
+from sid.spectrum_plot import spectrum_plot
 
 __all__ = [
     "__version__",
@@ -68,6 +72,7 @@ __all__ = [
     "LTVResult",
     "SidError",
     "SpectrogramResult",
+    "bode_plot",
     "compare",
     "detrend",
     "freq_bt",
@@ -76,6 +81,7 @@ __all__ = [
     "freq_map",
     "lti_freq_io",
     "ltv_disc",
+    "map_plot",
     "ltv_disc_frozen",
     "ltv_disc_io",
     "ltv_disc_tune",
@@ -83,4 +89,6 @@ __all__ = [
     "model_order",
     "residual",
     "spectrogram",
+    "spectrogram_plot",
+    "spectrum_plot",
 ]
