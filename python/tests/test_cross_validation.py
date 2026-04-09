@@ -763,3 +763,84 @@ class TestCrossValidationLTIFreqIO:
             atol=1e-8,
             err_msg="LTI B0 mismatch vs MATLAB reference",
         )
+
+
+class TestCrossValidationResidual:
+    """Residual analysis: reference_residual.json."""
+
+    def test_residual(self):
+        ref = _load("reference_residual.json")
+        y = _to_array(ref["input"], "y")
+        u = _to_array(ref["input"], "u")
+        if u.ndim == 1:
+            u = u[:, np.newaxis]
+        bt_ws = int(ref["params"]["bt_WindowSize"])
+        max_lag = int(ref["params"]["MaxLag"])
+
+        from sid.freq_bt import freq_bt
+        from sid.residual import residual
+
+        model = freq_bt(y, u, window_size=bt_ws)
+        result = residual(model, y, u, max_lag=max_lag)
+
+        expected_resid = _to_array(ref["output"], "Residual")
+        expected_ac = _to_array(ref["output"], "AutoCorr")
+        expected_cc = _to_array(ref["output"], "CrossCorr")
+
+        np.testing.assert_allclose(
+            result["residual"].ravel(),
+            expected_resid.ravel(),
+            rtol=ref["tolerance"]["Residual_rel"],
+            atol=1e-10,
+            err_msg="Residual mismatch vs MATLAB",
+        )
+        np.testing.assert_allclose(
+            result["auto_corr"].ravel(),
+            expected_ac.ravel(),
+            rtol=ref["tolerance"]["AutoCorr_rel"],
+            atol=1e-10,
+            err_msg="AutoCorr mismatch vs MATLAB",
+        )
+        np.testing.assert_allclose(
+            result["cross_corr"].ravel(),
+            expected_cc.ravel(),
+            rtol=ref["tolerance"]["CrossCorr_rel"],
+            atol=1e-10,
+            err_msg="CrossCorr mismatch vs MATLAB",
+        )
+
+
+class TestCrossValidationCompare:
+    """Model comparison: reference_compare.json."""
+
+    def test_compare(self):
+        ref = _load("reference_compare.json")
+        X = _to_array(ref["input"], "X")
+        U = _to_array(ref["input"], "U")
+        if U.ndim == 1:
+            U = U[:, np.newaxis]
+        lam = ref["params"]["Lambda"]
+
+        from sid.ltv_disc import ltv_disc
+        from sid.compare import compare
+
+        model = ltv_disc(X, U, lambda_=lam)
+        result = compare(model, X, U)
+
+        expected_pred = _to_array(ref["output"], "Predicted")
+        expected_fit = _to_array(ref["output"], "Fit")
+
+        np.testing.assert_allclose(
+            result["predicted"].ravel(),
+            expected_pred.ravel(),
+            rtol=ref["tolerance"]["Predicted_rel"],
+            atol=1e-10,
+            err_msg="Compare predicted mismatch vs MATLAB",
+        )
+        np.testing.assert_allclose(
+            result["fit"].ravel(),
+            expected_fit.ravel(),
+            rtol=ref["tolerance"]["Fit_rel"],
+            atol=1e-10,
+            err_msg="Compare fit mismatch vs MATLAB",
+        )
