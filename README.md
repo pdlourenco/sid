@@ -80,4 +80,4 @@ Contributions are welcome via issues and pull requests. See [CONTRIBUTING.md](CO
 
 ## License
 
-MIT License. Copyright (c) 2026 Pedro Lourenco. See [LICENSE](LICENSE).
+MIT License. Copyright (c) 2026 Pedro Lourenço. See [LICENSE](LICENSE).
