@@ -57,16 +57,16 @@ def compare(
 
     Returns
     -------
-    dict
-        Dictionary with the following keys:
+    CompareResult
+        Frozen dataclass with attributes:
 
-        - ``'predicted'`` -- ``(N, ny)`` model-predicted output.
-        - ``'measured'`` -- ``(N, ny)`` measured output (copy).
-        - ``'fit'`` -- ``(ny,)`` NRMSE fit percentage per channel.
+        - **predicted** -- ``(N, ny)`` model-predicted output.
+        - **measured** -- ``(N, ny)`` measured output (copy).
+        - **fit** -- ``(ny,)`` NRMSE fit percentage per channel.
           100% is perfect, 0% is no better than the mean, negative
           values indicate worse than the mean.
-        - ``'residual'`` -- ``(N, ny)`` residual ``y - y_pred``.
-        - ``'method'`` -- str, method of the source model.
+        - **residual** -- ``(N, ny)`` residual ``y - y_pred``.
+        - **method** -- str, method of the source model.
 
     Raises
     ------

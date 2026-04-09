@@ -54,24 +54,24 @@ def residual(
 
     Returns
     -------
-    dict
-        Dictionary with the following keys:
+    ResidualResult
+        Frozen dataclass with attributes:
 
-        - ``'residual'`` -- ``(N, ny)`` residual time series.
-        - ``'auto_corr'`` -- ``(max_lag+1,)`` normalised autocorrelation
-          of the first channel (for quick inspection).
-        - ``'auto_corr_all'`` -- ``(max_lag+1, ny)`` per-channel
+        - **residual** -- ``(N, ny)`` residual time series.
+        - **auto_corr** -- ``(max_lag+1,)`` normalised autocorrelation
+          of the first channel.
+        - **auto_corr_all** -- ``(max_lag+1, ny)`` per-channel
           autocorrelation.
-        - ``'cross_corr'`` -- ``(2*max_lag+1, ny*nu)`` normalised
+        - **cross_corr** -- ``(2*max_lag+1, ny*nu)`` normalised
           cross-correlation, or empty array for time-series.
-        - ``'confidence_bound'`` -- scalar 99% bound ``2.58/sqrt(N)``.
-        - ``'whiteness_pass'`` -- bool, ``True`` if all channels pass.
-        - ``'whiteness_pass_all'`` -- ``(ny,)`` bool array, per-channel.
-        - ``'independence_pass'`` -- bool, ``True`` if all pairs pass
+        - **confidence_bound** -- scalar 99% bound ``2.58/sqrt(N)``.
+        - **whiteness_pass** -- bool, ``True`` if all channels pass.
+        - **whiteness_pass_all** -- ``(ny,)`` bool array, per-channel.
+        - **independence_pass** -- bool, ``True`` if all pairs pass
           (always ``True`` for time-series).
-        - ``'independence_pass_all'`` -- ``(ny*nu,)`` bool array
-          (omitted for time-series).
-        - ``'data_length'`` -- int, effective number of samples *N*.
+        - **independence_pass_all** -- ``(ny*nu,)`` bool array, or
+          ``None`` for time-series.
+        - **data_length** -- int, effective number of samples *N*.
 
     Raises
     ------
