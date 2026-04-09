@@ -227,6 +227,91 @@ class LTVResult:
 
 
 @dataclass(frozen=True)
+class LTVIOResult:
+    """Result from LTV input-output identification (ltv_disc_io).
+
+    Contains the identified time-varying system matrices A(k), B(k),
+    estimated state trajectories, and optional Bayesian uncertainty
+    estimates.  All array shapes use the convention ``(rows, cols, time)``
+    consistent with MATLAB's ``(:, :, k)`` indexing.
+    """
+
+    a: np.ndarray
+    """Time-varying dynamics matrices, shape ``(n, n, N)``."""
+
+    b: np.ndarray
+    """Time-varying input matrices, shape ``(n, q, N)``."""
+
+    x: np.ndarray | list
+    """Estimated state trajectories, shape ``(N+1, n, L)`` or list of
+    ``(N_l+1, n)`` arrays for variable-length trajectories."""
+
+    h: np.ndarray
+    """Observation matrix, shape ``(py, n)`` (copy)."""
+
+    r: np.ndarray
+    """Measurement noise covariance, shape ``(py, py)`` (copy)."""
+
+    cost: np.ndarray
+    """Cost history at each iteration, shape ``(n_iter,)``."""
+
+    iterations: int
+    """Number of alternating iterations."""
+
+    lambda_: np.ndarray
+    """Regularization values used, shape ``(N-1,)``."""
+
+    data_length: int
+    """Number of time steps *N*."""
+
+    state_dim: int
+    """State dimension *n*."""
+
+    output_dim: int
+    """Output dimension *py*."""
+
+    input_dim: int
+    """Input dimension *q*."""
+
+    num_trajectories: int
+    """Number of trajectories *L*."""
+
+    a_std: np.ndarray | None
+    """Standard deviation of ``a`` entries, shape ``(n, n, N)``.
+    ``None`` when uncertainty was not computed."""
+
+    b_std: np.ndarray | None
+    """Standard deviation of ``b`` entries, shape ``(n, q, N)``.
+    ``None`` when uncertainty was not computed."""
+
+    p_cov: np.ndarray | None
+    """Row-wise posterior covariance blocks, shape ``(d, d, N)`` where
+    ``d = n + q``.  ``None`` when uncertainty was not computed."""
+
+    noise_cov: np.ndarray | None
+    """Noise covariance matrix, shape ``(n, n)``.
+    ``None`` when uncertainty was not computed."""
+
+    noise_cov_estimated: bool | None
+    """``True`` if ``noise_cov`` was estimated from residuals.
+    ``None`` when uncertainty was not computed."""
+
+    noise_variance: float | None
+    """Scalar noise variance ``trace(noise_cov) / n``.
+    ``None`` when uncertainty was not computed."""
+
+    degrees_of_freedom: float | None
+    """Effective degrees of freedom used in noise covariance estimation.
+    ``None`` when uncertainty was not computed."""
+
+    algorithm: str
+    """Identification algorithm (``'cosmic'``)."""
+
+    method: str
+    """Always ``'ltv_disc_io'``."""
+
+
+@dataclass(frozen=True)
 class FrozenResult:
     """Result from frozen transfer function computation (ltv_disc_frozen).
 
