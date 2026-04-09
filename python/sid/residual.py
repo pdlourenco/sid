@@ -14,6 +14,7 @@ import numpy as np
 from sid._exceptions import SidError
 from sid._internal.cov import sid_cov
 from sid._internal.freq_domain_sim import freq_domain_sim
+from sid._results import ResidualResult
 
 
 def residual(
@@ -23,7 +24,7 @@ def residual(
     *,
     max_lag: int | None = None,
     plot: bool = False,
-) -> dict:
+) -> ResidualResult:
     """Compute model residuals and perform diagnostic tests.
 
     This is the Python port of ``sidResidual.m``.
@@ -213,21 +214,20 @@ def residual(
     # ------------------------------------------------------------------
     # Pack result
     # ------------------------------------------------------------------
-    result_dict: dict = {
-        "residual": e,
-        "auto_corr": auto_corr,
-        "auto_corr_all": auto_corr_all,
-        "cross_corr": cross_corr,
-        "confidence_bound": conf_bound,
-        "whiteness_pass": whiteness_pass,
-        "whiteness_pass_all": whiteness_pass_all,
-        "independence_pass": independence_pass,
-        "data_length": N_eff,
-    }
-    if not is_time_series:
-        result_dict["independence_pass_all"] = indep_pass_all
+    indep_pass_all_out: np.ndarray | None = indep_pass_all if not is_time_series else None
 
-    return result_dict
+    return ResidualResult(
+        residual=e,
+        auto_corr=auto_corr,
+        auto_corr_all=auto_corr_all,
+        cross_corr=cross_corr,
+        confidence_bound=conf_bound,
+        whiteness_pass=whiteness_pass,
+        whiteness_pass_all=whiteness_pass_all,
+        independence_pass=independence_pass,
+        independence_pass_all=indep_pass_all_out,
+        data_length=N_eff,
+    )
 
 
 # ======================================================================

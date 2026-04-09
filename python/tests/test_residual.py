@@ -48,7 +48,7 @@ class TestResidual:
             "data_length",
         ]
         for key in expected_keys:
-            assert key in result, f"Missing key: {key}"
+            assert hasattr(result, key), f"Missing attribute: {key}"
 
     # ------------------------------------------------------------------
     # Test 2: Good freq-domain model -> whiteness should pass
@@ -63,10 +63,10 @@ class TestResidual:
         model = freq_bt(y, u, window_size=30)
         result = residual(model, y, u)
 
-        assert result["residual"].shape[0] == N
-        assert result["confidence_bound"] > 0
+        assert result.residual.shape[0] == N
+        assert result.confidence_bound > 0
         # Residual should have much smaller variance than the signal
-        assert np.std(result["residual"]) < np.std(y) * 0.5
+        assert np.std(result.residual) < np.std(y) * 0.5
 
     # ------------------------------------------------------------------
     # Test 3: Time-series mode (u=None) -> cross_corr empty, residual=y
@@ -81,11 +81,11 @@ class TestResidual:
         result = residual(model, y, None)
 
         # Cross-correlation should be None or empty for time-series
-        cc = result["cross_corr"]
+        cc = result.cross_corr
         assert cc is None or (hasattr(cc, "__len__") and len(cc) == 0)
         # Residual should equal y (no input, so no predicted component)
         np.testing.assert_allclose(
-            result["residual"].ravel(),
+            result.residual.ravel(),
             y.ravel(),
             atol=1e-10,
             err_msg="Time-series residual should equal y",
@@ -118,7 +118,7 @@ class TestResidual:
         result = residual(model, X, U)
 
         # Residuals should be small relative to signal
-        resid_norm = np.linalg.norm(result["residual"])
+        resid_norm = np.linalg.norm(result.residual)
         signal_norm = np.linalg.norm(X[1:])
         assert resid_norm / signal_norm < 0.5, (
             f"Residual norm ratio {resid_norm / signal_norm:.3f} should be small"
@@ -139,7 +139,7 @@ class TestResidual:
 
         expected_bound = 2.58 / np.sqrt(N)
         np.testing.assert_allclose(
-            result["confidence_bound"],
+            result.confidence_bound,
             expected_bound,
             atol=1e-10,
             err_msg="ConfidenceBound should be 2.58/sqrt(N)",
@@ -159,7 +159,7 @@ class TestResidual:
         result = residual(model, y, u)
 
         np.testing.assert_allclose(
-            result["auto_corr"].ravel()[0],
+            result.auto_corr.ravel()[0],
             1.0,
             atol=1e-10,
             err_msg="r_ee(0) should be 1.0 (normalised)",

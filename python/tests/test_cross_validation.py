@@ -788,21 +788,21 @@ class TestCrossValidationResidual:
         expected_cc = _to_array(ref["output"], "CrossCorr")
 
         np.testing.assert_allclose(
-            result["residual"].ravel(),
+            result.residual.ravel(),
             expected_resid.ravel(),
             rtol=ref["tolerance"]["Residual_rel"],
             atol=1e-10,
             err_msg="Residual mismatch vs MATLAB",
         )
         np.testing.assert_allclose(
-            result["auto_corr"].ravel(),
+            result.auto_corr.ravel(),
             expected_ac.ravel(),
             rtol=ref["tolerance"]["AutoCorr_rel"],
             atol=1e-10,
             err_msg="AutoCorr mismatch vs MATLAB",
         )
         np.testing.assert_allclose(
-            result["cross_corr"].ravel(),
+            result.cross_corr.ravel(),
             expected_cc.ravel(),
             rtol=ref["tolerance"]["CrossCorr_rel"],
             atol=1e-10,
@@ -831,14 +831,14 @@ class TestCrossValidationCompare:
         expected_fit = _to_array(ref["output"], "Fit")
 
         np.testing.assert_allclose(
-            result["predicted"].ravel(),
+            result.predicted.ravel(),
             expected_pred.ravel(),
             rtol=ref["tolerance"]["Predicted_rel"],
             atol=1e-10,
             err_msg="Compare predicted mismatch vs MATLAB",
         )
         np.testing.assert_allclose(
-            result["fit"].ravel(),
+            result.fit.ravel(),
             expected_fit.ravel(),
             rtol=ref["tolerance"]["Fit_rel"],
             atol=1e-10,

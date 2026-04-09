@@ -36,11 +36,13 @@ __version__ = "1.0.0"
 
 from sid._exceptions import SidError
 from sid._results import (
+    CompareResult,
     FreqMapResult,
     FreqResult,
     FrozenResult,
     LTVIOResult,
     LTVResult,
+    ResidualResult,
     SpectrogramResult,
 )
 from sid.bode_plot import bode_plot
@@ -65,11 +67,13 @@ from sid.spectrum_plot import spectrum_plot
 
 __all__ = [
     "__version__",
+    "CompareResult",
     "FreqMapResult",
     "FreqResult",
     "FrozenResult",
     "LTVIOResult",
     "LTVResult",
+    "ResidualResult",
     "SidError",
     "SpectrogramResult",
     "bode_plot",

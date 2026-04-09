@@ -341,3 +341,70 @@ class FrozenResult:
 
     method: str
     """Always ``'ltv_disc_frozen'``."""
+
+
+@dataclass(frozen=True)
+class ResidualResult:
+    """Result from residual analysis (residual).
+
+    Contains the model residuals, normalised auto- and cross-correlation
+    functions, and whiteness/independence diagnostic test outcomes.
+    """
+
+    residual: np.ndarray
+    """Residual time series, shape ``(N, ny)``."""
+
+    auto_corr: np.ndarray
+    """Normalised autocorrelation of the first output channel,
+    shape ``(max_lag + 1,)``."""
+
+    auto_corr_all: np.ndarray
+    """Per-channel normalised autocorrelation, shape ``(max_lag + 1, ny)``."""
+
+    cross_corr: np.ndarray
+    """Normalised cross-correlation between residuals and inputs,
+    shape ``(2 * max_lag + 1, ny * nu)``.  Empty array for time-series."""
+
+    confidence_bound: float
+    """99% confidence bound ``2.58 / sqrt(N)``."""
+
+    whiteness_pass: bool
+    """``True`` if all channels pass the whiteness test."""
+
+    whiteness_pass_all: np.ndarray
+    """Per-channel whiteness test result, shape ``(ny,)``."""
+
+    independence_pass: bool
+    """``True`` if all (output, input) pairs pass the independence test."""
+
+    independence_pass_all: np.ndarray | None
+    """Per-pair independence test result, shape ``(ny * nu,)``.
+    ``None`` for time-series mode."""
+
+    data_length: int
+    """Number of samples used."""
+
+
+@dataclass(frozen=True)
+class CompareResult:
+    """Result from model output comparison (compare).
+
+    Contains the predicted and measured outputs, the NRMSE fit metric
+    per channel, and the residual.
+    """
+
+    predicted: np.ndarray
+    """Model-predicted output, shape ``(N, ny)``."""
+
+    measured: np.ndarray
+    """Measured output (copy), shape ``(N, ny)``."""
+
+    fit: np.ndarray
+    """NRMSE fit percentage per channel, shape ``(ny,)``.
+    100% = perfect, 0% = no better than mean predictor."""
+
+    residual: np.ndarray
+    """Residual ``measured - predicted``, shape ``(N, ny)``."""
+
+    method: str
+    """Method identifier of the source model."""

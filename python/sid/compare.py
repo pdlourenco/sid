@@ -13,6 +13,7 @@ import numpy as np
 
 from sid._exceptions import SidError
 from sid._internal.freq_domain_sim import freq_domain_sim
+from sid._results import CompareResult
 
 
 def compare(
@@ -22,7 +23,7 @@ def compare(
     *,
     initial_state: np.ndarray | None = None,
     plot: bool = False,
-) -> dict:
+) -> CompareResult:
     """Compare model predicted output to measured data.
 
     This is the Python port of ``sidCompare.m``.
@@ -147,13 +148,13 @@ def compare(
     # ------------------------------------------------------------------
     # Pack result
     # ------------------------------------------------------------------
-    return {
-        "predicted": y_pred,
-        "measured": y_meas,
-        "fit": fit_vec,
-        "residual": y_meas - y_pred,
-        "method": method_name,
-    }
+    return CompareResult(
+        predicted=y_pred,
+        measured=y_meas,
+        fit=fit_vec,
+        residual=y_meas - y_pred,
+        method=method_name,
+    )
 
 
 # ======================================================================

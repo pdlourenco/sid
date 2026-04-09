@@ -38,7 +38,7 @@ class TestCompare:
 
         expected_keys = ["predicted", "measured", "fit", "residual", "method"]
         for key in expected_keys:
-            assert key in result, f"Missing key: {key}"
+            assert hasattr(result, key), f"Missing attribute: {key}"
 
     # ------------------------------------------------------------------
     # Test 2: Perfect noiseless model -> fit ~ 100%
@@ -63,7 +63,7 @@ class TestCompare:
         result = compare(model, X, U)
 
         # With near-perfect recovery and noiseless data, fit should be very high
-        fit_vals = np.atleast_1d(result["fit"])
+        fit_vals = np.atleast_1d(result.fit)
         assert np.all(fit_vals > 90), f"Perfect model should give >90% fit, got {fit_vals}"
 
     # ------------------------------------------------------------------
@@ -80,17 +80,17 @@ class TestCompare:
         result = compare(model, y, u)
 
         # Compute what fit would be if predicted were zero
-        y_meas = result["measured"].ravel()
+        y_meas = result.measured.ravel()
         y_mean = np.mean(y_meas)
         # The actual NRMSE fit formula: 100*(1 - ||y-ypred||/||y-mean(y)||)
         # When ypred=mean(y), fit=0.  When ypred=0 and mean(y)!=0, fit can be negative
         # Just verify the formula is consistent
-        y_pred = result["predicted"].ravel()
+        y_pred = result.predicted.ravel()
         manual_fit = 100.0 * (
             1.0 - np.linalg.norm(y_meas - y_pred) / np.linalg.norm(y_meas - y_mean)
         )
         np.testing.assert_allclose(
-            np.atleast_1d(result["fit"]).ravel()[0],
+            np.atleast_1d(result.fit).ravel()[0],
             manual_fit,
             atol=1e-8,
             err_msg="Fit should match manual NRMSE computation",
@@ -109,9 +109,9 @@ class TestCompare:
         model = freq_bt(y, u, window_size=40)
         result = compare(model, y, u)
 
-        fit_vals = np.atleast_1d(result["fit"])
+        fit_vals = np.atleast_1d(result.fit)
         assert np.all(fit_vals > 0), f"Good freq model should have fit > 0, got {fit_vals}"
-        assert result["predicted"].shape[0] == N
+        assert result.predicted.shape[0] == N
 
     # ------------------------------------------------------------------
     # Test 5: State-space compare -> fit > 50%
@@ -139,7 +139,7 @@ class TestCompare:
         model = ltv_disc(X, U, lambda_=1e4)
         result = compare(model, X, U)
 
-        fit_vals = np.atleast_1d(result["fit"])
+        fit_vals = np.atleast_1d(result.fit)
         assert np.all(fit_vals > 50), f"COSMIC model should give >50% fit, got {fit_vals}"
 
     # ------------------------------------------------------------------
@@ -155,7 +155,7 @@ class TestCompare:
         model = freq_bt(y, u, window_size=30)
         result = compare(model, y, u)
 
-        fit_vals = np.atleast_1d(result["fit"])
+        fit_vals = np.atleast_1d(result.fit)
         assert np.all(fit_vals >= -100), f"Fit should be >= -100, got {fit_vals}"
         assert np.all(fit_vals <= 100), f"Fit should be <= 100, got {fit_vals}"
 
@@ -172,7 +172,7 @@ class TestCompare:
         result = compare(model, y, None)
 
         # Without input, the model cannot predict output -> predicted ~ 0
-        pred = result["predicted"].ravel()
+        pred = result.predicted.ravel()
         assert np.allclose(pred, 0.0, atol=1e-10) or (
             np.linalg.norm(pred) < 0.1 * np.linalg.norm(y)
         ), "Time-series predicted should be zero or very small"
