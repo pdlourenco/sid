@@ -5,6 +5,9 @@ name: Cross-Language Validation
 # tests.yml and committed to the repository.  Each job below loads
 # those JSON files, re-runs the sid functions under its own engine,
 # and checks that outputs match within tolerance.
+#
+# The workflow triggers broadly, but each job uses a path condition
+# so that only the relevant validators run.
 
 on:
   workflow_dispatch:
@@ -24,8 +27,29 @@ on:
       - 'julia/**'
 
 jobs:
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    outputs:
+      matlab: ${{ steps.filter.outputs.matlab }}
+      python: ${{ steps.filter.outputs.python }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            matlab:
+              - 'matlab/**.m'
+              - 'testdata/**'
+            python:
+              - 'python/**'
+              - 'testdata/**'
+
   octave:
     name: Validate Octave against MATLAB reference
+    needs: changes
+    if: needs.changes.outputs.matlab == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     env:
       DEBIAN_FRONTEND: noninteractive
@@ -44,6 +68,8 @@ jobs:
 
   validate-python:
     name: Validate Python port
+    needs: changes
+    if: needs.changes.outputs.python == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
