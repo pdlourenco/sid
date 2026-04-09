@@ -42,3 +42,6 @@ jobs:
           else
             echo "No reference JSON files found — skipping cross-validation."
           fi
+
+      - name: Run example notebooks
+        run: python -m pytest --nbmake python/examples/ -v --tb=short
