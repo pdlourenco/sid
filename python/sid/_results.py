@@ -224,3 +224,35 @@ class LTVResult:
 
     method: str
     """Always ``'ltv_disc'``."""
+
+
+@dataclass(frozen=True)
+class FrozenResult:
+    """Result from frozen transfer function computation (ltv_disc_frozen).
+
+    Contains the instantaneous (frozen) frequency response G(w, k) computed
+    from time-varying state-space matrices A(k), B(k), along with optional
+    uncertainty propagation.
+    """
+
+    frequency: np.ndarray
+    """Frequency vector in rad/sample, shape ``(nf,)``."""
+
+    frequency_hz: np.ndarray
+    """Frequency vector in Hz, shape ``(nf,)``."""
+
+    time_steps: np.ndarray
+    """Selected time step indices (0-based), shape ``(nk,)``."""
+
+    response: np.ndarray
+    """Complex frozen transfer function, shape ``(nf, p, q, nk)``."""
+
+    response_std: np.ndarray | None
+    """Standard deviation of ``response``, shape ``(nf, p, q, nk)``.
+    ``None`` when the input ``LTVResult`` has no uncertainty."""
+
+    sample_time: float
+    """Sample time in seconds."""
+
+    method: str
+    """Always ``'ltv_disc_frozen'``."""

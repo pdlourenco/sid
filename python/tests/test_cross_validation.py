@@ -641,3 +641,33 @@ class TestCrossValidationCosmicInternals:
         np.testing.assert_allclose(
             reg, expected_reg, rtol=1e-6, atol=1e-10, err_msg="COSMIC regularization mismatch"
         )
+
+
+class TestCrossValidationLTVFrozen:
+    """LTV frozen TF: reference_ltv_frozen.json."""
+
+    def test_frozen_response(self):
+        ref = _load("reference_ltv_frozen.json")
+        X = _to_array(ref["input"], "X")
+        U = _to_array(ref["input"], "U")
+        if U.ndim == 1:
+            U = U[:, np.newaxis]
+        lam = ref["params"]["Lambda"]
+        # MATLAB 1-based time steps -> Python 0-based
+        time_steps_matlab = np.array(ref["params"]["frozen_TimeSteps"], dtype=int)
+        time_steps = time_steps_matlab - 1
+
+        from sid.ltv_disc import ltv_disc
+        from sid.ltv_disc_frozen import ltv_disc_frozen
+
+        ltv = ltv_disc(X, U, lambda_=lam)
+        frz = ltv_disc_frozen(ltv, time_steps=time_steps)
+
+        expected_resp = _to_complex(ref["output"], "Response")
+        np.testing.assert_allclose(
+            frz.response.ravel(),
+            expected_resp.ravel(),
+            rtol=ref["tolerance"]["Response_rel"],
+            atol=1e-10,
+            err_msg="Frozen TF response mismatch vs MATLAB",
+        )
