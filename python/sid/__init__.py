@@ -35,15 +35,25 @@ from __future__ import annotations
 __version__ = "1.0.0"
 
 from sid._exceptions import SidError
-from sid._results import FreqMapResult, FreqResult, FrozenResult, LTVResult, SpectrogramResult
+from sid._results import (
+    FreqMapResult,
+    FreqResult,
+    FrozenResult,
+    LTVIOResult,
+    LTVResult,
+    SpectrogramResult,
+)
 from sid.detrend import detrend
 from sid.freq_bt import freq_bt
 from sid.freq_btfdr import freq_btfdr
 from sid.freq_etfe import freq_etfe
 from sid.freq_map import freq_map
+from sid.lti_freq_io import lti_freq_io
 from sid.ltv_disc import ltv_disc
 from sid.ltv_disc_frozen import ltv_disc_frozen
+from sid.ltv_disc_io import ltv_disc_io
 from sid.ltv_disc_tune import ltv_disc_tune
+from sid.ltv_state_est import ltv_state_est
 from sid.spectrogram import spectrogram
 
 __all__ = [
@@ -51,6 +61,7 @@ __all__ = [
     "FreqMapResult",
     "FreqResult",
     "FrozenResult",
+    "LTVIOResult",
     "LTVResult",
     "SidError",
     "SpectrogramResult",
@@ -59,8 +70,11 @@ __all__ = [
     "freq_btfdr",
     "freq_etfe",
     "freq_map",
+    "lti_freq_io",
     "ltv_disc",
     "ltv_disc_frozen",
+    "ltv_disc_io",
     "ltv_disc_tune",
+    "ltv_state_est",
     "spectrogram",
 ]
