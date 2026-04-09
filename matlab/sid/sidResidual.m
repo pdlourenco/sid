@@ -9,7 +9,10 @@ function result = sidResidual(model, y, u, varargin)
 %   independence tests to assess model quality.
 %
 %   INPUTS:
-%     model - Result struct from any sid estimator (sidFreqBT, sidLTVdisc, etc.)
+%     model - Result struct from any sid estimator (see sidResultTypes).
+%             Freq-domain (§1): requires .Response, .Frequency, .SampleTime
+%             State-space (§4/§5): requires .A, .B, .StateDim, .InputDim,
+%               .DataLength
 %     y     - (N x ny) measured output (or (N+1 x p x L) state data for COSMIC)
 %     u     - (N x nu) input, or [] for time-series models
 %

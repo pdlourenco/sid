@@ -9,7 +9,10 @@ function result = sidCompare(model, y, u, varargin)
 %   compares it to the measured output using the NRMSE fit metric.
 %
 %   INPUTS:
-%     model - Result struct from any sid estimator
+%     model - Result struct from any sid estimator (see sidResultTypes).
+%             Freq-domain (§1): requires .Response, .Frequency, .SampleTime
+%             State-space (§4/§5): requires .A, .B, .StateDim, .InputDim,
+%               .DataLength
 %     y     - (N x ny) measured output, or (N+1 x p x L) state data for COSMIC
 %     u     - (N x nu) input, or (N x q x L) for multi-trajectory COSMIC
 %

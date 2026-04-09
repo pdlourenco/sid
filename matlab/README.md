@@ -114,6 +114,26 @@ partial-observation Output-COSMIC.
 
 All estimation functions support both positional and name-value calling conventions.
 
+## Result Types
+
+Every estimation function returns a struct with documented fields. Run
+`help sidResultTypes` for the complete field-by-field reference, or see
+the table below for a quick overview.
+
+| Result type | Produced by | Key fields |
+|---|---|---|
+| FreqResult | `sidFreqBT`, `sidFreqBTFDR`, `sidFreqETFE` | `.Response`, `.NoiseSpectrum`, `.Coherence`, `.ResponseStd` |
+| FreqMapResult | `sidFreqMap` | `.Time`, `.Response`, `.NoiseSpectrum`, `.Coherence` |
+| SpectrogramResult | `sidSpectrogram` | `.Time`, `.Frequency`, `.Power`, `.PowerDB`, `.Complex` |
+| LTVResult | `sidLTVdisc`, `sidLTVdiscTune` | `.A`, `.B`, `.Lambda`, `.Cost` (+ `.AStd`, `.BStd`, `.P` with uncertainty) |
+| LTVIOResult | `sidLTVdiscIO` | `.A`, `.B`, `.X`, `.H`, `.R`, `.Cost`, `.Iterations` |
+| FrozenResult | `sidLTVdiscFrozen` | `.Response`, `.ResponseStd`, `.TimeSteps` |
+| CompareResult | `sidCompare` | `.Predicted`, `.Measured`, `.Fit`, `.Residual` |
+| ResidualResult | `sidResidual` | `.Residual`, `.AutoCorr`, `.CrossCorr`, `.WhitenessPass` |
+
+All result structs include `.Method` (identifier string) and metadata fields
+such as `.SampleTime`, `.DataLength`, and `.NumTrajectories`.
+
 ## Compatibility
 
 | Platform | Version | Status |

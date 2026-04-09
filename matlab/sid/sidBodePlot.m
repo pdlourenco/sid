@@ -9,7 +9,10 @@ function varargout = sidBodePlot(result, varargin)
 %   frequency response with shaded confidence bands (default: +/-3sigma).
 %
 %   INPUTS:
-%     result     - Struct returned by sidFreqBT, sidFreqBTFDR, or sidFreqETFE.
+%     result     - FreqResult struct (see sidResultTypes §1).
+%                  Required fields: .Response, .Frequency, .FrequencyHz,
+%                    .SampleTime
+%                  Optional fields: .ResponseStd (for confidence bands)
 %
 %   NAME-VALUE OPTIONS:
 %     'Confidence'    - Number of standard deviations for the shaded

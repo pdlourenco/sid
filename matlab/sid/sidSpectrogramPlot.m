@@ -8,7 +8,8 @@ function varargout = sidSpectrogramPlot(result, varargin)
 %   Plots the spectrogram as a time-frequency color map with power in dB.
 %
 %   INPUTS:
-%     result - Struct returned by sidSpectrogram.
+%     result - SpectrogramResult struct (see sidResultTypes §3).
+%              Required fields: .Time, .Frequency, .PowerDB, .SampleTime
 %
 %   NAME-VALUE OPTIONS:
 %     'FrequencyScale' - 'linear' (default) or 'log'.

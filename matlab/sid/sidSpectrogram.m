@@ -36,6 +36,7 @@ function result = sidSpectrogram(x, varargin)
 %       .WindowLength  - segment length L
 %       .Overlap       - overlap P
 %       .NFFT          - FFT length
+%       .NumTrajectories - number of trajectories L
 %       .Method        - 'sidSpectrogram'
 %
 %   EXAMPLES:

@@ -106,6 +106,22 @@ Sections must appear in this exact order:
 | Changelog | Always |
 | Copyright block | Always |
 
+### Result Struct Definitions
+
+All result struct types are centrally defined in
+[`sid/sidResultTypes.m`](sid/sidResultTypes.m). When adding or modifying a
+function that produces a result struct:
+
+1. **Update `sidResultTypes.m`** to reflect any new or changed fields.
+2. **Keep the function's `OUTPUTS:` section in sync** with the central
+   definition — both must list the same fields with matching dimensions.
+3. **Reference the central definition** from any function that *consumes* a
+   result struct (e.g., plotting functions, `sidCompare`, `sidResidual`).
+   Use the format: `(see sidResultTypes §N)` where N is the section number.
+
+This mirrors the Python approach where result types are formally defined as
+frozen dataclasses in `python/sid/_results.py`.
+
 ### Key Rules
 
 - **Section headings are always PLURAL**: `INPUTS:`, `OUTPUTS:`, `EXAMPLES:`,

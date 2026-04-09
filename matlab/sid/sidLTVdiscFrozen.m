@@ -16,7 +16,9 @@ function result = sidLTVdiscFrozen(ltvResult, varargin)
 %   first-order (Jacobian) linearization.
 %
 %   INPUTS:
-%     ltvResult - Result struct from sidLTVdisc.
+%     ltvResult - Result struct from sidLTVdisc (see sidResultTypes §4).
+%                 Required fields: .A, .B, .StateDim, .InputDim, .DataLength
+%                 Optional fields: .P, .NoiseCov (for uncertainty propagation)
 %
 %   NAME-VALUE OPTIONS:
 %     'Frequencies' - (nf x 1) frequency vector in rad/sample.

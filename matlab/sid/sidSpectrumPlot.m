@@ -9,7 +9,10 @@ function varargout = sidSpectrumPlot(result, varargin)
 %   with shaded confidence bands (default: +/-3sigma).
 %
 %   INPUTS:
-%     result - Struct returned by sidFreqBT, sidFreqBTFDR, or sidFreqETFE.
+%     result - FreqResult struct (see sidResultTypes §1).
+%              Required fields: .NoiseSpectrum, .Frequency, .FrequencyHz,
+%                .SampleTime
+%              Optional fields: .NoiseSpectrumStd (for confidence bands)
 %
 %   NAME-VALUE OPTIONS:
 %     'Confidence'    - Number of standard deviations. Default: 3.

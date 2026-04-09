@@ -9,7 +9,10 @@ function varargout = sidMapPlot(result, varargin)
 %   on the x-axis and frequency on the y-axis.
 %
 %   INPUTS:
-%     result - Struct returned by sidFreqMap.
+%     result - FreqMapResult struct (see sidResultTypes §2).
+%              Required fields: .Time, .Frequency, .FrequencyHz,
+%                .SampleTime, .NoiseSpectrum
+%              Depending on PlotType: .Response, .Coherence
 %
 %   NAME-VALUE OPTIONS:
 %     'PlotType'      - What to plot:
