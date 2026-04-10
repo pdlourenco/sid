@@ -904,6 +904,8 @@ For k = N-2, ..., 0:
 
 **Complexity:** `O(N × (p+q)³)` — linear in the number of time steps, cubic in state+input dimension, independent of the number of trajectories `L` (which only affects the precomputation of `D(k)ᵀD(k)` and `Θ_k`).
 
+**Numerical diagnostic.** At each forward-pass step, the recursion inverts `Λ_{k-1}`. When `Λ_{k-1}` becomes ill-conditioned (`rcond(Λ_{k-1}) < eps`, where `eps` is machine epsilon), the solver issues a warning identifying the offending step and reporting the reciprocal condition number. This typically indicates that the regularization `λ` is too small relative to the noise level or that the empirical data covariance (§8.3.5) is close to rank-deficient. The solver still returns a result, but the user should interpret it with caution and consider increasing `λ`. Downstream uncertainty estimates (§8.9) may also be unreliable in this regime.
+
 #### 8.3.5 Existence and Uniqueness
 
 A unique solution exists if and only if the empirical covariance of the data is positive definite:
