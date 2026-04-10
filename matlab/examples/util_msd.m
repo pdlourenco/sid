@@ -1,5 +1,5 @@
 function [Ad, Bd] = util_msd(m, k_spring, c_damp, F, Ts)
-%UTIL_MSD  LTI n-mass spring-damper chain (exact ZOH discretization).
+% UTIL_MSD  LTI n-mass spring-damper chain (exact ZOH discretization).
 %
 %   [Ad, Bd] = util_msd(m, k_spring, c_damp, F, Ts)
 %

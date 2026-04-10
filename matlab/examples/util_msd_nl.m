@@ -1,5 +1,5 @@
 function x_traj = util_msd_nl(m, k_lin, k_cubic, c_damp, F, Ts, u, x0, substeps)
-%UTIL_MSD_NL  RK4 simulation of an n-mass chain with Duffing cubic stiffness.
+% UTIL_MSD_NL  RK4 simulation of an n-mass chain with Duffing cubic stiffness.
 %
 %   x = util_msd_nl(m, k_lin, k_cubic, c_damp, F, Ts, u)
 %   x = util_msd_nl(m, k_lin, k_cubic, c_damp, F, Ts, u, x0)
@@ -151,4 +151,5 @@ function x_traj = util_msd_nl(m, k_lin, k_cubic, c_damp, F, Ts, u, x0, substeps)
         acc = inv_m .* net_force;
         dxdt = [vel; acc];
     end
+
 end

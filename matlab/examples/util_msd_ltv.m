@@ -1,5 +1,5 @@
 function [Ad, Bd] = util_msd_ltv(m, k_spring, c_damp, F, Ts, N)
-%UTIL_MSD_LTV  LTV n-mass spring-damper chain with per-step parameters.
+% UTIL_MSD_LTV  LTV n-mass spring-damper chain with per-step parameters.
 %
 %   [Ad, Bd] = util_msd_ltv(m, k_spring, c_damp, F, Ts)
 %   [Ad, Bd] = util_msd_ltv(m, k_spring, c_damp, F, Ts, N)
