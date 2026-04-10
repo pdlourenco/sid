@@ -436,3 +436,116 @@ class TestFreqMapGeneral:
 
         result = freq_map(y, u, segment_length=512, algorithm="welch")
         assert result.num_trajectories == L_traj
+
+
+class TestFreqMapVariableLength:
+    """Variable-length trajectory support for sidFreqMap (SPEC.md §6.2).
+
+    The spec mandates that at each segment k, only trajectories that fully
+    span segment k contribute to the ensemble, and that num_trajectories
+    becomes a (K,) vector when that count varies across segments.
+    """
+
+    def _make_pair(self, N: int, rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray]:
+        u = rng.standard_normal(N)
+        y = lfilter([1.0], [1.0, -0.9], u) + 0.1 * rng.standard_normal(N)
+        return y, u
+
+    def test_per_segment_count(self) -> None:
+        """Variable-length list yields (K,) num_trajectories with expected pattern."""
+        rng = np.random.default_rng(0)
+        y1, u1 = self._make_pair(1000, rng)
+        y2, u2 = self._make_pair(500, rng)
+
+        import warnings as _w
+
+        with _w.catch_warnings(record=True) as caught:
+            _w.simplefilter("always")
+            result = freq_map(
+                [y1, y2],
+                [u1, u2],
+                segment_length=200,
+                overlap=100,
+                algorithm="bt",
+            )
+            trim_warns = [c for c in caught if "trimmed" in str(c.message)]
+            assert not trim_warns, "variable-length input should not be trimmed"
+
+        # N = max(N_l) = 1000, L=200, step=100 -> K = (1000-200)//100 + 1 = 9
+        assert len(result.time) == 9
+        assert isinstance(result.num_trajectories, np.ndarray)
+        assert result.num_trajectories.shape == (9,)
+        expected = np.array([2, 2, 2, 2, 1, 1, 1, 1, 1], dtype=np.intp)
+        np.testing.assert_array_equal(result.num_trajectories, expected)
+
+    def test_uniform_list_stays_scalar(self) -> None:
+        """A list whose trajectories all have equal length behaves like the 3-D case."""
+        rng = np.random.default_rng(1)
+        y1, u1 = self._make_pair(500, rng)
+        y2, u2 = self._make_pair(500, rng)
+        result = freq_map([y1, y2], [u1, u2], segment_length=128, overlap=64)
+        assert isinstance(result.num_trajectories, int)
+        assert result.num_trajectories == 2
+
+    def test_variable_length_welch(self) -> None:
+        """Welch inner estimator also honours per-segment filtering."""
+        rng = np.random.default_rng(2)
+        y1, u1 = self._make_pair(800, rng)
+        y2, u2 = self._make_pair(400, rng)
+        result = freq_map(
+            [y1, y2],
+            [u1, u2],
+            segment_length=200,
+            overlap=100,
+            algorithm="welch",
+        )
+        assert isinstance(result.num_trajectories, np.ndarray)
+        # Late segments should have only one active trajectory.
+        assert result.num_trajectories[-1] == 1
+        # Early segments should have both.
+        assert result.num_trajectories[0] == 2
+
+    def test_variable_length_time_series(self) -> None:
+        """Time-series mode (no u) supports variable-length lists."""
+        rng = np.random.default_rng(3)
+        y1 = rng.standard_normal(800)
+        y2 = rng.standard_normal(400)
+        result = freq_map([y1, y2], None, segment_length=200, overlap=100)
+        assert isinstance(result.num_trajectories, np.ndarray)
+        assert result.num_trajectories[0] == 2
+        assert result.num_trajectories[-1] == 1
+
+    def test_per_segment_equivalence(self) -> None:
+        """
+        A segment that uses only trajectory 0 must yield the same response
+        as passing trajectory 0 alone through the same estimator at that offset.
+        """
+        rng = np.random.default_rng(4)
+        y1, u1 = self._make_pair(1000, rng)
+        y2, u2 = self._make_pair(500, rng)
+
+        varlen = freq_map(
+            [y1, y2],
+            [u1, u2],
+            segment_length=200,
+            overlap=100,
+            algorithm="bt",
+        )
+
+        # Segment index 4 starts at sample 400, ends at 600 -- only traj 0 spans it.
+        assert varlen.num_trajectories[4] == 1
+        singleton = freq_map(
+            y1,
+            u1,
+            segment_length=200,
+            overlap=100,
+            algorithm="bt",
+        )
+        # The absolute response at the same segment should match the singleton map
+        # at the same segment index (segment 4 in both).
+        np.testing.assert_allclose(
+            varlen.response[:, 4],
+            singleton.response[:, 4],
+            rtol=1e-10,
+            atol=1e-12,
+        )

@@ -370,8 +370,18 @@ def freq_map(
     ---------
     2026-04-08 : First version (Python port) by Pedro Lourenco.
     """
-    # ---- Validate data ----
-    y, u, N, ny, nu, is_time_series, n_traj = validate_data(y, u)
+    # ---- Validate data (preserve variable-length lists for SPEC.md §6.2) ----
+    y, u, N, ny, nu, is_time_series, n_traj = validate_data(
+        y, u, preserve_lengths=True
+    )
+
+    # When the input was a variable-length list, validate_data returns lists
+    # of per-trajectory arrays.  We then do per-segment filtering below.
+    var_len = isinstance(y, list)
+    if var_len:
+        horizons = np.array([yt.shape[0] for yt in y], dtype=np.intp)
+    else:
+        horizons = None
 
     # ---- Defaults ----
     L = segment_length if segment_length is not None else min(N // 4, 256)
@@ -461,16 +471,47 @@ def freq_map(
             f"Data too short for even one segment with L={L}, P={P}.",
         )
 
-    # ---- Helper to extract a segment ----
-    def _extract_segment(start: int) -> tuple[np.ndarray, np.ndarray | None]:
+    # ---- Helper to extract a segment (SPEC.md §6.2 / §6.3) ----
+    # For uniform-length inputs, slice the 3-D / 2-D arrays directly.
+    # For variable-length list inputs, collect only those trajectories that
+    # fully span the segment [start, start + L), matching the spec:
+    #     "At each segment k, only trajectories that span segment k
+    #      contribute to the ensemble."
+    def _extract_segment(
+        start: int,
+    ) -> tuple[np.ndarray, np.ndarray | None, int]:
         end = start + L
+        if var_len:
+            assert horizons is not None
+            active = np.where(horizons >= end)[0]
+            n_act = len(active)
+            if n_act == 0:
+                raise SidError(
+                    "no_active_traj",
+                    f"Segment starting at sample {start} has no trajectories "
+                    f"spanning it. Check segment length / overlap vs horizons.",
+                )
+            if n_act == 1:
+                # Use 2-D form so the inner estimator stays on its
+                # single-trajectory code path (sid_cov expects 2-D in that case).
+                li = int(active[0])
+                yk = y[li][start:end, :]
+                uk = None if is_time_series else u[li][start:end, :]
+            else:
+                yk = np.stack([y[li][start:end, :] for li in active], axis=2)
+                if is_time_series:
+                    uk = None
+                else:
+                    uk = np.stack([u[li][start:end, :] for li in active], axis=2)
+            return yk, uk, int(n_act)
+
         if n_traj > 1:
             yk = y[start:end, :, :]
             uk = None if is_time_series else u[start:end, :, :]
         else:
             yk = y[start:end, :]
             uk = None if is_time_series else u[start:end, :]
-        return yk, uk
+        return yk, uk, n_traj
 
     # ---- Helper to run inner estimator on one segment ----
     def _estimate_segment(yk: np.ndarray, uk: np.ndarray | None) -> FreqResult:
@@ -490,8 +531,12 @@ def freq_map(
                 Ts,
             )
 
+    # ---- Track number of trajectories used per segment (SPEC.md §6.8) ----
+    n_traj_per_seg = np.empty(K, dtype=np.intp)
+
     # ---- First segment (to learn output dimensions) ----
-    yk0, uk0 = _extract_segment(0)
+    yk0, uk0, n_act0 = _extract_segment(0)
+    n_traj_per_seg[0] = n_act0
     r1 = _estimate_segment(yk0, uk0)
     nf = len(r1.frequency)
 
@@ -550,13 +595,21 @@ def freq_map(
     # ---- Loop over remaining segments (SPEC.md S6.3) ----
     for k in range(1, K):
         start_idx = k * step
-        yk, uk = _extract_segment(start_idx)
+        yk, uk, n_act_k = _extract_segment(start_idx)
+        n_traj_per_seg[k] = n_act_k
         rk = _estimate_segment(yk, uk)
         _store_segment(k, rk)
 
     # ---- Time vector (SPEC.md S6.2) ----
     # t_k = (k * step + L/2) * Ts -- centre of each segment
     time_vec = (np.arange(K, dtype=np.float64) * step + L / 2.0) * Ts
+
+    # ---- num_trajectories: scalar when uniform, (K,) vector when variable-length ----
+    # (SPEC.md §6.8)
+    if var_len and np.any(n_traj_per_seg != n_traj_per_seg[0]):
+        num_traj_out: int | np.ndarray = n_traj_per_seg.astype(np.intp)
+    else:
+        num_traj_out = int(n_traj_per_seg[0]) if var_len else n_traj
 
     # ---- Pack result ----
     return FreqMapResult(
@@ -573,6 +626,6 @@ def freq_map(
         overlap=P,
         window_size=M,
         algorithm=alg,
-        num_trajectories=n_traj,
+        num_trajectories=num_traj_out,
         method="freq_map",
     )

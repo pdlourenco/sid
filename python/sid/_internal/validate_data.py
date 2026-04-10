@@ -19,13 +19,22 @@ from sid._exceptions import SidError
 def validate_data(
     y: np.ndarray | list,
     u: np.ndarray | list | None = None,
-) -> tuple[np.ndarray, np.ndarray | None, int, int, int, bool, int]:
+    *,
+    preserve_lengths: bool = False,
+) -> tuple[np.ndarray | list, np.ndarray | list | None, int, int, int, bool, int]:
     """Validate and orient data for ``sid.freq_*`` functions.
 
     This is the Python port of ``sidValidateData.m``.  It ensures column
     orientation, checks for NaN/Inf and complex data, and verifies size
     consistency.  Multi-trajectory input is supported via 3-D arrays or
-    lists of arrays (trimmed to the shortest trajectory length).
+    lists of arrays.
+
+    By default, variable-length list inputs are trimmed to the shortest
+    trajectory length and a warning is emitted.  When
+    ``preserve_lengths=True``, list inputs with different lengths are
+    returned as lists of per-trajectory arrays instead of being trimmed;
+    callers are then responsible for per-segment filtering (SPEC.md §6.2
+    for ``sidFreqMap``).
 
     Parameters
     ----------
@@ -35,15 +44,25 @@ def validate_data(
     u : ndarray, list of ndarray, or None, optional
         Input data.  Same shape conventions as *y*.  Pass ``None`` (the
         default) for time-series (output-only) identification.
+    preserve_lengths : bool, optional
+        When ``True`` and the input is a list of variable-length
+        trajectories, the result is returned as a list of per-trajectory
+        arrays rather than being trimmed to the shortest length.  This
+        is used by :func:`sid.freq_map` to implement the per-segment
+        filtering required by SPEC.md §6.2.  Default: ``False``.
 
     Returns
     -------
-    y : ndarray
-        Oriented output data, shape ``(N, ny)`` or ``(N, ny, L)``.
-    u : ndarray or None
-        Oriented input data, or ``None`` for time-series mode.
+    y : ndarray or list of ndarray
+        Oriented output data.  By default, a 2-D/3-D ndarray.  When
+        ``preserve_lengths=True`` and the input was a variable-length
+        list, a list of ``(N_l, ny)`` arrays (one per trajectory).
+    u : ndarray, list of ndarray, or None
+        Oriented input data, with the same shape convention as *y*, or
+        ``None`` for time-series mode.
     N : int
-        Number of samples per trajectory.
+        Number of samples per trajectory.  For preserved variable-length
+        lists this is ``max(N_l)``; otherwise the common trimmed length.
     ny : int
         Number of output channels.
     nu : int
@@ -75,6 +94,7 @@ def validate_data(
     Changelog
     ---------
     2026-04-08 : First version by Pedro Lourenco.
+    2026-04-10 : Add ``preserve_lengths`` for SPEC.md §6.2 compliance.
     """
 
     # ---- Handle list input (variable-length trajectories) ---------------
@@ -95,55 +115,103 @@ def validate_data(
                     f"y has {L} trajectories but u has {len(u)}.",
                 )
 
-        # Ensure each trajectory is at least 2-D and find the shortest
+        # Ensure each trajectory is at least 2-D and find the per-trajectory length
+        y_list: list[np.ndarray] = []
         lengths = np.empty(L, dtype=int)
         for traj in range(L):
-            y[traj] = np.asarray(y[traj], dtype=np.float64)
-            if y[traj].ndim == 1:
-                y[traj] = y[traj][:, np.newaxis]
-            lengths[traj] = y[traj].shape[0]
+            yt = np.asarray(y[traj])
+            if np.iscomplexobj(yt):
+                raise SidError(
+                    "complex_data",
+                    "Complex data is not supported in v1.0. Input y must be real.",
+                )
+            yt = yt.astype(np.float64)
+            if yt.ndim == 1:
+                yt = yt[:, np.newaxis]
+            if not np.all(np.isfinite(yt)):
+                raise SidError("non_finite", f"Data y[{traj}] contains NaN or Inf.")
+            y_list.append(yt)
+            lengths[traj] = yt.shape[0]
 
-        N_common = int(np.min(lengths))
-        ny = y[0].shape[1]
-
-        # Stack into 3-D array
-        y_3d = np.zeros((N_common, ny, L), dtype=np.float64)
-        for traj in range(L):
-            if y[traj].shape[1] != ny:
+        ny = y_list[0].shape[1]
+        for traj in range(1, L):
+            if y_list[traj].shape[1] != ny:
                 raise SidError(
                     "dim_mismatch",
-                    f"y[{traj}] has {y[traj].shape[1]} columns, expected {ny}.",
+                    f"y[{traj}] has {y_list[traj].shape[1]} columns, expected {ny}.",
                 )
-            y_3d[:, :, traj] = y[traj][:N_common, :]
+
+        # Validate/prepare u_list if present
+        u_list: list[np.ndarray] | None = None
+        nu_raw: int = 0
+        if not is_time_series:
+            assert isinstance(u, list)  # for type checker
+            u_list = []
+            for traj in range(L):
+                ut = np.asarray(u[traj])
+                if np.iscomplexobj(ut):
+                    raise SidError(
+                        "complex_data",
+                        "Complex data is not supported in v1.0. Input u must be real.",
+                    )
+                ut = ut.astype(np.float64)
+                if ut.ndim == 1:
+                    ut = ut[:, np.newaxis]
+                if not np.all(np.isfinite(ut)):
+                    raise SidError("non_finite", f"Data u[{traj}] contains NaN or Inf.")
+                if traj == 0:
+                    nu_raw = ut.shape[1]
+                elif ut.shape[1] != nu_raw:
+                    raise SidError(
+                        "dim_mismatch",
+                        f"u[{traj}] has {ut.shape[1]} columns, expected {nu_raw}.",
+                    )
+                if ut.shape[0] != lengths[traj]:
+                    raise SidError(
+                        "size_mismatch",
+                        f"u[{traj}] has {ut.shape[0]} samples but y[{traj}] has "
+                        f"{lengths[traj]}. Trajectory-wise lengths must match.",
+                    )
+                u_list.append(ut)
+
+        variable_length = bool(np.any(lengths != lengths[0]))
+
+        if preserve_lengths and variable_length:
+            # List-preserving path: return per-trajectory arrays for callers
+            # that do per-segment filtering (SPEC.md §6.2 for sidFreqMap).
+            N_max = int(np.max(lengths))
+            if N_max < 2:
+                raise SidError("too_short", "Data must have at least 2 samples.")
+            if N_max < 10:
+                warnings.warn(
+                    f"Very short data (N_max = {N_max}). Estimates will be unreliable.",
+                    stacklevel=2,
+                )
+            return (
+                y_list,
+                u_list,
+                N_max,
+                ny,
+                (nu_raw if not is_time_series else 0),
+                is_time_series,
+                L,
+            )
+
+        # Trim-to-shortest path (default, and only option when lengths are uniform)
+        N_common = int(np.min(lengths))
+        y_3d = np.zeros((N_common, ny, L), dtype=np.float64)
+        for traj in range(L):
+            y_3d[:, :, traj] = y_list[traj][:N_common, :]
         y = y_3d
 
         if not is_time_series:
-            assert isinstance(u, list)  # for type checker
-            nu = None
+            assert u_list is not None
+            u_3d = np.zeros((N_common, nu_raw, L), dtype=np.float64)
             for traj in range(L):
-                u[traj] = np.asarray(u[traj], dtype=np.float64)
-                if u[traj].ndim == 1:
-                    u[traj] = u[traj][:, np.newaxis]
-                if nu is None:
-                    nu = u[traj].shape[1]
-                elif u[traj].shape[1] != nu:
-                    raise SidError(
-                        "dim_mismatch",
-                        f"u[{traj}] has {u[traj].shape[1]} columns, expected {nu}.",
-                    )
-                if u[traj].shape[0] < N_common:
-                    raise SidError(
-                        "size_mismatch",
-                        f"u[{traj}] has {u[traj].shape[0]} samples but y requires "
-                        f"at least {N_common}.",
-                    )
-            assert nu is not None
-            u_3d = np.zeros((N_common, nu, L), dtype=np.float64)
-            for traj in range(L):
-                u_3d[:, :, traj] = u[traj][:N_common, :]
+                u_3d[:, :, traj] = u_list[traj][:N_common, :]
             u = u_3d
 
-        if np.any(lengths != N_common):
+        if variable_length:
             warnings.warn(
                 f"Variable-length trajectories trimmed to shortest length N = {N_common}.",
                 stacklevel=2,

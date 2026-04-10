@@ -85,8 +85,22 @@ function result = sidFreqMap(y, u, varargin)
 %   https://github.com/pdlourenco/sid-matlab
 %  -----------------------------------------------------------------------
 
-    % ---- Validate data ----
-    [y, u, N, ny, nu, isTimeSeries, nTraj] = sidValidateData(y, u);
+    % ---- Validate data (preserve variable-length cells for SPEC.md §6.2) ----
+    [y, u, N, ny, nu, isTimeSeries, nTraj] = sidValidateData(y, u, true);
+
+    % If the input was a variable-length cell array, y and u remain cell
+    % arrays here.  We detect that and fall into the per-segment filtering
+    % path (SPEC.md §6.2): at each segment k, only trajectories that span
+    % segment k contribute to the ensemble.
+    varLen = iscell(y);
+    if varLen
+        horizons = zeros(nTraj, 1);
+        for ll = 1:nTraj
+            horizons(ll) = size(y{ll}, 1);
+        end
+    else
+        horizons = [];
+    end
 
     % ---- Parse options ----
     defs.SegmentLength = min(floor(N / 4), 256);
@@ -198,24 +212,12 @@ function result = sidFreqMap(y, u, varargin)
             'Data too short for even one segment with L=%d, P=%d.', L, P);
     end
 
+    % ---- Track number of trajectories used per segment (SPEC.md §6.8) ----
+    nTrajPerSeg = zeros(K, 1);
+
     % ---- Run inner estimator on first segment to get dimensions ----
-    s1 = 1;
-    e1 = L;
-    if nTraj > 1
-        yk = y(s1:e1, :, :);
-        if isTimeSeries
-            uk = [];
-        else
-            uk = u(s1:e1, :, :);
-        end
-    else
-        yk = y(s1:e1, :);
-        if isTimeSeries
-            uk = [];
-        else
-            uk = u(s1:e1, :);
-        end
-    end
+    [yk, uk, nAct] = extractSegment(1);
+    nTrajPerSeg(1) = nAct;
 
     if strcmp(algorithm, 'bt')
         r1 = sidFreqBT(yk, uk, btArgs{:});
@@ -251,23 +253,8 @@ function result = sidFreqMap(y, u, varargin)
 
     % ---- Loop over remaining segments (SPEC.md §6.3) ----
     for k = 2:K
-        startIdx = (k - 1) * step + 1;
-        endIdx   = startIdx + L - 1;
-        if nTraj > 1
-            yk = y(startIdx:endIdx, :, :);
-            if isTimeSeries
-                uk = [];
-            else
-                uk = u(startIdx:endIdx, :, :);
-            end
-        else
-            yk = y(startIdx:endIdx, :);
-            if isTimeSeries
-                uk = [];
-            else
-                uk = u(startIdx:endIdx, :);
-            end
-        end
+        [yk, uk, nAct] = extractSegment(k);
+        nTrajPerSeg(k) = nAct;
         if strcmp(algorithm, 'bt')
             rk = sidFreqBT(yk, uk, btArgs{:});
         else
@@ -294,8 +281,81 @@ function result = sidFreqMap(y, u, varargin)
     result.Overlap          = P;
     result.WindowSize       = M;
     result.Algorithm        = algorithm;
-    result.NumTrajectories  = nTraj;
+    % NumTrajectories: scalar when every segment uses the same count,
+    % (K x 1) vector when variable-length trajectories drop in/out
+    % (SPEC.md §6.8).
+    if varLen && any(nTrajPerSeg ~= nTrajPerSeg(1))
+        result.NumTrajectories = nTrajPerSeg;
+    elseif varLen
+        result.NumTrajectories = nTrajPerSeg(1);
+    else
+        result.NumTrajectories = nTraj;
+    end
     result.Method           = 'sidFreqMap';
+
+    % ---- Nested helper to extract one segment (SPEC.md §6.2 / §6.3) ----
+    % For uniform-length inputs, slice the 3-D / 2-D arrays directly.
+    % For variable-length cell inputs, collect only those trajectories that
+    % fully span the segment [startIdx, endIdx], matching the spec:
+    %     "At each segment k, only trajectories that span segment k
+    %      contribute to the ensemble."
+    function [yk_, uk_, nAct_] = extractSegment(k_)
+        startIdx_ = (k_ - 1) * step + 1;
+        endIdx_   = startIdx_ + L - 1;
+        if varLen
+            active = find(horizons >= endIdx_);
+            nAct_ = numel(active);
+            if nAct_ == 0
+                error('sid:noActiveTraj', ...
+                    ['Segment starting at sample %d has no trajectories ' ...
+                     'spanning it. Check segment length / overlap vs horizons.'], ...
+                    startIdx_);
+            end
+            if nAct_ == 1
+                % 2-D form so the inner estimator stays on its
+                % single-trajectory code path (sidCov expects 2-D).
+                li = active(1);
+                yk_ = y{li}(startIdx_:endIdx_, :);
+                if isTimeSeries
+                    uk_ = [];
+                else
+                    uk_ = u{li}(startIdx_:endIdx_, :);
+                end
+            else
+                yk_ = zeros(L, ny, nAct_);
+                if isTimeSeries
+                    uk_ = [];
+                else
+                    uk_ = zeros(L, nu, nAct_);
+                end
+                for ii_ = 1:nAct_
+                    li = active(ii_);
+                    yk_(:, :, ii_) = y{li}(startIdx_:endIdx_, :);
+                    if ~isTimeSeries
+                        uk_(:, :, ii_) = u{li}(startIdx_:endIdx_, :);
+                    end
+                end
+            end
+            return;
+        end
+
+        if nTraj > 1
+            yk_ = y(startIdx_:endIdx_, :, :);
+            if isTimeSeries
+                uk_ = [];
+            else
+                uk_ = u(startIdx_:endIdx_, :, :);
+            end
+        else
+            yk_ = y(startIdx_:endIdx_, :);
+            if isTimeSeries
+                uk_ = [];
+            else
+                uk_ = u(startIdx_:endIdx_, :);
+            end
+        end
+        nAct_ = nTraj;
+    end
 
     % ---- Nested helper to store segment results ----
     function storeSegment(idx, rk)

@@ -1,7 +1,8 @@
-function [y, u, N, ny, nu, isTimeSeries, nTraj] = sidValidateData(y, u)
+function [y, u, N, ny, nu, isTimeSeries, nTraj] = sidValidateData(y, u, preserveLengths)
 % SIDVALIDATEDATA Validate and orient data for sidFreq* functions.
 %
 %   [y, u, N, ny, nu, isTimeSeries, nTraj] = sidValidateData(y, u)
+%   [y, u, N, ny, nu, isTimeSeries, nTraj] = sidValidateData(y, u, preserveLengths)
 %
 %   Shared data validation used by sidFreqBT, sidFreqETFE, sidFreqBTFDR.
 %   Ensures column orientation, checks for NaN/Inf, complex data, and
@@ -10,15 +11,29 @@ function [y, u, N, ny, nu, isTimeSeries, nTraj] = sidValidateData(y, u)
 %   Supports multi-trajectory input:
 %     - 3D arrays: y is (N x n_y x L), u is (N x n_u x L)
 %     - 2D arrays: y is (N x n_y), treated as L=1
+%     - Cell arrays: {y1, y2, ...} for variable-length trajectories
+%
+%   By default, variable-length cell input is trimmed to the shortest
+%   trajectory length and a warning is emitted.  When preserveLengths is
+%   true, variable-length cell input is returned as a cell array of
+%   per-trajectory matrices instead; callers (e.g. sidFreqMap) are then
+%   responsible for per-segment filtering (SPEC.md §6.2).
 %
 %   INPUTS:
-%     y - Output data, (N x n_y), (N x n_y x L), or vector
-%     u - Input data, (N x n_u), (N x n_u x L), vector, or [] for time series
+%     y                - Output data, (N x n_y), (N x n_y x L), cell, or vector
+%     u                - Input data, (N x n_u), (N x n_u x L), cell, vector,
+%                        or [] for time series
+%     preserveLengths  - (optional) logical, default false. When true and y
+%                        is a variable-length cell array, the returned y/u
+%                        are cell arrays of per-trajectory data and N is
+%                        max(N_l).
 %
 %   OUTPUTS:
-%     y            - (N x ny x nTraj) oriented output data
-%     u            - (N x nu x nTraj) oriented input data, or []
-%     N            - Number of samples per trajectory
+%     y            - (N x ny x nTraj) oriented output data, or cell array
+%                    of per-trajectory (N_l x ny) when preserving lengths
+%     u            - (N x nu x nTraj) oriented input data, cell array, or []
+%     N            - Number of samples per trajectory; max(N_l) in preserved
+%                    variable-length mode, otherwise the common trimmed length
 %     ny           - Number of output channels
 %     nu           - Number of input channels (0 for time series)
 %     isTimeSeries - Logical, true when u is empty
@@ -47,9 +62,15 @@ function [y, u, N, ny, nu, isTimeSeries, nTraj] = sidValidateData(y, u)
 %   https://github.com/pdlourenco/sid-matlab
 %  -----------------------------------------------------------------------
 
+    if nargin < 3 || isempty(preserveLengths)
+        preserveLengths = false;
+    end
+
     % ---- Handle cell array input (variable-length trajectories) ----
-    % Cell arrays are trimmed to the shortest trajectory length and
-    % stacked into a 3D array. This follows SPEC.md §2.1.
+    % Default: trimmed to the shortest trajectory length and stacked into a
+    % 3D array (SPEC.md §2.1).  When preserveLengths is true, variable-length
+    % cell input is returned as a cell array of per-trajectory matrices so
+    % callers can do per-segment filtering (SPEC.md §6.2 for sidFreqMap).
     if iscell(y)
         isTimeSeries = isempty(u) || (iscell(u) && isempty(u));
         L = numel(y);
@@ -67,16 +88,79 @@ function [y, u, N, ny, nu, isTimeSeries, nTraj] = sidValidateData(y, u)
             end
         end
 
-        % Determine common length (trim to shortest)
+        % Orient every trajectory and validate contents before we decide
+        % whether to trim or preserve lengths.
         lengths = zeros(L, 1);
         for l = 1:L
             if isvector(y{l})
                 y{l} = y{l}(:);
             end
+            if ~isreal(y{l})
+                error('sid:complexData', ...
+                    'Complex data is not supported in v1.0. y{%d} must be real.', l);
+            end
+            if any(~isfinite(y{l}(:)))
+                error('sid:nonFinite', 'Data y{%d} contains NaN or Inf values.', l);
+            end
             lengths(l) = size(y{l}, 1);
         end
-        N_common = min(lengths);
         ny = size(y{1}, 2);
+        for l = 2:L
+            if size(y{l}, 2) ~= ny
+                error('sid:dimMismatch', ...
+                    'y{%d} has %d columns, expected %d.', l, size(y{l}, 2), ny);
+            end
+        end
+
+        nu_raw = 0;
+        if ~isTimeSeries
+            nu_raw = size(u{1}, 2);
+            for l = 1:L
+                if isvector(u{l})
+                    u{l} = u{l}(:);
+                end
+                if ~isreal(u{l})
+                    error('sid:complexData', ...
+                        'Complex data is not supported in v1.0. u{%d} must be real.', l);
+                end
+                if any(~isfinite(u{l}(:)))
+                    error('sid:nonFinite', 'Data u{%d} contains NaN or Inf values.', l);
+                end
+                if size(u{l}, 2) ~= nu_raw
+                    error('sid:dimMismatch', ...
+                        'u{%d} has %d columns, expected %d.', l, size(u{l}, 2), nu_raw);
+                end
+                if size(u{l}, 1) ~= lengths(l)
+                    error('sid:sizeMismatch', ...
+                        'u{%d} has %d samples but y{%d} has %d. Trajectory-wise lengths must match.', ...
+                        l, size(u{l}, 1), l, lengths(l));
+                end
+            end
+        end
+
+        variableLength = any(lengths ~= lengths(1));
+
+        if preserveLengths && variableLength
+            % Return cell arrays as-is so callers can do per-segment filtering.
+            N = max(lengths);
+            if N < 2
+                error('sid:tooShort', 'Data must have at least 2 samples.');
+            end
+            if ~isTimeSeries
+                nu = nu_raw;
+            else
+                nu = 0;
+            end
+            nTraj = L;
+            if N < 10
+                warning('sid:shortData', ...
+                    'Very short data (N_max = %d). Estimates will be unreliable.', N);
+            end
+            return;
+        end
+
+        % Default path: trim to shortest and stack into 3-D arrays.
+        N_common = min(lengths);
 
         % Stack into 3D array
         y_3d = zeros(N_common, ny, L);
