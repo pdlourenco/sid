@@ -1,0 +1,5 @@
+#!/bin/bash
+# Binder build script: install the sid Python toolbox (with plotting extras)
+# in editable mode so the example notebooks in python/examples/ can `import sid`.
+set -euo pipefail
+pip install -e "./python[plot]"
