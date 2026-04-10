@@ -3,6 +3,12 @@
 This guide covers Python-specific contribution standards for the sid toolbox.
 For general project guidelines, see the root [CONTRIBUTING.md](../CONTRIBUTING.md).
 
+> **⚠ Read this first.** Before writing or modifying any algorithmic code,
+> read the [Specification as Source of Truth](../CONTRIBUTING.md#specification-as-source-of-truth)
+> section in the root contributing guide. `spec/SPEC.md` is the binding
+> contract for this implementation — Python conforms to the spec, not to
+> the MATLAB port. If MATLAB and the spec disagree, the spec wins.
+
 Please ensure that `pytest python/tests/ -v` passes before submitting — the
 CI pipeline checks automatically.
 

@@ -3,6 +3,13 @@
 This guide covers MATLAB/Octave-specific contribution standards.
 For general project guidelines, see the root [CONTRIBUTING.md](../CONTRIBUTING.md).
 
+> **⚠ Read this first.** Before writing or modifying any algorithmic code,
+> read the [Specification as Source of Truth](../CONTRIBUTING.md#specification-as-source-of-truth)
+> section in the root contributing guide. `spec/SPEC.md` is the binding
+> contract for this implementation — the MATLAB code is *not* the ground
+> truth. If the current MATLAB behaviour disagrees with the spec, the
+> spec wins and the MATLAB code must be fixed.
+
 Please ensure that `matlab/tests/runAllTests.m` passes on both MATLAB and
 Octave before submitting — the CI pipeline checks both platforms automatically.
 
