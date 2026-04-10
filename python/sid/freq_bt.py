@@ -237,15 +237,36 @@ def freq_bt(
         Coh: np.ndarray | None = None
 
     elif ny == 1 and nu == 1:
-        # SISO: G(w) = Phi_yu(w) / Phi_u(w)
-        G = PhiYU / PhiU
+        # SISO: G(w) = Phi_yu(w) / Phi_u(w)  (SPEC.md S2.6)
+        # Regularization: if |Phi_u(w_k)| < eps * max(|Phi_u|), set G = NaN
+        eps_reg = 1e-10
+        PhiU_abs = np.abs(np.real(PhiU))
+        PhiU_max = float(np.max(PhiU_abs)) if PhiU_abs.size > 0 else 0.0
+        singular_mask = PhiU_abs < eps_reg * PhiU_max
+
+        G = np.empty_like(PhiYU)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            G[:] = PhiYU / PhiU
+        if np.any(singular_mask):
+            G[singular_mask] = np.nan + 1j * np.nan
+            warnings.warn(
+                "Input spectrum Phi_u is near-singular at some "
+                "frequencies. G set to NaN at those points.",
+                stacklevel=2,
+            )
 
         # Phi_v(w) = Phi_y(w) - |Phi_yu(w)|^2 / Phi_u(w)  -- noise spectrum
-        PhiV = np.real(PhiY) - np.abs(PhiYU) ** 2 / np.real(PhiU)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            PhiV = np.real(PhiY) - np.abs(PhiYU) ** 2 / np.real(PhiU)
+        if np.any(singular_mask):
+            PhiV[singular_mask] = np.real(PhiY[singular_mask])
         PhiV = np.maximum(PhiV, 0.0)
 
         # gamma^2(w) = |Phi_yu|^2 / (Phi_y * Phi_u)  -- squared coherence
-        Coh = np.abs(PhiYU) ** 2 / (np.real(PhiY) * np.real(PhiU))
+        with np.errstate(divide="ignore", invalid="ignore"):
+            Coh = np.abs(PhiYU) ** 2 / (np.real(PhiY) * np.real(PhiU))
+        if np.any(singular_mask):
+            Coh[singular_mask] = 0.0
         Coh = np.clip(Coh, 0.0, 1.0)
 
     else:

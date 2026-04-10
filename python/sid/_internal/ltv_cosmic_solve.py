@@ -9,6 +9,8 @@
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 
 
@@ -101,8 +103,18 @@ def cosmic_solve(
     Lbd[:, :, 0] = S[:, :, 0]
     Y[:, :, 0] = np.linalg.solve(Lbd[:, :, 0], T[:, :, 0])
 
+    eps_mach = np.finfo(np.float64).eps
     for k in range(1, N):
         Lbd_prev = Lbd[:, :, k - 1]
+        # Reciprocal condition number estimate (matches MATLAB sidLTVcosmicSolve)
+        rc = 1.0 / np.linalg.cond(Lbd_prev)
+        if rc < eps_mach:
+            warnings.warn(
+                f"COSMIC forward pass: Lbd({k - 1}) is near-singular "
+                f"(rcond={rc:.2e}). Results may be unreliable. "
+                "Try adjusting lambda.",
+                stacklevel=2,
+            )
         Lbd[:, :, k] = S[:, :, k] - lambda_[k - 1] ** 2 * np.linalg.solve(Lbd_prev, eye_d)
         Y[:, :, k] = np.linalg.solve(
             Lbd[:, :, k],

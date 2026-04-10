@@ -219,8 +219,12 @@ class LTVResult:
     algorithm: str
     """Identification algorithm (``'cosmic'``)."""
 
-    preconditioned: bool
-    """Whether block-diagonal preconditioning was applied."""
+    preconditioned: bool | str
+    """Whether block-diagonal preconditioning was applied.
+
+    ``False`` when not requested, ``'not_implemented'`` when requested
+    but disabled (v1.0), or ``True`` when implemented and applied.
+    """
 
     method: str
     """Always ``'ltv_disc'``."""

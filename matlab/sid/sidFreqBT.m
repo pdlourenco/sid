@@ -176,13 +176,31 @@ function result = sidFreqBT(y, u, varargin)
         PhiV = real(PhiY);
         Coh = [];
     elseif ny == 1 && nu == 1
-        % SISO: G(w) = Phi_yu(w) / Phi_u(w)
+        % SISO: G(w) = Phi_yu(w) / Phi_u(w)  (SPEC.md §2.6)
+        % Regularization: if |Phi_u(w_k)| < eps * max(|Phi_u|), set G = NaN
+        epsReg = 1e-10;
+        PhiU_abs = abs(real(PhiU));
+        PhiU_max = max(PhiU_abs);
+        singularMask = PhiU_abs < epsReg * PhiU_max;
+
         G = PhiYU ./ PhiU;
+        if any(singularMask)
+            G(singularMask) = NaN + 1j*NaN;
+            warning('sid:singularPhiU', ...
+                ['Input spectrum Phi_u is near-singular at some ' ...
+                 'frequencies. G set to NaN at those points.']);
+        end
         % Phi_v(w) = Phi_y(w) - |Phi_yu(w)|^2 / Phi_u(w)
         PhiV = real(PhiY) - abs(PhiYU).^2 ./ real(PhiU);
+        if any(singularMask)
+            PhiV(singularMask) = real(PhiY(singularMask));
+        end
         PhiV = max(PhiV, 0);
         % gamma^2(w) = |Phi_yu|^2 / (Phi_y * Phi_u) — squared coherence
         Coh = abs(PhiYU).^2 ./ (real(PhiY) .* real(PhiU));
+        if any(singularMask)
+            Coh(singularMask) = 0;
+        end
         Coh = min(max(Coh, 0), 1);
     else
         % MIMO: G(w) = Phi_yu(w) * Phi_u(w)^{-1} (SPEC.md §3.2)

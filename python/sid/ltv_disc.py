@@ -269,6 +269,7 @@ def ltv_disc(
     # ------------------------------------------------------------------
     # Preconditioning
     # ------------------------------------------------------------------
+    precondition_requested = bool(do_precondition)
     if do_precondition:
         warnings.warn(
             "Preconditioning is disabled in v1.0 due to a known issue "
@@ -346,7 +347,10 @@ def ltv_disc(
         input_dim=q,
         num_trajectories=L,
         algorithm=algo,
-        preconditioned=False,  # v1.0: preconditioning always disabled
+        # v1.0: preconditioning is disabled. Signal this distinctly from
+        # "not requested" when the user asked for it, matching MATLAB's
+        # sidLTVdisc behaviour (Preconditioned = 'not_implemented').
+        preconditioned="not_implemented" if precondition_requested else False,
         method="ltv_disc",
     )
 
