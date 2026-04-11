@@ -50,6 +50,36 @@ ref1.tolerance = struct('Response_rel', 1e-10, 'NoiseSpectrum_rel', 1e-10);
 
 writeJSON(fullfile(thisDir, 'reference_siso_bt.json'), ref1);
 
+% ---- Test case 1 (large M): SISO BT in the FFT-path bug envelope ----
+% Regression vector for SPEC.md S2.5.1. Prior to the 2026-04 fix,
+% sidFreqBT on the default 128-point grid with M >= 128 silently
+% produced the wrong spectrum in MATLAB (positive/negative lag overlap
+% for 128 <= M < 256, silent truncation for M >= 256) and crashed with
+% IndexError in the Python port for M >= 256. M = 200 sits in the
+% "silent wrong" region and forces the FFT fast path, so pinning the
+% correct spectrum here is the strongest shared-drift guard against a
+% future regression that re-introduces the hardcoded L = 256.
+fprintf('Generating reference_siso_bt_large_M.json...\n');
+rng(200);
+N_lm = 600;  % M = 200 must be <= N/2 = 300, comfortable margin
+u1_lm = randn(N_lm, 1);
+y1_lm = filter([1], [1 -0.9], u1_lm) + 0.1 * randn(N_lm, 1);
+r1_lm = sidFreqBT(y1_lm, u1_lm, 'WindowSize', 200);
+
+ref1_lm = struct();
+ref1_lm.function_name = 'sidFreqBT';
+ref1_lm.params = struct('WindowSize', 200, 'SampleTime', 1.0);
+ref1_lm.input = struct('y', y1_lm, 'u', u1_lm);
+ref1_lm.output = struct( ...
+    'Frequency', r1_lm.Frequency, ...
+    'Response_real', real(r1_lm.Response), ...
+    'Response_imag', imag(r1_lm.Response), ...
+    'NoiseSpectrum', r1_lm.NoiseSpectrum, ...
+    'Coherence', r1_lm.Coherence);
+ref1_lm.tolerance = struct('Response_rel', 1e-10, 'NoiseSpectrum_rel', 1e-10);
+
+writeJSON(fullfile(thisDir, 'reference_siso_bt_large_M.json'), ref1_lm);
+
 % ---- Test case 1b: SISO Blackman-Tukey (time series mode) ----
 fprintf('Generating reference_timeseries_bt.json...\n');
 rng(42);

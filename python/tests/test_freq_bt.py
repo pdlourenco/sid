@@ -191,3 +191,39 @@ class TestFreqBT:
         y = rng.standard_normal(N)
         result = freq_bt(y, u, window_size=20)
         assert hasattr(result, "response")
+
+    @pytest.mark.parametrize("M", [128, 200, 256, 500])
+    def test_large_window_size(self, M: int) -> None:
+        """freq_bt produces finite, default-grid output for M in the old crash region.
+
+        This is a regression test for the FFT-fast-path bug where L was hardcoded
+        to 2*nf = 256, causing silent positive/negative lag overlap (M in
+        [128, 255]) and an IndexError crash (M >= 256). See SPEC.md S2.5.1.
+        """
+        rng = np.random.default_rng(123)
+        N = 2 * M + 100  # ensures freq_bt does not clamp M to N//2
+        u = rng.standard_normal(N)
+        y = lfilter([1, 0.5], [1, -0.8], u) + 0.05 * rng.standard_normal(N)
+
+        result = freq_bt(y, u, window_size=M)
+
+        # Spec-required output shape on the default 128-point grid
+        assert result.window_size == M
+        assert result.response.shape == (128,)
+        assert np.all(np.isfinite(result.response))
+        assert np.all(np.isfinite(result.noise_spectrum))
+        assert np.all(result.noise_spectrum >= -1e-10)
+
+        # Cross-check against the direct DFT path. is_default_freqs returns
+        # True for any vector that matches the default grid to within 1e-12,
+        # so we offset by -1e-11 to defeat that check and force the direct
+        # path. The shift must be negative -- a positive shift would push
+        # the last element above pi and trip freq_bt's frequency validation.
+        # Do NOT "clean this up": the offset is what makes the cross-check
+        # exercise the two code paths.
+        w_direct = np.arange(1, 129) * np.pi / 128 - 1e-11
+        result_direct = freq_bt(y, u, window_size=M, frequencies=w_direct)
+        rel_err = np.max(np.abs(result.response - result_direct.response)) / np.max(
+            np.abs(result_direct.response)
+        )
+        assert rel_err < 1e-8, f"M={M}: FFT path vs direct path relErr={rel_err:.2e}"

@@ -116,8 +116,22 @@ def _fft_path(
 ) -> np.ndarray:
     """FFT fast path for the default linear frequency grid.
 
-    Assumes frequencies are ``(1:nf) * pi / nf``, i.e. the bins produced
-    by a length ``2 * nf`` FFT.
+    Outputs the spectral estimate at the default-grid frequencies
+    ``omega_k = k * pi / nf`` for ``k = 1 .. nf``.  The FFT length ``L``
+    is chosen per SPEC.md S2.5.1 to satisfy two constraints simultaneously:
+
+    1. ``L >= 2*M+1`` so that positive lags ``s[0..M]`` and the wrapped
+       negative lags ``s[L-M..L-1]`` do not collide in the buffer.
+    2. ``L`` is an integer multiple of ``2*nf`` so that the FFT bins
+       remain aligned with the default frequency grid.
+
+    The smallest ``L`` satisfying both is ``L = 2*nf*K`` where
+    ``K = ceil((2*M + 1) / (2*nf))``.  For the typical regime ``M << nf``
+    (e.g. the default ``M = min(N // 10, 30)`` with ``nf = 128``),
+    ``K = 1`` and ``L = 256``, identical to the historical fast path.
+    For larger ``M`` the FFT length grows just enough to fit the lag
+    sequence, and the desired bins are recovered by striding the FFT
+    output by ``K``.
 
     Parameters
     ----------
@@ -136,18 +150,24 @@ def _fft_path(
     """
 
     M: int = len(W) - 1
-    L: int = 2 * nf  # FFT length (256 for default 128 frequencies)
+
+    # K = ceil((2M+1) / (2*nf)) using integer arithmetic; L = 2*nf*K.
+    # See SPEC.md S2.5.1 step 2.
+    two_nf: int = 2 * nf
+    K: int = max(1, (2 * M + 1 + two_nf - 1) // two_nf)
+    L: int = two_nf * K
 
     s = np.zeros(L, dtype=np.complex128)
 
     # Lag 0
     s[0] = W[0] * R[0]
 
-    # Positive lags 1 .. M
+    # Positive lags 1 .. M  (safe: L >= 2*M+1 implies M < L)
     for tau in range(1, M + 1):
         s[tau] = W[tau] * R[tau]
 
-    # Negative lags -1 .. -M  (wrapped into positions L-1 .. L-M)
+    # Negative lags -1 .. -M  (wrapped into positions L-1 .. L-M;
+    # safe and disjoint from positive lags because L - M >= M + 1)
     for tau in range(1, M + 1):
         if R_neg is None:
             s[L - tau] = W[tau] * np.conj(R[tau])
@@ -156,8 +176,10 @@ def _fft_path(
 
     S = np.fft.fft(s, n=L)
 
-    # Extract bins 1 .. nf (skip DC at bin 0)
-    return S[1 : nf + 1]
+    # Extract bins K, 2K, ..., nf*K  (SPEC.md S2.5.1 step 4).
+    # Bin k*K of a length-L FFT sits at frequency k*K * 2*pi/L
+    # = k*K * 2*pi/(2*nf*K) = k * pi/nf = omega_k, as required.
+    return S[K : K * (nf + 1) : K]
 
 
 def _direct_path(

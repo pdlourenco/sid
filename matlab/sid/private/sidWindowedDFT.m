@@ -107,15 +107,35 @@ end
 function Phi = windowedDFT_FFT(R, W, nf, Rneg)
 % WINDOWEDDFT_FFT FFT fast path for default linear frequency grid.
 %
-%   Assumes frequencies are (1:nf) * pi / nf, i.e. the bins produced by
-%   a length-2*nf FFT.
+%   Outputs the spectral estimate at the default-grid frequencies
+%   omega_k = k * pi / nf for k = 1..nf.  The FFT length L is chosen per
+%   SPEC.md §2.5.1 to satisfy two constraints simultaneously:
+%
+%     1. L >= 2*M+1, so positive lags s(1..M+1) and the wrapped negative
+%        lags s(L-M+1..L) do not collide in the buffer.
+%     2. L is an integer multiple of 2*nf, so the FFT bins remain aligned
+%        with the default frequency grid.
+%
+%   The smallest L satisfying both is L = 2*nf*K, where
+%     K = ceil((2*M + 1) / (2*nf)).
+%   For the typical regime M << nf (e.g. the default M = min(N/10, 30)
+%   with nf = 128), K = 1 and L = 256, matching the historical fast path
+%   exactly.  For larger M the FFT length grows just enough to fit the
+%   lag sequence, and the desired bins are recovered by striding the FFT
+%   output by K.
 
     M = length(W) - 1;
-    L = 2 * nf;   % FFT length: 256 for the default 128 frequencies
+
+    % K = ceil((2M+1) / (2*nf)); L = 2*nf*K.  See SPEC.md §2.5.1 step 2.
+    twoNf = 2 * nf;
+    K = max(1, ceil((2 * M + 1) / twoNf));
+    L = twoNf * K;
 
     % Build the windowed covariance sequence in FFT order.
     % Lags 0..M go into positions 1..M+1.
     % Lags -M..-1 go into positions L-M+1..L (wrapped negative lags).
+    % L >= 2*M+1 implies L - M + 1 >= M + 2 > M + 1, so the two ranges
+    % are disjoint and the remainder of s stays zero-padded.
     s = zeros(L, 1);
 
     % Lag 0
@@ -140,9 +160,11 @@ function Phi = windowedDFT_FFT(R, W, nf, Rneg)
     % FFT
     S = fft(s, L);
 
-    % Extract bins 2..nf+1 (skipping DC at bin 1).
-    % Bin k+1 corresponds to frequency k * 2*pi / L = k * pi / nf.
-    Phi = S(2:nf + 1);
+    % Extract bins K+1, 2K+1, ..., nf*K+1 (skipping DC at bin 1).
+    % Bin k*K+1 corresponds to frequency k*K * 2*pi/L = k * pi/nf,
+    % which is the desired omega_k.  When K = 1 this reduces to
+    % bins 2..nf+1, matching the historical implementation.
+    Phi = S((K+1):K:(K*nf+1));
 end
 
 function Phi = windowedDFT_direct(R, W, freqs, Rneg)

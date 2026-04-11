@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from sid._internal.cov import sid_cov
 from sid._internal.hann_win import hann_win
@@ -132,3 +133,63 @@ class TestWindowedDFT:
         Phi = windowed_dft(R, W, freqs_custom, use_fft=False)
         assert Phi.shape == (5,)
         assert np.all(np.real(Phi) > -1e-10)
+
+    # ---- Regression tests for the FFT-fast-path L hardcode bug ----
+    # Per SPEC.md S2.5.1, the FFT length must satisfy L >= 2M+1 and be an
+    # integer multiple of 2*nf. The previous implementation hardcoded
+    # L = 2*nf = 256, which silently overlapped positive/negative lag writes
+    # for nf <= M < 2*nf and crashed with IndexError for M >= 2*nf. The
+    # parametrisations below cover both regimes plus the M=127 boundary
+    # (last value the old code handled correctly) as a regression guard.
+
+    @pytest.mark.parametrize("M", [127, 128, 150, 200, 255, 256, 300, 500])
+    def test_fft_vs_direct_large_M_scalar_auto(self, M: int) -> None:
+        """FFT path matches direct DFT for M >= nf (auto-covariance)."""
+        rng = np.random.default_rng(42)
+        N = 2 * M + 50  # comfortably > 2M so freq_bt would not clamp
+        x = rng.standard_normal((N, 1))
+        R = sid_cov(x, x, M)
+        W = hann_win(M)
+        freqs = np.arange(1, 129) * np.pi / 128
+
+        Phi_fft = windowed_dft(R, W, freqs, use_fft=True)
+        Phi_direct = windowed_dft(R, W, freqs, use_fft=False)
+
+        rel_err = np.max(np.abs(Phi_fft - Phi_direct)) / np.max(np.abs(Phi_direct))
+        assert rel_err < 1e-10, f"M={M}: FFT vs direct relErr={rel_err:.2e}"
+
+    @pytest.mark.parametrize("M", [128, 200, 500])
+    def test_fft_vs_direct_large_M_scalar_cross(self, M: int) -> None:
+        """FFT path matches direct DFT for M >= nf (cross-covariance)."""
+        rng = np.random.default_rng(7)
+        N = 2 * M + 50
+        y = rng.standard_normal((N, 1))
+        u = rng.standard_normal((N, 1))
+        Ryu = sid_cov(y, u, M)
+        Ruy = sid_cov(u, y, M)
+        W = hann_win(M)
+        freqs = np.arange(1, 129) * np.pi / 128
+
+        Phi_fft = windowed_dft(Ryu, W, freqs, use_fft=True, R_neg=Ruy)
+        Phi_dir = windowed_dft(Ryu, W, freqs, use_fft=False, R_neg=Ruy)
+
+        rel_err = np.max(np.abs(Phi_fft - Phi_dir)) / np.max(np.abs(Phi_dir))
+        assert rel_err < 1e-10, f"M={M}: FFT vs direct relErr={rel_err:.2e}"
+
+    @pytest.mark.parametrize("M", [128, 200, 500])
+    def test_fft_vs_direct_large_M_matrix(self, M: int) -> None:
+        """FFT path matches direct DFT for M >= nf (matrix auto-covariance)."""
+        rng = np.random.default_rng(11)
+        N = 2 * M + 50
+        x = rng.standard_normal((N, 2))
+        R = sid_cov(x, x, M)  # (M+1, 2, 2)
+        W = hann_win(M)
+        freqs = np.arange(1, 129) * np.pi / 128
+
+        Phi_fft = windowed_dft(R, W, freqs, use_fft=True)
+        Phi_dir = windowed_dft(R, W, freqs, use_fft=False)
+
+        rel_err = np.max(np.abs(Phi_fft.ravel() - Phi_dir.ravel())) / np.max(
+            np.abs(Phi_dir.ravel())
+        )
+        assert rel_err < 1e-10, f"M={M}: FFT vs direct relErr={rel_err:.2e}"

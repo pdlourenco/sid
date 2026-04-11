@@ -151,18 +151,33 @@ When using the default frequency grid (§2.2), the computation is done via FFT:
    c(τ) = R̂_xz(τ) × W_M(τ)       for τ = -M, ..., 0, ..., M
    ```
 
-2. Arrange into FFT input order. For a length-`L` FFT where `L ≥ 2M+1`:
+2. Choose the FFT length `L`. It must satisfy two constraints:
+
+   - `L ≥ 2M+1`, so positive lags `s(0..M)` and the wrapped negative lags `s(L-M..L-1)` do not collide.
+   - `L` must be an integer multiple of `2 × n_f`, so the FFT bins land exactly on the default-grid frequencies `ω_k = k × π/n_f`.
+
+   The smallest `L` satisfying both is
+
+   ```
+   K = ⌈(2M + 1) / (2 × n_f)⌉
+   L = 2 × n_f × K
+   ```
+
+   For the typical regime `M ≪ n_f` (e.g. the default `M = min(⌊N/10⌋, 30)` with the default `n_f = 128`), `K = 1` and `L = 256`. For larger `M` the multiplier `K` grows so the buffer is always large enough — e.g. `M = 128` → `K = 1`, `L = 256`; `M = 200` → `K = 2`, `L = 512`; `M = 500` → `K = 4`, `L = 1024`.
+
+   Then arrange the windowed covariance into the length-`L` buffer:
+
    ```
    s(k) = c(k)           for k = 0, 1, ..., M
    s(k) = 0              for k = M+1, ..., L-M-1     (zero-padding)
    s(k) = c(k - L)       for k = L-M, ..., L-1       (negative lags wrapped)
    ```
-   In practice, `L = 256` (the smallest power of 2 ≥ 2×128+1, used for the default 128-frequency grid).
 
 3. Compute `S = fft(s)`.
 
-4. Extract the desired frequency bins: `Φ̂(ω_k) = S(k+1)` for `k = 1, ..., 128`
-   (MATLAB 1-indexed: bin 1 is DC, bin `k+1` corresponds to frequency `k × 2π/L`).
+4. Extract the desired frequency bins by striding the FFT output by `K`:
+   `Φ̂(ω_k) = S(k × K + 1)` for `k = 1, ..., n_f`
+   (MATLAB 1-indexed: bin 1 is DC; bin `k × K + 1` sits at frequency `k × K × 2π/L = k × π/n_f = ω_k`). When `K = 1` this reduces to bins `2 .. n_f + 1`.
 
 **Scaling:** No additional scaling factor is applied. The FFT computes the sum directly.
 

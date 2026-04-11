@@ -122,6 +122,83 @@ class TestCrossValidationSISO:
         )
 
 
+class TestCrossValidationSISOLargeM:
+    """SISO Blackman-Tukey at M = 200: reference_siso_bt_large_M.json.
+
+    Regression vector for SPEC.md S2.5.1.  Pins Python/MATLAB agreement
+    in the previously broken FFT-fast-path window-size regime
+    (``M >= nf = 128``), where the legacy hardcoded ``L = 2*nf = 256``
+    caused silent positive/negative lag overlap in both languages.  Any
+    future change that re-introduces the hardcode will flip every
+    assertion in this class.
+    """
+
+    def test_siso_bt_large_M_response(self):
+        ref = _load("reference_siso_bt_large_M.json")
+        y = _to_array(ref["input"], "y")
+        u = _to_array(ref["input"], "u")
+        ws = ref["params"]["WindowSize"]
+        ts = ref["params"]["SampleTime"]
+
+        result = sid.freq_bt(y, u, window_size=ws, sample_time=ts)
+
+        expected_resp = _to_complex(ref["output"], "Response")
+        np.testing.assert_allclose(
+            result.response,
+            expected_resp.ravel(),
+            rtol=ref["tolerance"]["Response_rel"],
+            err_msg="SISO BT (large M) response mismatch vs MATLAB reference",
+        )
+
+    def test_siso_bt_large_M_frequency(self):
+        ref = _load("reference_siso_bt_large_M.json")
+        y = _to_array(ref["input"], "y")
+        u = _to_array(ref["input"], "u")
+        ws = ref["params"]["WindowSize"]
+
+        result = sid.freq_bt(y, u, window_size=ws)
+
+        expected_freq = _to_array(ref["output"], "Frequency")
+        np.testing.assert_allclose(
+            result.frequency,
+            expected_freq.ravel(),
+            rtol=1e-12,
+            err_msg="SISO BT (large M) frequency grid mismatch",
+        )
+
+    def test_siso_bt_large_M_noise_spectrum(self):
+        ref = _load("reference_siso_bt_large_M.json")
+        y = _to_array(ref["input"], "y")
+        u = _to_array(ref["input"], "u")
+        ws = ref["params"]["WindowSize"]
+
+        result = sid.freq_bt(y, u, window_size=ws)
+
+        expected_ns = _to_array(ref["output"], "NoiseSpectrum")
+        np.testing.assert_allclose(
+            result.noise_spectrum,
+            expected_ns.ravel(),
+            rtol=ref["tolerance"]["NoiseSpectrum_rel"],
+            err_msg="SISO BT (large M) noise spectrum mismatch vs MATLAB reference",
+        )
+
+    def test_siso_bt_large_M_coherence(self):
+        ref = _load("reference_siso_bt_large_M.json")
+        y = _to_array(ref["input"], "y")
+        u = _to_array(ref["input"], "u")
+        ws = ref["params"]["WindowSize"]
+
+        result = sid.freq_bt(y, u, window_size=ws)
+
+        expected_coh = _to_array(ref["output"], "Coherence")
+        np.testing.assert_allclose(
+            result.coherence,
+            expected_coh.ravel(),
+            rtol=1e-10,
+            err_msg="SISO BT (large M) coherence mismatch vs MATLAB reference",
+        )
+
+
 class TestCrossValidationMIMO:
     """MIMO Blackman-Tukey: reference_mimo_bt.json."""
 
