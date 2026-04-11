@@ -92,11 +92,18 @@ fprintf('  Section %d completed: Compare Bode magnitude plots.\n', ...
 % noise-floor shape.
 
 figure;
-semilogx(w, 10*log10(abs(r_bt.NoiseSpectrum)), 'b', 'DisplayName', 'BT');
+% Clamp the noise spectrum with a small floor before log10: per
+% SPEC.md 2.7 the noise spectrum is non-negative and may hit exact
+% zero at frequencies where the estimator variance has been clamped
+% from a slightly-negative value, which would otherwise produce
+% log10(0) warnings / "non-positive data" log-plot warnings.
+noise_floor = eps;
+semilogx(w, 10*log10(max(abs(r_bt.NoiseSpectrum), noise_floor)), 'b', ...
+    'DisplayName', 'BT');
 hold on;
-semilogx(w, 10*log10(abs(r_etfe_s.NoiseSpectrum)), 'g', ...
+semilogx(w, 10*log10(max(abs(r_etfe_s.NoiseSpectrum), noise_floor)), 'g', ...
     'DisplayName', 'ETFE (S = 15)');
-semilogx(w, 10*log10(abs(r_fdr.NoiseSpectrum)), 'r', ...
+semilogx(w, 10*log10(max(abs(r_fdr.NoiseSpectrum), noise_floor)), 'r', ...
     'DisplayName', 'BTFDR');
 hold off;
 xlabel('Frequency (rad/sample)');
@@ -161,10 +168,10 @@ r_ts_etfe = sidFreqETFE(y_ts, []);
 w_ts = r_ts_bt.Frequency;
 
 figure;
-semilogx(w_ts, 10*log10(abs(r_ts_etfe.NoiseSpectrum)), ...
+semilogx(w_ts, 10*log10(max(abs(r_ts_etfe.NoiseSpectrum), noise_floor)), ...
     'Color', [0.7 0.7 0.7], 'DisplayName', 'ETFE (periodogram)');
 hold on;
-semilogx(w_ts, 10*log10(abs(r_ts_bt.NoiseSpectrum)), 'b', ...
+semilogx(w_ts, 10*log10(max(abs(r_ts_bt.NoiseSpectrum), noise_floor)), 'b', ...
     'DisplayName', 'BT (M = 100)');
 hold off;
 xlabel('Frequency (rad/sample)');

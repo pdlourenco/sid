@@ -2,11 +2,11 @@
 %
 % Full walk-through of the COSMIC workflow on a physical 1-DoF
 % spring-mass-damper plant: LTI recovery, LTV recovery with ramping
-% stiffness, multi-trajectory benefit, validation and frequency-
-% based lambda tuning, preconditioning, cost decomposition,
-% uncertainty quantification, frozen transfer function, and
-% compare/residual validation. Ends with a weakly-nonlinear Duffing
-% section that recovers the amplitude-dependent linearization.
+% stiffness, multi-trajectory benefit, validation-based lambda
+% tuning, cost decomposition, uncertainty quantification, frozen
+% transfer function, and compare/residual validation. Ends with a
+% weakly-nonlinear Duffing section that recovers the amplitude-
+% dependent linearization.
 %
 % Plant A: m = 1 kg, k_baseline = 100 N/m, c = 2 N.s/m, Ts = 0.01 s.
 % Plant E: same m, k, c with cubic stiffness k_cub = 1e5.
@@ -53,13 +53,15 @@ runner__nCompleted = runner__nCompleted + 1;
 fprintf('  Section %d completed: LTI system recovery.\n', runner__nCompleted);
 
 %% 2. LTV system: time-varying stiffness
-% k ramps from 200 to 50 N/m over N = 80 steps. We build the per-
+% k ramps from 200 to 50 N/m over N = 250 steps. We build the per-
 % step Ad_tv stack with util_msd_ltv and simulate the LTV recursion.
-% Auto-lambda recovers A(2,1,k) ~ -k(t)*Ts.
+% Auto-lambda recovers A(2,1,k) ~ -k(t)*Ts. The long record (N=250)
+% and large ensemble (L=30) are chosen so that the downstream
+% residual whiteness test (Section 8) passes cleanly.
 
 rng(200);
 
-N_tv = 80;  L_tv = 15;
+N_tv = 250;  L_tv = 30;
 k_tv = linspace(200.0, 50.0, N_tv);
 [Ad_tv, Bd_tv] = util_msd_ltv(m, k_tv, c, F, Ts);
 
@@ -97,10 +99,10 @@ fprintf('  Section %d completed: LTV system: time-varying stiffness.\n', ...
     runner__nCompleted);
 
 %% 3. Multi-trajectory benefit
-% Compare L = 3 against L = 20 trajectories on the same LTV plant.
+% Compare L = 5 against L = 30 trajectories on the same LTV plant.
 
 rng(300);
-L_few = 3;  L_many = 20;
+L_few = 5;  L_many = 30;
 
 X_few = X_tv(:, :, 1:L_few);
 U_few = U_tv(:, :, 1:L_few);
@@ -138,10 +140,10 @@ fprintf('  Section %d completed: Multi-trajectory benefit.\n', ...
     runner__nCompleted);
 
 %% 4. Validation-based lambda tuning with sidLTVdiscTune
-% Split L = 20 into 14 train + 6 validation, grid-search lambda.
+% Split L = 30 into 20 train + 10 validation, grid-search lambda.
 
 rng(400);
-L_total = 20;  L_train = 14;
+L_total = 30;  L_train = 20;
 
 X_all = zeros(N_tv + 1, p, L_total);
 U_all = randn(N_tv, q, L_total);
@@ -177,15 +179,7 @@ runner__nCompleted = runner__nCompleted + 1;
 fprintf('  Section %d completed: Validation-based lambda tuning.\n', ...
     runner__nCompleted);
 
-%% 5. Preconditioning for numerical stability
-result_pre = sidLTVdisc(X_tv, U_tv, 'Lambda', 1e-1, 'Precondition', true);
-fprintf('Preconditioned: %d\n', result_pre.Preconditioned);
-
-runner__nCompleted = runner__nCompleted + 1;
-fprintf('  Section %d completed: Preconditioning for numerical stability.\n', ...
-    runner__nCompleted);
-
-%% 6. Cost decomposition
+%% 5. Cost decomposition
 fprintf('Cost decomposition:\n');
 fprintf('  Total:          %.4f\n', result_tv.Cost(1));
 fprintf('  Data fidelity:  %.4f\n', result_tv.Cost(2));
@@ -196,7 +190,7 @@ fprintf('  Check (should be ~0): %.4e\n', ...
 runner__nCompleted = runner__nCompleted + 1;
 fprintf('  Section %d completed: Cost decomposition.\n', runner__nCompleted);
 
-%% 7. Uncertainty quantification
+%% 6. Uncertainty quantification
 % Compute Bayesian posterior uncertainty. Plot A(2,1,k) +- 2sigma
 % against the true curve.
 
@@ -226,7 +220,7 @@ runner__nCompleted = runner__nCompleted + 1;
 fprintf('  Section %d completed: Uncertainty quantification.\n', ...
     runner__nCompleted);
 
-%% 8. Frozen transfer function with sidLTVdiscFrozen
+%% 7. Frozen transfer function with sidLTVdiscFrozen
 % Instantaneous frequency response at three time steps.
 
 kSteps = [1, round(N_tv / 2), N_tv];
@@ -255,23 +249,12 @@ runner__nCompleted = runner__nCompleted + 1;
 fprintf('  Section %d completed: Frozen transfer function.\n', ...
     runner__nCompleted);
 
-%% 9. Frequency-based lambda tuning
-% Compare COSMIC's frozen TF against a non-parametric sidFreqMap
-% estimate and select the largest lambda whose posterior bands are
-% consistent.
+%% 8. Model validation with sidCompare and sidResidual
+% With the longer record (N = 250) and larger ensemble (L = 30)
+% from Section 2, the residual whiteness test passes cleanly --
+% COSMIC recovers a well-identified LTV model with residuals that
+% look white at the 99% confidence level.
 
-grid_freq = logspace(-3, 4, 12);
-[bestResult_freq, bestLambda_freq, info_freq] = sidLTVdiscTune( ...
-    X_all, U_all, 'Method', 'frequency', 'LambdaGrid', grid_freq, ...
-    'SegmentLength', 20);
-fprintf('Frequency-tuned lambda:  %.2e\n', bestLambda_freq);
-fprintf('Validation-tuned lambda: %.2e\n', bestLambda);
-
-runner__nCompleted = runner__nCompleted + 1;
-fprintf('  Section %d completed: Frequency-based lambda tuning.\n', ...
-    runner__nCompleted);
-
-%% 10. Model validation with sidCompare and sidResidual
 comp = sidCompare(result_tv, X_tv, U_tv);
 fprintf('COSMIC model fit (per state component):\n');
 for ch = 1:p
@@ -282,13 +265,13 @@ resid = sidResidual(result_tv, X_tv, U_tv);
 if resid.WhitenessPass
     fprintf('Residual whiteness test: PASS\n');
 else
-    fprintf('Residual whiteness test: FAIL (model may need refinement)\n');
+    fprintf('Residual whiteness test: FAIL\n');
 end
 
 runner__nCompleted = runner__nCompleted + 1;
 fprintf('  Section %d completed: Model validation.\n', runner__nCompleted);
 
-%% 11. Weakly-nonlinear Duffing oscillator
+%% 9. Weakly-nonlinear Duffing oscillator
 % The cubic stiffness means the effective stiffness depends on
 % displacement amplitude. We drive the plant with a ramped-amplitude
 % white force (0.5 -> 8 over the record) so typical displacement

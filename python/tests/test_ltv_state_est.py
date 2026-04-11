@@ -14,7 +14,10 @@ from __future__ import annotations
 
 import numpy as np
 
-from sid._internal.test_msd import test_msd as _test_msd
+# util_msd is the spring-mass-damper plant helper from python/examples/.
+# It is made importable here by python/tests/conftest.py, which prepends
+# the examples directory to sys.path.
+from util_msd import util_msd as _test_msd  # noqa: E402
 from sid.ltv_state_est import ltv_state_est
 
 

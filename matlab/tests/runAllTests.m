@@ -33,6 +33,13 @@ end
 mkdir(runner__shimDir);
 copyfile(fullfile(runner__privateDir, '*.m'), runner__shimDir);
 addpath(runner__shimDir);
+% The example-suite helpers (util_msd, util_msd_ltv, util_msd_nl) are
+% used by several test files as spring-mass-damper plant simulators.
+% They live in matlab/examples/ as siblings of the example scripts (see
+% spec/EXAMPLES.md section 2.1) and must be on the path for tests to
+% import them.
+runner__examplesDir = fullfile(runner__matlabDir, 'examples');
+addpath(runner__examplesDir);
 
 % Auto-discover test files matching test_*.m
 runner__listing = dir(fullfile(runner__thisDir, 'test_*.m'));

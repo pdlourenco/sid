@@ -652,11 +652,19 @@ class TestCrossValidationLTVCosmic:
 
 
 class TestCrossValidationTestMSD:
-    """Test MSD system: reference_test_msd.json."""
+    """MSD plant: reference_test_msd.json.
+
+    Verifies that the Python ``util_msd`` example helper produces the
+    same discrete state-space matrices as the MATLAB port for the
+    reference input parameters.
+    """
 
     def test_msd_matrices(self):
         ref = _load("reference_test_msd.json")
-        from sid._internal.test_msd import test_msd
+        # util_msd lives in python/examples/util_msd.py; conftest.py
+        # prepends that directory to sys.path so this import works
+        # without sys.path manipulation here.
+        from util_msd import util_msd
 
         m = _to_array(ref["input"], "m").ravel()
         k_spring = _to_array(ref["input"], "k_spring").ravel()
@@ -664,7 +672,7 @@ class TestCrossValidationTestMSD:
         F = _to_array(ref["input"], "F")
         Ts = float(ref["input"]["Ts"])
 
-        Ad, Bd = test_msd(m, k_spring, c_damp, F, Ts)
+        Ad, Bd = util_msd(m, k_spring, c_damp, F, Ts)
 
         expected_Ad = _to_array(ref["output"], "Ad")
         expected_Bd = _to_array(ref["output"], "Bd")

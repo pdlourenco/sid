@@ -388,7 +388,7 @@ fprintf('  Test 11 passed: trust-region converges (%d iterations).\n', result_tr
 %% Test 12: Mass-spring-damper LTI, full observation
 % Full pipeline on 6-state MSD with all states measured.
 rng(1200);
-[Ad, Bd] = sidTestMSD( ...
+[Ad, Bd] = util_msd( ...
     [1.0; 1.5; 1.0], [100; 80; 60], [2; 1.5; 1], ...
     [1; 0; 0], 0.01);
 n = 6; q = 1; py = 6; N = 200; L = 10;
@@ -517,7 +517,7 @@ A_tv = zeros(n, n, N);
 B_tv = zeros(n, q, N);
 for k = 1:N
     k1 = 100 * (1 + 0.3 * sin(2 * pi * k / N));
-    [Adk, Bdk] = sidTestMSD( ...
+    [Adk, Bdk] = util_msd( ...
         m_vec, [k1; 80; 60], c_vec, F_vec, Ts);
     A_tv(:, :, k) = Adk;
     B_tv(:, :, k) = Bdk;

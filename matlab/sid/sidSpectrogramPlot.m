@@ -73,6 +73,17 @@ function varargout = sidSpectrogramPlot(result, varargin)
     T = result.Time(:)';           % row for meshgrid
     F = result.Frequency(:);       % column
 
+    % When a log frequency scale is requested, drop any non-positive
+    % frequency bins (the DC bin in particular) before calling pcolor
+    % so Octave's log-axis logic does not emit the warning
+    % "axis: omitting non-positive data in log plot". Matplotlib
+    % handles this silently; Octave does not.
+    if strcmpi(opts.FrequencyScale, 'log')
+        mask = F > 0;
+        F = F(mask);
+        Z = Z(mask, :);
+    end
+
     % ---- Create axes ----
     if isempty(opts.Axes)
         fig = figure;

@@ -27,9 +27,11 @@ function [Ad, Bd] = util_msd(m, k_spring, c_damp, F, Ts)
 %     Ad - (2n x 2n) discrete dynamics matrix.
 %     Bd - (2n x q)  discrete input matrix.
 %
-%   This is the example-suite counterpart to the internal test fixture
-%   sidTestMSD; it is sibling to the exampleXxx.m scripts so they can call
-%   it without any private-directory shim.
+%   This helper is the canonical spring-mass-damper plant simulator
+%   for both the example suite (matlab/examples/example*.m) and the
+%   MATLAB unit tests (matlab/tests/test_*.m), which pick it up via
+%   addpath(matlab/examples) in runAllTests.m. See spec/EXAMPLES.md
+%   section 2.1 for the binding contract.
 %
 %   EXAMPLE:
 %     m = [1; 1]; k = [100; 80]; c = [0.5; 0.5];

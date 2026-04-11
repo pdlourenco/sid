@@ -29,6 +29,10 @@ copyfile(fullfile(privateDir, '*.m'), shimDir);
 addpath(shimDir);
 cleanupObj = onCleanup(@() cleanupShim(shimDir));
 
+% Example-suite helpers (util_msd and friends) live in matlab/examples/
+% and are used by the MSD reference validation case below.
+addpath(fullfile(rootDir, 'matlab', 'examples'));
+
 files = dir(fullfile(thisDir, 'reference_*.json'));
 if isempty(files)
     fprintf('No reference JSON files found in %s\n', thisDir);
@@ -203,9 +207,14 @@ function result = callSidFunction(funcName, input, params)
         case 'sidLTIfreqIO'
             [A0, B0] = sidLTIfreqIO(input.Y, input.U, input.H);
             result = struct('A0', A0, 'B0', B0);
-        case 'sidTestMSD'
-            [Ad, Bd] = sidTestMSD(input.m, input.k_spring, ...
-                                  input.c_damp, input.F, input.Ts);
+        case {'sidTestMSD', 'util_msd'}
+            % util_msd (in matlab/examples/) is the current spring-
+            % mass-damper helper; sidTestMSD is accepted as an alias
+            % for JSON files generated before the 2026-04-12 helper
+            % consolidation. Both dispatch to util_msd which is
+            % bit-identical to sidTestMSD at the reference params.
+            [Ad, Bd] = util_msd(input.m, input.k_spring, ...
+                                input.c_damp, input.F, input.Ts);
             result = struct('Ad', Ad, 'Bd', Bd);
         otherwise
             error('Unknown function: %s', funcName);
