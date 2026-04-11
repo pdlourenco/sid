@@ -199,4 +199,45 @@ assert(isfield(result, 'Response'), 'Should return a result struct');
 runner__nPassed = runner__nPassed + 1;
 fprintf('  Test 16 passed: near-zero input handled.\n');
 
+%% Test 17: Large window size (M in the old FFT-path bug envelope)
+% Regression for the sidWindowedDFT L = 2*nf hardcode (SPEC.md §2.5.1).
+% With the default 128-point grid, M in [128, 255] silently produced
+% the wrong spectrum (positive/negative lag overlap) and M >= 256
+% silently truncated (MATLAB auto-extended s past L, then fft(s, L)
+% dropped the extra entries). This end-to-end test exercises sidFreqBT
+% on the default grid across that range and cross-checks against the
+% direct DFT path (forced by offsetting the frequency vector slightly).
+for M_i = [128, 200, 256, 500]
+    rng(123);
+    N_i = 2 * M_i + 100;  % ensures sidFreqBT does not clamp M
+    u_i = randn(N_i, 1);
+    y_i = filter([1 0.5], [1 -0.8], u_i) + 0.05 * randn(N_i, 1);
+
+    res_fft = sidFreqBT(y_i, u_i, 'WindowSize', M_i);
+    assert(res_fft.WindowSize == M_i, 'WindowSize should be %d', M_i);
+    assert(isequal(size(res_fft.Response), [128, 1]), ...
+        'Default grid gives (128 x 1) Response');
+    assert(all(isfinite(res_fft.Response)), ...
+        'M=%d: Response should be finite', M_i);
+    assert(all(isfinite(res_fft.NoiseSpectrum)), ...
+        'M=%d: NoiseSpectrum should be finite', M_i);
+    assert(all(res_fft.NoiseSpectrum >= -1e-10), ...
+        'M=%d: NoiseSpectrum should be non-negative', M_i);
+
+    % Cross-check against the direct DFT path. sidIsDefaultFreqs returns
+    % true for vectors that match the default grid to within 1e-12, so
+    % we offset by -1e-11 to escape that check and force the direct
+    % path. The shift is negative so the last element stays inside the
+    % required (0, pi] range. DO NOT "clean this up" — the offset is
+    % what makes the cross-check exercise both code paths.
+    w_direct = (1:128)' * pi / 128 - 1e-11;
+    res_dir = sidFreqBT(y_i, u_i, 'WindowSize', M_i, 'Frequencies', w_direct);
+    relErr = max(abs(res_fft.Response - res_dir.Response)) / ...
+        max(abs(res_dir.Response));
+    assert(relErr < 1e-8, ...
+        'M=%d: FFT path vs direct path relErr=%.2e', M_i, relErr);
+end
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 17 passed: large WindowSize (FFT-path regression).\n');
+
 fprintf('test_sidFreqBT: %d/%d passed\n', runner__nPassed, runner__nPassed);
