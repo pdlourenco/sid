@@ -11,7 +11,7 @@ mathematical specification:
   (single source of truth for all implementations)
 - [`testdata/`](testdata/) — Cross-language reference test vectors (JSON; see [README](testdata/README.md) for format)
 - [`matlab/`](matlab/) — MATLAB/Octave implementation (stable)
-- [`python/`](python/) — Python implementation (planned)
+- [`python/`](python/) — Python implementation (stable)
 - [`julia/`](julia/) — Julia implementation (planned)
 
 ## Specification as Source of Truth

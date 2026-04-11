@@ -31,7 +31,7 @@ consistency.
 | Language | Status | Directory | README | Requirements |
 |----------|--------|-----------|--------|--------------|
 | MATLAB/Octave | Stable | [`matlab/`](matlab/) | [README](matlab/README.md) | MATLAB R2016b+ or GNU Octave 8.0+ |
-| Python | Planned | [`python/`](python/) | [README](python/README.md) | TBD |
+| Python | Stable | [`python/`](python/) | [README](python/README.md) | Python 3.10+, NumPy 1.22+, SciPy 1.8+ |
 | Julia | Planned | [`julia/`](julia/) | [README](julia/README.md) | TBD |
 
 See each language's README for installation, quick start, function reference, and compatibility details.

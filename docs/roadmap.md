@@ -91,7 +91,7 @@ sid/
 │   └── examples/                % Example scripts
 │       ├── runAllExamples.m
 │       └── example*.m
-├── python/                      % Python implementation (planned)
+├── python/                      % Python implementation (stable)
 ├── julia/                       % Julia implementation (planned)
 ├── testdata/                    % Cross-language reference data
 ├── docs/                        % Cross-cutting documentation
@@ -433,7 +433,7 @@ Architecture is decomposed into reusable layers:
 - `maxSize` data segmentation
 - Custom window functions (Hann only for sidFreqBT)
 - idfrd-compatible class
-- Python / Julia ports (v1.0 freeze → port → release)
+- Julia port
 - C reference implementation
 - Online/recursive COSMIC (Phase 8c — v2)
 - Unknown observation matrix estimation (joint H + dynamics)

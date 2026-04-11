@@ -22,30 +22,30 @@ result.noise_spectrum                   # result.NoiseSpectrum
 
 | MATLAB function | Python function | Description | Status |
 |----------------|-----------------|-------------|--------|
-| **`sidFreqBT`** | `sid.freq_bt` | Frequency response via Blackman-Tukey | ⬜ |
-| **`sidFreqBTFDR`** | `sid.freq_btfdr` | Blackman-Tukey, frequency-dependent resolution | ⬜ |
-| **`sidFreqETFE`** | `sid.freq_etfe` | Empirical transfer function estimate | ⬜ |
-| **`sidFreqMap`** | `sid.freq_map` | Time-varying frequency response map (BT or Welch) | ⬜ |
-| **`sidSpectrogram`** | `sid.spectrogram` | Short-time FFT spectrogram | ⬜ |
-| **`sidLTVdisc`** | `sid.ltv_disc` | Discrete LTV state-space identification (COSMIC) | ⬜ |
-| **`sidLTVdiscTune`** | `sid.ltv_disc_tune` | Lambda tuning (validation-based and frequency-response) | ⬜ |
-| **`sidLTVdiscFrozen`** | `sid.ltv_disc_frozen` | Frozen transfer function G(ω,k) from A(k), B(k) | ⬜ |
-| **`sidLTVdiscIO`** | `sid.ltv_disc_io` | Partial-observation LTV identification (Output-COSMIC) | ⬜ |
-| **`sidLTVStateEst`** | `sid.ltv_state_est` | Batch LTV state estimation (RTS smoother) | ⬜ |
-| **`sidLTIfreqIO`** | `sid.lti_freq_io` | LTI realization from I/O frequency response (Ho-Kalman) | ⬜ |
-| **`sidModelOrder`** | `sid.model_order` | Model order estimation (Hankel SVD) | ⬜ |
-| **`sidDetrend`** | `sid.detrend` | Polynomial detrending (preprocessing) | ⬜ |
-| **`sidResidual`** | `sid.residual` | Residual analysis (whiteness + independence tests) | ⬜ |
-| **`sidCompare`** | `sid.compare` | Model output comparison with fit metric | ⬜ |
+| **`sidFreqBT`** | `sid.freq_bt` | Frequency response via Blackman-Tukey | ✅ |
+| **`sidFreqBTFDR`** | `sid.freq_btfdr` | Blackman-Tukey, frequency-dependent resolution | ✅ |
+| **`sidFreqETFE`** | `sid.freq_etfe` | Empirical transfer function estimate | ✅ |
+| **`sidFreqMap`** | `sid.freq_map` | Time-varying frequency response map (BT or Welch) | ✅ |
+| **`sidSpectrogram`** | `sid.spectrogram` | Short-time FFT spectrogram | ✅ |
+| **`sidLTVdisc`** | `sid.ltv_disc` | Discrete LTV state-space identification (COSMIC) | ✅ |
+| **`sidLTVdiscTune`** | `sid.ltv_disc_tune` | Lambda tuning (validation-based and frequency-response) | ✅ |
+| **`sidLTVdiscFrozen`** | `sid.ltv_disc_frozen` | Frozen transfer function G(ω,k) from A(k), B(k) | ✅ |
+| **`sidLTVdiscIO`** | `sid.ltv_disc_io` | Partial-observation LTV identification (Output-COSMIC) | ✅ |
+| **`sidLTVStateEst`** | `sid.ltv_state_est` | Batch LTV state estimation (RTS smoother) | ✅ |
+| **`sidLTIfreqIO`** | `sid.lti_freq_io` | LTI realization from I/O frequency response (Ho-Kalman) | ✅ |
+| **`sidModelOrder`** | `sid.model_order` | Model order estimation (Hankel SVD) | ✅ |
+| **`sidDetrend`** | `sid.detrend` | Polynomial detrending (preprocessing) | ✅ |
+| **`sidResidual`** | `sid.residual` | Residual analysis (whiteness + independence tests) | ✅ |
+| **`sidCompare`** | `sid.compare` | Model output comparison with fit metric | ✅ |
 
 ### Plotting Functions
 
 | MATLAB function | Python function | Description | Status |
 |----------------|-----------------|-------------|--------|
-| **`sidBodePlot`** | `sid.bode_plot` | Bode diagram with confidence bands | ⬜ |
-| **`sidSpectrumPlot`** | `sid.spectrum_plot` | Power spectrum with confidence bands | ⬜ |
-| **`sidMapPlot`** | `sid.map_plot` | Time-frequency color map | ⬜ |
-| **`sidSpectrogramPlot`** | `sid.spectrogram_plot` | Spectrogram color map | ⬜ |
+| **`sidBodePlot`** | `sid.bode_plot` | Bode diagram with confidence bands | ✅ |
+| **`sidSpectrumPlot`** | `sid.spectrum_plot` | Power spectrum with confidence bands | ✅ |
+| **`sidMapPlot`** | `sid.map_plot` | Time-frequency color map | ✅ |
+| **`sidSpectrogramPlot`** | `sid.spectrogram_plot` | Spectrogram color map | ✅ |
 
 ### Private Helper Functions
 
@@ -218,7 +218,7 @@ This ensures every building block is tested in isolation before composition.
 
 ## Phased Roadmap
 
-### Phase P1 — Scaffolding ⬜
+### Phase P1 — Scaffolding ✅
 
 - `python/pyproject.toml` — packaging (numpy, scipy, optional matplotlib)
 - `python/sid/__init__.py` — public API exports
@@ -230,7 +230,7 @@ This ensures every building block is tested in isolation before composition.
 - `.github/workflows/python-lint.yml` — ruff + header check CI
 - `python/tests/conftest.py` — shared fixtures, tolerance helpers
 
-### Phase P2 — `freq_bt` SISO Core ⬜
+### Phase P2 — `freq_bt` SISO Core ✅
 
 Port the Blackman-Tukey estimator and all its private dependencies.
 
@@ -252,7 +252,7 @@ Port the Blackman-Tukey estimator and all its private dependencies.
 |------|--------------|---------------|-------|
 | 2.8 | `sidFreqBT.m` | `freq_bt.py` | `test_freq_bt.py` |
 
-### Phase P3 — Time Series + MIMO ⬜
+### Phase P3 — Time Series + MIMO ✅
 
 Extend `freq_bt` to handle `u=None` (time series mode) and multi-channel
 input/output (MIMO). No new files — extends Phase P2 code.
@@ -262,7 +262,7 @@ input/output (MIMO). No new files — extends Phase P2 code.
 
 Tests: additional cases in `test_freq_bt.py`.
 
-### Phase P4 — Multi-Trajectory ⬜
+### Phase P4 — Multi-Trajectory ✅
 
 Extend `validate_data`, `cov`, `freq_bt` to accept 3D arrays `(N, nch, L)` and
 `list[ndarray]` for variable-length trajectories.
@@ -273,7 +273,7 @@ Extend `validate_data`, `cov`, `freq_bt` to accept 3D arrays `(N, nch, L)` and
 
 Tests: `test_multi_trajectory.py`, additional cases in `test_freq_bt.py`.
 
-### Phase P5 — `freq_etfe`, `freq_btfdr`, `detrend` ⬜
+### Phase P5 — `freq_etfe`, `freq_btfdr`, `detrend` ✅
 
 | Step | MATLAB source | Python target | Tests |
 |------|--------------|---------------|-------|
@@ -281,7 +281,7 @@ Tests: `test_multi_trajectory.py`, additional cases in `test_freq_bt.py`.
 | 5.2 | `sidFreqBTFDR.m` | `freq_btfdr.py` | `test_freq_btfdr.py` |
 | 5.3 | `sidDetrend.m` | `detrend.py` | `test_detrend.py` |
 
-### Phase P6 — `spectrogram`, `freq_map` ⬜
+### Phase P6 — `spectrogram`, `freq_map` ✅
 
 | Step | MATLAB source | Python target | Tests |
 |------|--------------|---------------|-------|
@@ -292,7 +292,7 @@ Tests: `test_multi_trajectory.py`, additional cases in `test_freq_bt.py`.
 - `algorithm='bt'` (default): calls `freq_bt` per segment
 - `algorithm='welch'`: Welch's method per segment
 
-### Phase P7 — `ltv_disc` Core (COSMIC) ⬜
+### Phase P7 — `ltv_disc` Core (COSMIC) ✅
 
 **Private helpers:**
 
@@ -310,13 +310,13 @@ Tests: `test_multi_trajectory.py`, additional cases in `test_freq_bt.py`.
 |------|--------------|---------------|-------|
 | 7.6 | `sidLTVdisc.m` | `ltv_disc.py` | `test_ltv_disc.py` |
 
-### Phase P7a — Variable-Length Trajectories ⬜
+### Phase P7a — Variable-Length Trajectories ✅
 
 | Step | MATLAB source | Python target | Tests |
 |------|--------------|---------------|-------|
 | 7a.1 | `sidLTVbuildDataMatricesVarLen.m` | extend `ltv_build_data_matrices.py` | `test_ltv_disc_var_len.py` |
 
-### Phase P7b — Bayesian Uncertainty ⬜
+### Phase P7b — Bayesian Uncertainty ✅
 
 **Private helpers:**
 
@@ -328,14 +328,14 @@ Tests: `test_multi_trajectory.py`, additional cases in `test_freq_bt.py`.
 
 Tests: `test_ltv_disc_uncertainty.py`
 
-### Phase P7c — `ltv_disc_tune`, `ltv_disc_frozen` ⬜
+### Phase P7c — `ltv_disc_tune`, `ltv_disc_frozen` ✅
 
 | Step | MATLAB source | Python target | Tests |
 |------|--------------|---------------|-------|
 | 7c.1 | `sidLTVdiscTune.m` | `ltv_disc_tune.py` | `test_ltv_disc_tune.py` |
 | 7c.2 | `sidLTVdiscFrozen.m` | `ltv_disc_frozen.py` | `test_ltv_disc_frozen.py` |
 
-### Phase P8 — Output-COSMIC ⬜
+### Phase P8 — Output-COSMIC ✅
 
 Depends on P2 (frequency-domain) and P7 (COSMIC core).
 
@@ -354,7 +354,7 @@ Depends on P2 (frequency-domain) and P7 (COSMIC core).
 | 8.4 | `sidModelOrder.m` | `model_order.py` | `test_model_order.py` |
 | 8.5 | `sidLTVdiscIO.m` | `ltv_disc_io.py` | `test_ltv_disc_io.py` |
 
-### Phase P9 — Workflow Utilities ⬜
+### Phase P9 — Workflow Utilities ✅
 
 **Private helpers:**
 
@@ -369,7 +369,7 @@ Depends on P2 (frequency-domain) and P7 (COSMIC core).
 | 9.2 | `sidResidual.m` | `residual.py` | `test_residual.py` |
 | 9.3 | `sidCompare.m` | `compare.py` | `test_compare.py` |
 
-### Phase P10 — Plotting ⬜
+### Phase P10 — Plotting ✅
 
 All plotting functions lazy-import matplotlib and accept an optional `ax=`
 keyword argument for embedding in user-created figures.
@@ -381,7 +381,7 @@ keyword argument for embedding in user-created figures.
 | 10.3 | `sidMapPlot.m` | `map_plot.py` | `test_plotting.py` |
 | 10.4 | `sidSpectrogramPlot.m` | `spectrogram_plot.py` | `test_plotting.py` |
 
-### Phase P10a — Examples (Jupyter Notebooks) ⬜
+### Phase P10a — Examples (Jupyter Notebooks) ✅
 
 Each MATLAB example script is ported to a Jupyter notebook in `python/examples/`.
 Notebooks are the natural Python equivalent of MATLAB's `%%`-sectioned scripts:
@@ -415,7 +415,7 @@ they combine narrative, code, and inline plots in a single runnable document.
 - Notebooks are validated using `nbval` or `pytest --nbmake` in CI to ensure
   they execute without errors (output cells are not checked, only execution)
 
-### Phase P11 — Cross-Validation + CI ⬜
+### Phase P11 — Cross-Validation + CI ✅
 
 - `python/tests/test_cross_validation.py` — load JSON from `testdata/`, call
   Python functions, assert `rtol=1e-10`
@@ -452,21 +452,21 @@ P1 (scaffolding)
 
 | Phase | Description | Dependencies | Status |
 |-------|-------------|-------------|--------|
-| P1 | Scaffolding | — | ⬜ |
-| P2 | `freq_bt` SISO core | P1 | ⬜ |
-| P3 | Time series + MIMO | P2 | ⬜ |
-| P4 | Multi-trajectory | P3 | ⬜ |
-| P5 | `freq_etfe`, `freq_btfdr`, `detrend` | P2 | ⬜ |
-| P6 | `spectrogram`, `freq_map` | P2, P5 | ⬜ |
-| P7 | `ltv_disc` core (COSMIC) | P1 | ⬜ |
-| P7a | Variable-length trajectories | P7 | ⬜ |
-| P7b | Bayesian uncertainty | P7 | ⬜ |
-| P7c | `ltv_disc_tune`, `ltv_disc_frozen` | P7, P7b | ⬜ |
-| P8 | Output-COSMIC | P2, P7 | ⬜ |
-| P9 | Workflow utilities | P2, P7 | ⬜ |
-| P10 | Plotting | P2, P6 | ⬜ |
-| P10a | Examples (Jupyter notebooks) | P10, varies per notebook | ⬜ |
-| P11 | Cross-validation + CI | all | ⬜ |
+| P1 | Scaffolding | — | ✅ |
+| P2 | `freq_bt` SISO core | P1 | ✅ |
+| P3 | Time series + MIMO | P2 | ✅ |
+| P4 | Multi-trajectory | P3 | ✅ |
+| P5 | `freq_etfe`, `freq_btfdr`, `detrend` | P2 | ✅ |
+| P6 | `spectrogram`, `freq_map` | P2, P5 | ✅ |
+| P7 | `ltv_disc` core (COSMIC) | P1 | ✅ |
+| P7a | Variable-length trajectories | P7 | ✅ |
+| P7b | Bayesian uncertainty | P7 | ✅ |
+| P7c | `ltv_disc_tune`, `ltv_disc_frozen` | P7, P7b | ✅ |
+| P8 | Output-COSMIC | P2, P7 | ✅ |
+| P9 | Workflow utilities | P2, P7 | ✅ |
+| P10 | Plotting | P2, P6 | ✅ |
+| P10a | Examples (Jupyter notebooks) | P10, varies per notebook | ✅ |
+| P11 | Cross-validation + CI | all | ✅ |
 
 ---
 

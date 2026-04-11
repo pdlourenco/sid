@@ -32,7 +32,7 @@ sidSpectrogramPlot -> sid.spectrogram_plot
 
 from __future__ import annotations
 
-__version__ = "1.0.0"
+__version__ = "0.1.0"
 
 from sid._exceptions import SidError
 from sid._results import (
