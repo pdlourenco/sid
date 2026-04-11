@@ -28,6 +28,13 @@ copyfile(fullfile(privateDir, '*.m'), shimDir);
 addpath(shimDir);
 cleanupObj = onCleanup(@() cleanupShim(shimDir));
 
+% util_msd is the spring-mass-damper plant helper used by the example
+% suite (see spec/EXAMPLES.md section 2.1). It also serves as the
+% reference implementation of the MSD plant for the Python-MATLAB
+% cross-validation test vectors generated below.
+examplesDir = fullfile(rootDir, 'matlab', 'examples');
+addpath(examplesDir);
+
 % ---- Test case 1: SISO Blackman-Tukey ----
 fprintf('Generating reference_siso_bt.json...\n');
 rng(42);
@@ -584,17 +591,20 @@ ref16.tolerance = struct('A0_rel', 1e-6, 'B0_rel', 1e-6);
 
 writeJSON(fullfile(thisDir, 'reference_lti_freq_io.json'), ref16);
 
-% ---- Test case 17: sidTestMSD ----
+% ---- Test case 17: util_msd (n-mass spring-damper plant) ----
+% The reference helper for the plant family used by the example suite.
+% Produces bit-identical output to the legacy private sidTestMSD at the
+% parameters used below; the swap is numerically innocent.
 fprintf('Generating reference_test_msd.json...\n');
 m_msd = [2; 1; 3];
 k_msd = [100; 200; 150];
 c_msd = [5; 3; 4];
 F_msd = [1 0; 0 0; 0 1];
 Ts_msd = 0.01;
-[Ad_msd, Bd_msd] = sidTestMSD(m_msd, k_msd, c_msd, F_msd, Ts_msd);
+[Ad_msd, Bd_msd] = util_msd(m_msd, k_msd, c_msd, F_msd, Ts_msd);
 
 ref17 = struct();
-ref17.function_name = 'sidTestMSD';
+ref17.function_name = 'util_msd';
 ref17.params = struct();
 ref17.input = struct('m', m_msd, 'k_spring', k_msd, 'c_damp', c_msd, ...
                      'F', F_msd, 'Ts', Ts_msd);

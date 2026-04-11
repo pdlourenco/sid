@@ -8,51 +8,33 @@
 """Unit tests for the example-suite SMD plant helpers.
 
 The module under test (:mod:`util_msd`) lives in ``python/examples/`` as a
-sibling of the notebooks. Because it is not part of the installed ``sid``
-package, we prepend the examples directory to ``sys.path`` before importing.
+sibling of the notebooks. It is made importable here by the test-suite
+``conftest.py``, which prepends the examples directory to ``sys.path``.
+
+The n=3 parity check against a legacy ``sid._internal.test_msd`` fixture
+used to live in this module; that fixture has been removed as part of
+the consolidation described in the commit history, and its regression
+role is now carried by ``test_cross_validation.TestCrossValidationTestMSD``
+which compares the helper's output against the MATLAB-generated
+``testdata/reference_test_msd.json`` vectors.
 """
 
 from __future__ import annotations
-
-import pathlib
-import sys
 
 import numpy as np
 import pytest
 from scipy.linalg import expm
 
-_EXAMPLES = pathlib.Path(__file__).resolve().parent.parent / "examples"
-if str(_EXAMPLES) not in sys.path:
-    sys.path.insert(0, str(_EXAMPLES))
-
 from util_msd import util_msd, util_msd_ltv, util_msd_nl  # noqa: E402
-
-from sid._internal.test_msd import test_msd as _legacy_test_msd  # noqa: E402
 
 
 # ----------------------------------------------------------------------
-# LTI chain — n=3 parity with the legacy _internal fixture
+# LTI chain — analytical and shape checks
 # ----------------------------------------------------------------------
 
 
 class TestUtilMsdLti:
     """LTI chain discretization."""
-
-    def test_n3_parity_with_legacy_fixture(self) -> None:
-        """n=3 Ad/Bd must match sid._internal.test_msd to 1e-12."""
-        m = np.array([2.0, 1.0, 3.0])
-        k = np.array([100.0, 200.0, 150.0])
-        c = np.array([5.0, 3.0, 4.0])
-        F = np.array([[1.0, 0.0], [0.0, 0.0], [0.0, 1.0]])
-        Ts = 0.01
-
-        Ad_new, Bd_new = util_msd(m, k, c, F, Ts)
-        Ad_old, Bd_old = _legacy_test_msd(m, k, c, F, Ts)
-
-        assert Ad_new.shape == (6, 6)
-        assert Bd_new.shape == (6, 2)
-        np.testing.assert_allclose(Ad_new, Ad_old, atol=1e-12, rtol=1e-12)
-        np.testing.assert_allclose(Bd_new, Bd_old, atol=1e-12, rtol=1e-12)
 
     def test_n1_sdof_against_analytical(self) -> None:
         """n=1 SDOF: matches the direct ZOH of the analytic 2x2 Ac."""

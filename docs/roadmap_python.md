@@ -59,7 +59,7 @@ result.noise_spectrum                   # result.NoiseSpectrum
 | `sidWindowedDFT` | `_internal/windowed_dft.py` | Windowed Fourier transform (FFT + direct paths) |
 | `sidUncertainty` | `_internal/uncertainty.py` | Asymptotic variance formulas |
 | `sidParseOptions` | *(not needed — Python uses kwargs)* | — |
-| `sidTestMSD` | `_internal/test_msd.py` | Mass-spring-damper test system (ZOH discretization) |
+| `util_msd` (+ `util_msd_ltv`, `util_msd_nl`) | `python/examples/util_msd.py` | Spring-mass-damper plant helpers. Live in `examples/` as sibling modules; tests import them via `sys.path` injection in `python/tests/conftest.py`. Replaced the legacy private `sidTestMSD` / `sid._internal.test_msd` in 2026-04. |
 | `sidLTVbuildDataMatrices` | `_internal/ltv_build_data_matrices.py` | COSMIC data matrix construction |
 | `sidLTVbuildDataMatricesVarLen` | `_internal/ltv_build_data_matrices.py` | Variable-length trajectory variant |
 | `sidLTVbuildBlockTerms` | `_internal/ltv_build_block_terms.py` | COSMIC block Hessian terms |
@@ -298,7 +298,7 @@ Tests: `test_multi_trajectory.py`, additional cases in `test_freq_bt.py`.
 
 | Step | MATLAB source | Python target |
 |------|--------------|---------------|
-| 7.1 | `sidTestMSD.m` | `_internal/test_msd.py` |
+| 7.1 | `matlab/examples/util_msd.m` | `python/examples/util_msd.py` |
 | 7.2 | `sidLTVbuildDataMatrices.m` | `_internal/ltv_build_data_matrices.py` |
 | 7.3 | `sidLTVbuildBlockTerms.m` | `_internal/ltv_build_block_terms.py` |
 | 7.4 | `sidLTVcosmicSolve.m` | `_internal/ltv_cosmic_solve.py` |
