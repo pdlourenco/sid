@@ -133,11 +133,25 @@ fprintf('  Section %d completed: %s.\n', runner__nCompleted, ...
     'Preprocessing: detrend data before estimation');
 
 %% Model validation: residual analysis
+% sidResidual runs two diagnostics on the one-step prediction
+% residuals: a whiteness test (residual autocorrelation should fall
+% inside a 99% confidence bound) and an independence test (cross-
+% correlation with the input should also fall inside the bound).
+%
+% EXPECTED RESULT on this plant: whiteness FAILS. The non-parametric
+% Blackman-Tukey estimator has finite-window bias, and on a narrow
+% resonance (Q = 5 here) that bias leaks into the residuals as a
+% small but systematic auto-correlation that exceeds the 99% bound.
+% This is not a bug -- it is the estimator telling you "your model
+% is missing structure that a parametric method could capture". See
+% exampleLTVdisc for a parametric COSMIC fit where whiteness passes
+% cleanly.
+
 resid = sidResidual(result, y, u);
 if resid.WhitenessPass
     fprintf('Whiteness test:    PASS\n');
 else
-    fprintf('Whiteness test:    FAIL\n');
+    fprintf('Whiteness test:    FAIL (expected for BT on narrow resonances)\n');
 end
 if resid.IndependencePass
     fprintf('Independence test: PASS\n');

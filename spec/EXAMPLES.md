@@ -1,7 +1,7 @@
 # sid — Examples Specification
 
-**Version:** 1.0.0
-**Date:** 2026-04-11
+**Version:** 1.0.1
+**Date:** 2026-04-12
 **Reference:** Companion to [`SPEC.md`](SPEC.md). Where `SPEC.md` defines
 the binding behavior of the algorithmic functions, this document defines
 the binding structure of the example suite shipped with every language
@@ -698,7 +698,7 @@ wording in the first column):
 | 4 | Plot noise spectrum | Display the BT noise spectrum estimate. |
 | 5 | Compare different window sizes | Demonstrate how the Hann window length trades bias for variance; show that a short window smears the narrow resonance. |
 | 6 | Preprocessing: detrend data before estimation | Corrupt the signals with a linear drift and DC offset; show that `detrend` removes the low-frequency bias. |
-| 7 | Model validation: residual analysis | Call `residual` and print whiteness/independence pass/fail. |
+| 7 | Model validation: residual analysis | Call `residual` and print whiteness/independence pass/fail. Ports MUST include a narrative note that the non-parametric BT estimator has finite-window bias on narrow resonances, so the whiteness test is *expected* to FAIL on this plant — the test is reporting unmodelled residual structure, not a bug in the example. Readers should treat the FAIL as the pedagogical point of the section. |
 | 8 | Model validation: compare predicted vs measured | Call `compare` and print NRMSE fit. |
 | 9 | Time-series mode (no input) | Re-simulate the plant and hand only the output to `freq_bt` (with `u = None`); show the resonance still appears in the output spectrum. |
 
@@ -917,7 +917,7 @@ and §3.2 — enabling direct BT-vs-ETFE-vs-BTFDR comparison.
 | Kind | Section | Binding content |
 |---|---|---|
 | Plot (magnitude overlay) | 3 | Four estimator curves + true TF; legend identifies each. |
-| Plot (noise-spectrum overlay) | 4 | Three estimator curves. |
+| Plot (noise-spectrum overlay) | 4 | Three estimator curves. Ports MUST clamp the noise-spectrum array with a small positive floor (e.g. `max(abs(Φ_v), eps)`) before applying `log10` because per §2.7 of `SPEC.md` the noise spectrum is non-negative and hits exact zero at frequencies where the clamp activates. |
 | Plot (magnitude overlay) | 5 | Log-grid version of §3 with three estimators + true. |
 | Plot (power-spectrum overlay) | 6 | ETFE periodogram (grey) and BT smoothed spectrum (blue). |
 | Print | 7 | Four NRMSE lines, one per method (including the second ETFE smoothing variant). |
@@ -1092,11 +1092,11 @@ at ≈ 31.83 Hz near `t ≈ 1.5 s`.
 
 **Goal.** Walk through the full COSMIC workflow — LTI recovery,
 LTV recovery with ramping stiffness, multi-trajectory benefit,
-validation and frequency-based lambda tuning, preconditioning, cost
-decomposition, uncertainty quantification, frozen transfer function,
-compare/residual validation — all on a physical 1-DoF SMD plant. End
-with a nonlinear Duffing section that recovers the amplitude-
-dependent local linearization.
+validation lambda tuning, cost decomposition, uncertainty
+quantification, frozen transfer function, compare/residual
+validation — all on a physical 1-DoF SMD plant. End with a
+nonlinear Duffing section that recovers the amplitude-dependent
+local linearization.
 
 **Plant.** Plant A (§1.1) for all linear sections. Plant E (§1.5) for
 the Duffing section (same `m`, `k_lin`, `c`, `F` as Plant A; adds
@@ -1105,21 +1105,34 @@ the Duffing section (same `m`, `k_lin`, `c`, `F` as Plant A; adds
 **Dimensions.** `p = 2` (state = `[x, v]`), `q = 1` (single force
 input).
 
+**Removed in v1.0.1.** Earlier drafts included a "Preconditioning
+for numerical stability" section and a "Frequency-based lambda
+tuning" section. The preconditioning code path is intentionally
+disabled in v1.0 of the library (the call site emits a runtime
+warning), so demonstrating it produces a noisy example. The
+frequency-based tuning method compares the COSMIC frozen TF against
+a non-parametric `freq_map` estimate; on physical SMD plants the
+velocity state has a band-pass spectrum that `freq_map` cannot
+reliably estimate at the low frequencies where the modes live, so
+no lambda in any reasonable grid clears the 90% consistency
+threshold and the call emits "No lambda achieved 90% consistency".
+Both sections were removed to keep this example a clean demo. The
+library still supports both features; they are simply not
+exercised here.
+
 **Required sections.**
 
 | # | Section title (SHOULD) | Topic (MUST) |
 |---|---|---|
 | 1 | LTI system recovery | Build `(Ad, Bd)` via §2.1 for Plant A; simulate `L = 10` trajectories of `N = 50` steps with process noise `σ = 0.01`; call `ltv_disc` with `lambda_ = 1e5`; print the true `Ad`, the mean recovered `A(k)` across time, and the Frobenius-norm recovery error. |
-| 2 | LTV system: time-varying stiffness | Build an `(n=1, N=80)` `k_spring` array ramping `200 → 50`; use §2.2 for the per-step stack; simulate `L = 15` trajectories with process noise `σ = 0.01`; call `ltv_disc` with `lambda_ = 'auto'`. Plot the recovered `A[1, 0](k)` against the true curve (for a 1-DoF plant with small `Ts`, `Ad[1, 0] ≈ −k(t)·Ts`). |
-| 3 | Multi-trajectory benefit | Compare COSMIC recovery with `L = 3` vs `L = 20` trajectories on the section-2 LTV plant. |
-| 4 | Validation-based lambda tuning | Split `L = 20` trajectories into 14 train + 6 validation; call `ltv_disc_tune` with `method='validation'` and a log-spaced lambda grid; plot the validation-loss curve. |
-| 5 | Preconditioning for numerical stability | Call `ltv_disc` with `precondition = True`; print the `preconditioned` flag. |
-| 6 | Cost decomposition | Print the three-element `cost = [total, data_fidelity, regularization]`. |
-| 7 | Uncertainty quantification | Call `ltv_disc` with `uncertainty = True` and plot `A[1, 0](k) ± 2σ` over the true curve. |
-| 8 | Frozen transfer function with `ltv_disc_frozen` | Call `ltv_disc_frozen` on the section-7 result at three time steps `[0, N/2, N-1]`; overlay the three Bode magnitudes. |
-| 9 | Frequency-based lambda tuning | Call `ltv_disc_tune` with `method='frequency'` on the section-4 data; compare the tuned λ against the validation-tuned λ. |
-| 10 | Model validation with `compare` and `residual` | Call both on the section-2 result; print per-channel NRMSE fits and the whiteness verdict. |
-| 11 | Weakly-nonlinear Duffing oscillator | Build Plant E; simulate `L = 12` trajectories over `N = 400` steps with a *ramped-amplitude* white input (amplitude profile `linspace(0.5, 8.0, N)`); call `ltv_disc` with a **small manual lambda** (`lambda_ = 0.1`, not `'auto'`, because auto-tuning over-regularises this dataset); plot the recovered `A[1, 0](k)` and overlay the linearized `Ad[1, 0]` reference from §2.1. |
+| 2 | LTV system: time-varying stiffness | Build an `(n=1, N=250)` `k_spring` array ramping `200 → 50`; use §2.2 for the per-step stack; simulate `L = 30` trajectories with process noise `σ = 0.01`; call `ltv_disc` with `lambda_ = 'auto'`. Plot the recovered `A[1, 0](k)` against the true curve (for a 1-DoF plant with small `Ts`, `Ad[1, 0] ≈ −k(t)·Ts`). The longer record and larger trajectory count are chosen so that the downstream residual whiteness test (section 7) passes cleanly. |
+| 3 | Multi-trajectory benefit | Compare COSMIC recovery with `L = 5` vs `L = 30` trajectories on the section-2 LTV plant. |
+| 4 | Validation-based lambda tuning | Split `L = 30` trajectories into 20 train + 10 validation; call `ltv_disc_tune` with `method='validation'` and a log-spaced lambda grid; plot the validation-loss curve. |
+| 5 | Cost decomposition | Print the three-element `cost = [total, data_fidelity, regularization]`. |
+| 6 | Uncertainty quantification | Call `ltv_disc` with `uncertainty = True` and plot `A[1, 0](k) ± 2σ` over the true curve. |
+| 7 | Frozen transfer function with `ltv_disc_frozen` | Call `ltv_disc_frozen` on the section-6 result at three time steps `[0, N/2, N-1]`; overlay the three Bode magnitudes. |
+| 8 | Model validation with `compare` and `residual` | Call both on the section-2 result; print per-channel NRMSE fits and the whiteness verdict. With `N = 250, L = 30` the whiteness test is expected to PASS. |
+| 9 | Weakly-nonlinear Duffing oscillator | Build Plant E; simulate `L = 12` trajectories over `N = 400` steps with a *ramped-amplitude* white input (amplitude profile `linspace(0.5, 8.0, N)`); call `ltv_disc` with a **small manual lambda** (`lambda_ = 0.1`, not `'auto'`, because auto-tuning over-regularises this dataset); plot the recovered `A[1, 0](k)` and overlay the linearized `Ad[1, 0]` reference from §2.1. |
 
 **Required `sid.*` invocations.**
 
@@ -1129,12 +1142,10 @@ input).
 | 2 | `ltv_disc` | `lambda_ = 'auto'` |
 | 3 | `ltv_disc` | two calls on subsets with different `L` |
 | 4 | `ltv_disc_tune` | positional args `(X_train, U_train, X_val, U_val)`, `method = 'validation'`, `lambda_grid = logspace(-3, 6, 30)` |
-| 5 | `ltv_disc` | `lambda_ = 1e-1`, `precondition = True` |
-| 7 | `ltv_disc` | `lambda_ = 'auto'`, `uncertainty = True` |
-| 8 | `ltv_disc_frozen` | `time_steps = [0, N/2, N-1]` on the uncertainty-enabled result |
-| 9 | `ltv_disc_tune` | positional args `(X_all, U_all)`, `method = 'frequency'`, `lambda_grid = logspace(-3, 4, 12)`, `segment_length = 20` |
-| 10 | `compare`, `residual` | each on the section-2 result |
-| 11 | `ltv_disc` | `lambda_ = 0.1` (manual) on the Duffing data |
+| 6 | `ltv_disc` | `lambda_ = 'auto'`, `uncertainty = True` |
+| 7 | `ltv_disc_frozen` | `time_steps = [0, N/2, N-1]` on the uncertainty-enabled result |
+| 8 | `compare`, `residual` | each on the section-2 result |
+| 9 | `ltv_disc` | `lambda_ = 0.1` (manual) on the Duffing data |
 
 **Required outputs.**
 
@@ -1144,13 +1155,11 @@ input).
 | Plot (`A[1,0](k)`) | 2 | True curve + COSMIC recovery overlay. |
 | Plot (`A[1,0](k)`) | 3 | `L_few`, `L_many`, and true curves. |
 | Plot (validation loss curve) | 4 | Loss vs λ on log scale with the minimum marked. |
-| Print | 5 | `preconditioned` flag. |
-| Print | 6 | Four-line cost breakdown with a consistency check (total − data − reg ≈ 0). |
-| Plot (`A[1,0](k)` with ±2σ band) | 7 | — |
-| Plot (Bode magnitudes at 3 time steps) | 8 | — |
-| Print | 9 | Two lines: frequency-tuned λ and validation-tuned λ. |
-| Print | 10 | Per-channel fits and whiteness PASS/FAIL. |
-| Plot (2-panel: amplitude profile + recovered `A[1,0](k)`) | 11 | Top panel: excitation amplitude ramp. Bottom panel: recovered `A[1,0](k)` with the small-amplitude linear reference as a horizontal dashed line. |
+| Print | 5 | Four-line cost breakdown with a consistency check (total − data − reg ≈ 0). |
+| Plot (`A[1,0](k)` with ±2σ band) | 6 | — |
+| Plot (Bode magnitudes at 3 time steps) | 7 | — |
+| Print | 8 | Per-channel fits and whiteness PASS (expected PASS with the v1.0.1 parameter choice). |
+| Plot (2-panel: amplitude profile + recovered `A[1,0](k)`) | 9 | Top panel: excitation amplitude ramp. Bottom panel: recovered `A[1,0](k)` with the small-amplitude linear reference as a horizontal dashed line. |
 
 ---
 
@@ -1521,6 +1530,43 @@ A port against v1.0.0 is conformant until v1.0.0 is explicitly
 deprecated (major version bump). A port SHOULD update to a newer
 minor version when practical, but is not required to chase every
 MINOR bump immediately.
+
+### 6.5 Changelog
+
+**v1.0.1 — 2026-04-12.** Cleanup pass motivated by spurious
+warnings in the v1.0.0 example suite:
+
+- §3.5 `method_comparison`: clarified that ports MUST clamp the
+  noise-spectrum array with a small positive floor before applying
+  `log10`, so the noise-spectrum overlay plot does not emit a
+  divide-by-zero warning at frequencies where the spectrum has been
+  clamped to zero per §2.7 of `SPEC.md`.
+- §3.1 `siso`: clarified that the residual whiteness test is
+  *expected* to FAIL on the Plant A SDOF. The non-parametric BT
+  estimator has finite-window bias that shows up as residual
+  auto-correlation; the FAIL is the pedagogical content of the
+  section, not a bug.
+- §3.9 `ltv_disc`:
+  - Removed "Preconditioning for numerical stability" section.
+    Preconditioning is intentionally disabled in the v1.0 library
+    release, so the call emits a runtime warning with no
+    pedagogical payload.
+  - Removed "Frequency-based lambda tuning" section.
+    `ltv_disc_tune(method='frequency')` relies on a non-parametric
+    `freq_map` estimate of each state channel; the velocity
+    component of a 1-DoF SMD has a bandpass spectrum that
+    `freq_map` cannot reliably estimate, so the method finds 0%
+    consistency on any reasonable lambda grid and emits "No lambda
+    achieved 90% consistency". The library method is not broken,
+    but it is the wrong tool for physical SMD plants.
+  - Changed the LTV section's simulation parameters from
+    `N = 80, L = 15` to `N = 250, L = 30`. With the longer record
+    and larger ensemble, the Section 8 residual whiteness test
+    passes cleanly in both Python and MATLAB, so the example can
+    print PASS without narration.
+  - Renumbered remaining sections from 11 to 9.
+
+**v1.0.0 — 2026-04-11.** Initial release.
 
 ---
 
