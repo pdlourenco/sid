@@ -3,7 +3,7 @@
 # project root for full license information.
 #
 # This module is part of the Open Source System Identification Toolbox (SID).
-# https://github.com/pdlourenco/sid-matlab
+# https://github.com/pdlourenco/sid
 
 """Tests for lti_freq_io from sid.
 

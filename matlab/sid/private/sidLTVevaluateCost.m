@@ -47,7 +47,7 @@ function [cost, fidelity, reg, variation] = sidLTVevaluateCost(A, B, D, Xl, lamb
 %   This function is part of the Open Source System Identification
 %   Toolbox (SID).
 %   For full documentation and examples, visit
-%   https://github.com/pdlourenco/sid-matlab
+%   https://github.com/pdlourenco/sid
 %  -----------------------------------------------------------------------
 
     % J = (1/2) sum_k ||D(k)C(k) - X'(k)||^2 + (1/2) sum_k lambda(k)||C(k+1)-C(k)||^2

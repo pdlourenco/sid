@@ -82,7 +82,7 @@ function result = sidFreqMap(y, u, varargin)
 %   This function is part of the Open Source System Identification
 %   Toolbox (SID).
 %   For full documentation and examples, visit
-%   https://github.com/pdlourenco/sid-matlab
+%   https://github.com/pdlourenco/sid
 %  -----------------------------------------------------------------------
 
     % ---- Validate data (preserve variable-length cells for SPEC.md §6.2) ----

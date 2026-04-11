@@ -1,7 +1,7 @@
 # sid — Python Implementation
 
-![Python Tests](https://github.com/pdlourenco/sid-matlab/actions/workflows/python-tests.yml/badge.svg)
-![Python Lint](https://github.com/pdlourenco/sid-matlab/actions/workflows/python-lint.yml/badge.svg)
+![Python Tests](https://github.com/pdlourenco/sid/actions/workflows/python-tests.yml/badge.svg)
+![Python Lint](https://github.com/pdlourenco/sid/actions/workflows/python-lint.yml/badge.svg)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/pdlourenco/sid/main?labpath=python%2Fexamples)
 
 Python implementation of the sid system identification toolbox. Numerically

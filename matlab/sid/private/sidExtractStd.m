@@ -37,7 +37,7 @@ function [AStd, BStd] = sidExtractStd(P, Sigma, N, p, q)
 %   This function is part of the Open Source System Identification
 %   Toolbox (SID).
 %   For full documentation and examples, visit
-%   https://github.com/pdlourenco/sid-matlab
+%   https://github.com/pdlourenco/sid
 %  -----------------------------------------------------------------------
 
     % Var(A(k)_{b,a}) = Sigma_{bb} * P(k)_{aa}       for a = 1,...,p

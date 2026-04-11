@@ -1,10 +1,10 @@
 # sid — Open-Source System Identification Toolbox
 
-![MATLAB/Octave Tests](https://github.com/pdlourenco/sid-matlab/actions/workflows/tests.yml/badge.svg)
-![MATLAB/Octave Lint](https://github.com/pdlourenco/sid-matlab/actions/workflows/lint.yml/badge.svg)
-![Python Tests](https://github.com/pdlourenco/sid-matlab/actions/workflows/python-tests.yml/badge.svg)
-![Python Lint](https://github.com/pdlourenco/sid-matlab/actions/workflows/python-lint.yml/badge.svg)
-![Cross-Language Validation](https://github.com/pdlourenco/sid-matlab/actions/workflows/cross-validate.yml/badge.svg)
+![MATLAB/Octave Tests](https://github.com/pdlourenco/sid/actions/workflows/tests.yml/badge.svg)
+![MATLAB/Octave Lint](https://github.com/pdlourenco/sid/actions/workflows/lint.yml/badge.svg)
+![Python Tests](https://github.com/pdlourenco/sid/actions/workflows/python-tests.yml/badge.svg)
+![Python Lint](https://github.com/pdlourenco/sid/actions/workflows/python-lint.yml/badge.svg)
+![Cross-Language Validation](https://github.com/pdlourenco/sid/actions/workflows/cross-validate.yml/badge.svg)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **sid** is a free, open-source toolbox for **system identification** — covering
@@ -40,7 +40,7 @@ See each language's README for installation, quick start, function reference, an
 <summary><strong>Tip:</strong> Only need one language? Use a sparse checkout.</summary>
 
 ```bash
-git clone --no-checkout https://github.com/pdlourenco/sid-matlab.git sid
+git clone --no-checkout https://github.com/pdlourenco/sid.git sid
 cd sid
 git sparse-checkout init --cone
 git sparse-checkout set spec testdata matlab   # replace 'matlab' with your language

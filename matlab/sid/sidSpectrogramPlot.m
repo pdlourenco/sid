@@ -46,7 +46,7 @@ function varargout = sidSpectrogramPlot(result, varargin)
 %   This function is part of the Open Source System Identification
 %   Toolbox (SID).
 %   For full documentation and examples, visit
-%   https://github.com/pdlourenco/sid-matlab
+%   https://github.com/pdlourenco/sid
 %  -----------------------------------------------------------------------
 
     % ---- Parse options ----

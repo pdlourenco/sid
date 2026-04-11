@@ -1,11 +1,11 @@
 # sid — MATLAB/Octave Implementation
 
-![Tests](https://github.com/pdlourenco/sid-matlab/actions/workflows/tests.yml/badge.svg)
-![Lint](https://github.com/pdlourenco/sid-matlab/actions/workflows/lint.yml/badge.svg)
+![Tests](https://github.com/pdlourenco/sid/actions/workflows/tests.yml/badge.svg)
+![Lint](https://github.com/pdlourenco/sid/actions/workflows/lint.yml/badge.svg)
 ![MATLAB R2016b+](https://img.shields.io/badge/MATLAB-R2016b%2B-orange.svg)
 ![GNU Octave 8+](https://img.shields.io/badge/GNU_Octave-8%2B-blue.svg)
 
-[![Open in MATLAB Online](https://www.mathworks.com/images/responsive/global/open-in-matlab-online.svg)](https://matlab.mathworks.com/open/github/v1?repo=pdlourenco/sid-matlab&file=matlab/examples/exampleSISO.m)
+[![Open in MATLAB Online](https://www.mathworks.com/images/responsive/global/open-in-matlab-online.svg)](https://matlab.mathworks.com/open/github/v1?repo=pdlourenco/sid&file=matlab/examples/exampleSISO.m)
 
 MATLAB/Octave implementation of the sid system identification toolbox.
 Pure MATLAB/Octave code with **zero toolbox dependencies**. Provides
@@ -23,13 +23,13 @@ tested on both platforms in CI.
 Clone the repository:
 
 ```bash
-git clone https://github.com/pdlourenco/sid-matlab.git
+git clone https://github.com/pdlourenco/sid.git
 ```
 
 Then add it to your MATLAB or Octave path:
 
 ```matlab
-run('/path/to/sid-matlab/matlab/sidInstall.m')
+run('/path/to/sid/matlab/sidInstall.m')
 ```
 
 To make the path persistent across sessions, add the line above to your

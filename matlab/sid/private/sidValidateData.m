@@ -59,7 +59,7 @@ function [y, u, N, ny, nu, isTimeSeries, nTraj] = sidValidateData(y, u, preserve
 %   This function is part of the Open Source System Identification
 %   Toolbox (SID).
 %   For full documentation and examples, visit
-%   https://github.com/pdlourenco/sid-matlab
+%   https://github.com/pdlourenco/sid
 %  -----------------------------------------------------------------------
 
     if nargin < 3 || isempty(preserveLengths)

@@ -1,4 +1,4 @@
-%% runAllTests - Master test runner for the sid-matlab package
+%% runAllTests - Master test runner for the sid package
 %
 % Discovers and runs all test_*.m scripts in this directory, then reports
 % a pass/fail summary. New tests are picked up automatically — no manifest
@@ -11,7 +11,7 @@
 % Or from the project root:
 %   run('matlab/tests/runAllTests.m')
 
-fprintf('=== sid-matlab Test Suite ===\n\n');
+fprintf('=== sid Test Suite ===\n\n');
 
 % Add paths — resolve this script's directory robustly (mfilename may
 % return only the base name when invoked via run() in some environments).

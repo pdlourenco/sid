@@ -1,4 +1,4 @@
-%% example_template - Template for sid-matlab example scripts
+%% example_template - Template for sid example scripts
 %
 % Copy this file to create new examples. Follow the structure below
 % so the example runner (runAllExamples.m) can track section progress.

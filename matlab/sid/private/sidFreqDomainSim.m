@@ -38,7 +38,7 @@ function Y_pred = sidFreqDomainSim(G_model, freqs_model, u, N)
 %   This function is part of the Open Source System Identification
 %   Toolbox (SID).
 %   For full documentation and examples, visit
-%   https://github.com/pdlourenco/sid-matlab
+%   https://github.com/pdlourenco/sid
 %  -----------------------------------------------------------------------
 
     ny = size(G_model, 2);

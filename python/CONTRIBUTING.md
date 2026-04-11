@@ -29,7 +29,7 @@ between code and the algorithm specification.
 # project root for full license information.
 #
 # This module is part of the Open Source System Identification Toolbox (SID).
-# https://github.com/pdlourenco/sid-matlab
+# https://github.com/pdlourenco/sid
 
 """Brief one-line description of the module."""
 

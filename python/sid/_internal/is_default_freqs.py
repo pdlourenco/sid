@@ -3,7 +3,7 @@
 # project root for full license information.
 #
 # This module is part of the Open Source System Identification Toolbox (SID).
-# https://github.com/pdlourenco/sid-matlab
+# https://github.com/pdlourenco/sid
 
 """Check whether a frequency vector matches the default 128-point grid."""
 

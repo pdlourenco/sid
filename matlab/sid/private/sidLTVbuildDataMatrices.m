@@ -40,7 +40,7 @@ function [D, Xl] = sidLTVbuildDataMatrices(X, U, N, p, q, L)
 %   This function is part of the Open Source System Identification
 %   Toolbox (SID).
 %   For full documentation and examples, visit
-%   https://github.com/pdlourenco/sid-matlab
+%   https://github.com/pdlourenco/sid
 %  -----------------------------------------------------------------------
 
     % D(k) = [X(k); U(k)]' / sqrt(N), Xl(k) = X(k+1)' / sqrt(N) (SPEC.md §8.3.2)

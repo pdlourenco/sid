@@ -8,7 +8,7 @@
 % Usage:
 %   run('matlab/examples/runAllExamples.m')
 
-fprintf('=== sid-matlab Examples ===\n\n');
+fprintf('=== sid Examples ===\n\n');
 
 % Add paths — resolve this script's directory robustly (mfilename may
 % return only the base name when invoked via run() in some environments).

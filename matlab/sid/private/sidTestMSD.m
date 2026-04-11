@@ -38,7 +38,7 @@ function [Ad, Bd] = sidTestMSD(m, k_spring, c_damp, F, Ts)
 %   This function is part of the Open Source System Identification
 %   Toolbox (SID).
 %   For full documentation and examples, visit
-%   https://github.com/pdlourenco/sid-matlab
+%   https://github.com/pdlourenco/sid
 %  -----------------------------------------------------------------------
 
     M_mat = diag(m);

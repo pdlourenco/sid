@@ -1,4 +1,4 @@
-%% test_template - Template for sid-matlab test files
+%% test_template - Template for sid test files
 %
 % Copy this file to create new tests. Follow the structure below so the
 % test runner (runAllTests.m) can track individual test case results.

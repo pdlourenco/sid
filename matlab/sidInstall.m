@@ -8,7 +8,7 @@ function sidInstall()
 %   private directory mechanism and do not need to be on the path.
 %   Run this once per session, or add the following to your startup.m:
 %
-%       run('/path/to/sid-matlab/matlab/sidInstall.m')
+%       run('/path/to/sid/matlab/sidInstall.m')
 %
 %   EXAMPLES:
 %     sidInstall
@@ -27,7 +27,7 @@ function sidInstall()
 %   This function is part of the Open Source System Identification
 %   Toolbox (SID).
 %   For full documentation and examples, visit
-%   https://github.com/pdlourenco/sid-matlab
+%   https://github.com/pdlourenco/sid
 %  -----------------------------------------------------------------------
 
     rootDir = fileparts(mfilename('fullpath'));
