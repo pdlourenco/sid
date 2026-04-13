@@ -12,10 +12,10 @@ System Identification or Signal Processing Toolboxes.
 
 The toolbox covers two complementary paths: a frequency-domain path built on
 Blackman-Tukey spectral analysis (Ljung, 1999), and a state-space path built
-on the COSMIC (Closed-form data-driven linear time-varying SysteM IdentifiCation) algorithm — a closed-form, O(N)-complexity solver for discrete
-linear time-varying system identification (Carvalho et al., 2022). Both paths
-support SISO, MIMO, time series, and multi-trajectory data through a unified
-API.
+on the COSMIC (Closed-form data-driven linear time-varying SysteM IdentifiCation)
+algorithm — a closed-form, O(N)-complexity solver for discrete linear time-varying
+system identification (Carvalho et al., 2022). Both paths support SISO, MIMO, time
+series, and multi-trajectory data through a unified API.
 
 No toolboxes are required. The entire codebase uses only core MATLAB/Octave
 functions and runs on MATLAB R2016b+ and GNU Octave 8.0+, including MATLAB
