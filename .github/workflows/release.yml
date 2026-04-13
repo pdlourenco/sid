@@ -1,0 +1,117 @@
+name: Release
+
+# Assembles a release archive matching the file tree in
+# <lang>/RELEASE_NOTES.md, uploads it as a workflow artifact,
+# and (on tag push) creates a GitHub release with the archive
+# attached and the release notes as the description.
+#
+# Tags must follow the pattern v<version>-<language>:
+#   v0.1-matlab   →  sid-v0.1-matlab.zip
+#   v0.1-python   →  sid-v0.1-python.zip
+#
+# Manual dispatch (workflow_dispatch) builds the archive for
+# testing without creating a release.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v0.1-matlab)'
+        required: true
+  push:
+    tags:
+      - 'v*-matlab'
+      - 'v*-python'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build release archive
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Determine release target
+        id: meta
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+
+          if [[ "$TAG" == *-matlab ]]; then
+            LANG=matlab
+          elif [[ "$TAG" == *-python ]]; then
+            LANG=python
+          else
+            echo "::error::Tag must end with -matlab or -python"
+            exit 1
+          fi
+
+          VERSION="${TAG%-"$LANG"}"
+          VERSION="${VERSION#v}"
+
+          echo "tag=$TAG"                        >> "$GITHUB_OUTPUT"
+          echo "language=$LANG"                  >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION"                >> "$GITHUB_OUTPUT"
+          echo "archive=sid-v${VERSION}-${LANG}" >> "$GITHUB_OUTPUT"
+
+      - name: Assemble MATLAB archive
+        if: steps.meta.outputs.language == 'matlab'
+        run: |
+          DEST="${{ steps.meta.outputs.archive }}"
+          mkdir -p "$DEST/spec" "$DEST/matlab"
+
+          cp README.md LICENSE "$DEST/"
+          cp spec/SPEC.md spec/EXAMPLES.md "$DEST/spec/"
+          cp matlab/README.md matlab/sidInstall.m "$DEST/matlab/"
+          cp -r matlab/sid "$DEST/matlab/sid"
+          cp -r matlab/examples "$DEST/matlab/examples"
+
+      - name: Assemble Python archive
+        if: steps.meta.outputs.language == 'python'
+        run: |
+          DEST="${{ steps.meta.outputs.archive }}"
+          mkdir -p "$DEST/spec" "$DEST/python"
+
+          cp README.md LICENSE "$DEST/"
+          cp spec/SPEC.md spec/EXAMPLES.md "$DEST/spec/"
+          cp -r testdata "$DEST/"
+          cp -r binder "$DEST/"
+          cp python/README.md python/pyproject.toml "$DEST/python/"
+          cp -r python/sid "$DEST/python/sid"
+          cp -r python/examples "$DEST/python/examples"
+
+      - name: Create zip
+        run: zip -r "${{ steps.meta.outputs.archive }}.zip" "${{ steps.meta.outputs.archive }}/"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.archive }}
+          path: ${{ steps.meta.outputs.archive }}.zip
+
+      - name: Create GitHub release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          LANG="${{ steps.meta.outputs.language }}"
+          TAG="${{ steps.meta.outputs.tag }}"
+          VERSION="${{ steps.meta.outputs.version }}"
+          ARCHIVE="${{ steps.meta.outputs.archive }}.zip"
+
+          if [[ "$LANG" == "matlab" ]]; then
+            TITLE="sid v${VERSION} — MATLAB/Octave"
+          else
+            TITLE="sid v${VERSION} — Python"
+          fi
+
+          gh release create "$TAG" "$ARCHIVE" \
+            --title "$TITLE" \
+            --notes-file "${LANG}/RELEASE_NOTES.md"
