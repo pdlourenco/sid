@@ -32,7 +32,6 @@ sid-v0.1.0-python/
 ├── spec/
 │   ├── SPEC.md                            # Full algorithm specification
 │   └── EXAMPLES.md                        # Example-suite specification
-├── testdata/                              # Cross-language reference vectors (JSON)
 ├── binder/                                # MyBinder environment definition
 │   ├── runtime.txt                        # python-3.11
 │   ├── requirements.txt                   # numpy, scipy, matplotlib

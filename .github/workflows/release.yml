@@ -81,7 +81,6 @@ jobs:
 
           cp README.md LICENSE "$DEST/"
           cp spec/SPEC.md spec/EXAMPLES.md "$DEST/spec/"
-          cp -r testdata "$DEST/"
           cp -r binder "$DEST/"
           cp python/README.md python/pyproject.toml "$DEST/python/"
           cp -r python/sid "$DEST/python/sid"
