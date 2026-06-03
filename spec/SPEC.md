@@ -3,6 +3,7 @@
 **Version:** 1.0.0
 **Date:** 2026-04-04
 **Reference:** Ljung, L. *System Identification: Theory for the User*, 2nd ed., Prentice Hall, 1999.
+**Rationale:** see [`docs/DESIGN.md`](../docs/DESIGN.md) for why these methods and this architecture were chosen (this document is the *contract*; DESIGN is the *why*).
 
 ---
 
