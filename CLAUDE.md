@@ -30,18 +30,15 @@ principles — not just surface-level lint — and act on what you find before
 pushing. This catches the "I'd have caught that if I'd thought harder" class of
 bug before it burns CI minutes and reviewer attention.
 
-Until the dedicated reviewer-context document lands (tracked in #115), use the
-**"Checklist for reviewers (and self-review)"** in [`CONTRIBUTING.md`](CONTRIBUTING.md)
-as the review basis, paying particular attention to:
-
-- Is every new default / bound / threshold covered by `spec/SPEC.md`?
-- Do the MATLAB and Python sides derive their behaviour **independently from the
-  spec**, rather than one being ported copy-by-copy from the other?
-- Are tests written against the spec's requirements, not against the current
-  output of the other language?
+Coding agents should launch a reviewer subagent on the local diff, seeded with
+[`docs/REVIEW_CONTEXT.md`](docs/REVIEW_CONTEXT.md) (project principles, red
+flags, review modes), following the prompt and exceptions in
+[`CONTRIBUTING.md`](CONTRIBUTING.md) §"Pre-push self-review (agent convention)".
+Act on findings before pushing and note the outcome in the PR description
+(`pre-push review: no findings` or `pre-push review flagged X, fixed in <sha>`).
 
 The narrow exceptions — one-line typo, formatting-only, pure revert — don't
-warrant the ceremony. Note the outcome briefly in the PR description.
+warrant the ceremony.
 
 ## 3. Implementation is bound to the spec as a contract
 
