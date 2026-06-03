@@ -10,6 +10,21 @@
 
 ---
 
+## Verification (right-side mechanisms)
+
+Every binding rule in this document should name the mechanism that gates it — the "right side" of the V. A `**Verified by:**` block at the end of each function section lists the verifier for each rule cluster, using this vocabulary:
+
+- **`cross-vector`** — a `testdata/reference_*.json` reference vector checked by the `cross-validate.yml` CI job; pins MATLAB↔Python numerical equivalence on fixed inputs.
+- **`unit(M)` / `unit(Py)`** — a language unit test (e.g. `matlab/tests/test_sidFreqBT.m`, `python/tests/test_freq_bt.py`).
+- **`lint`** — `check_headers.py` / `check_python_headers.py` / MISS_HIT / ruff.
+- **`manual`** — a convention held by inspection on release PRs; no automated check asserts it.
+- **`deferred`** — rule explicitly out of v1.0 scope (see the implementation-status banner above).
+- **`none`** — no verifier today: **visible debt**. A reviewer in verification mode should flag these. The current uncovered set is enumerated in the coverage-map recon on [issue #113](https://github.com/pdlourenco/sid/issues/113); `⚠️ confirm` marks rules whose coverage is inferred from test names but not yet verified assertion-by-assertion.
+
+A `cross-vector` check proves the two ports *agree*, not that either satisfies the spec; the strongest rules pair it with a `unit` test written against the spec requirement (see `CONTRIBUTING.md` §"Cross-language reference vectors are a check, not a proof" and `CLAUDE.md` §3).
+
+---
+
 ## 1. System Model
 
 All frequency-domain estimation in this package assumes the general linear time-invariant model:
@@ -39,6 +54,8 @@ where `e(t)` is white noise with covariance matrix `Λ`.
 **LTV extension:** The `sidFreqMap` function (§6) relaxes the time-invariance assumption by applying spectral analysis (Blackman-Tukey or Welch) to overlapping segments, producing a time-varying frequency response Ĝ(ω, t). Within each segment, local time-invariance is assumed.
 
 **Multi-trajectory support:** All `sid` functions accept multiple independent trajectories (experiments) of the same system. For frequency-domain functions (`sidFreqBT`, `sidFreqETFE`, `sidFreqMap`, `sidSpectrogram`), spectral estimates are ensemble-averaged across trajectories before forming transfer function ratios or power spectra, reducing variance by a factor of `L` without sacrificing frequency resolution. For `sidLTVdisc`, multiple trajectories are aggregated in the data matrices as described in §8. Multi-trajectory data is passed as 3D arrays `(N × n_ch × L)` when all trajectories share the same length, or as cell arrays `{y1, y2, ..., yL}` when lengths differ. See §2, §4.1, and §6 below for the mathematical basis.
+
+**Verified by:** the data-model notation is definitional (`manual`); the multi-trajectory ensemble-averaging and time-series-mode (`n_u = 0`) claims are exercised by `unit(M)` `test_multiTrajectory.m` / `test_sidFreqBT.m` and their Python counterparts.
 
 ---
 
@@ -265,6 +282,14 @@ To convert to the Signal Processing Toolbox convention, multiply by `Ts`:
 Φ̂_SPT(ω) = Ts × Φ̂_SID(ω)
 ```
 
+**Verified by:**
+
+- Frequency response, noise spectrum, SISO/MIMO/time-series paths (§2.1–2.7) — `cross-vector` (`reference_siso_bt`, `reference_mimo_bt`, `reference_timeseries_bt`, `reference_siso_bt_large_M`), `unit(M)` `test_sidFreqBT.m`, `unit(Py)` `test_freq_bt.py`.
+- §2.3 covariance, §2.4 Hann window, §2.5 windowed DFT incl. FFT fast path — `cross-vector` (`reference_internals`), `unit(M)` `test_sidCov`/`test_sidHannWin`/`test_sidWindowedDFT`/`test_sidDFT`, `unit(Py)` `test_cov`/`test_hann_win`/`test_windowed_dft`/`test_dft`.
+- §2.6 singular-input regularization (`Ĝ=NaN` when `|Φ̂_u|<ε`, ε=1e-10) — `none` (candidate gap, see #113).
+- §2.7 noise-spectrum non-negativity clamp — `none` (candidate gap).
+- §2.8 normalization convention (no `Ts`, no `1/2π`) — `manual`; held implicitly by the cross-vectors' absolute values, asserted by no test.
+
 ---
 
 ## 3. Uncertainty Estimation
@@ -373,6 +398,12 @@ This is equivalent to treating each `(i,j)` channel as an independent SISO syste
 
 **Limitations:** The diagonal approximation ignores cross-channel correlations in both the noise and input spectra. It is exact when inputs are uncorrelated and the noise is channel-independent, and **underestimates** variance otherwise. A full MIMO treatment using `Φ̂_u(ω)⁻¹ ⊗ Φ̂_v(ω)` is deferred to a future version.
 
+**Verified by:**
+
+- §3.1–3.5 window norm, coherence, variance formulas — `cross-vector` (`reference_uncertainty`), `unit(M)` `test_sidUncertainty.m`, `unit(Py)` `test_uncertainty.py`.
+- §3.3 `σ_G=Inf` regularization (`γ̂²<ε`) — `unit` if exercised by the uncertainty tests; ⚠️ confirm.
+- §3.6 MIMO diagonal approximation — ⚠️ confirm a MIMO uncertainty case is asserted; no dedicated MIMO uncertainty vector.
+
 ---
 
 ## 4. `sidFreqETFE` — Empirical Transfer Function Estimate
@@ -434,6 +465,11 @@ When no input is present, the ETFE reduces to the **periodogram**:
 
 The ETFE has no closed-form asymptotic variance formula: the periodogram is an inconsistent estimator whose variance does not decrease with `N`. The `ResponseStd` and `NoiseSpectrumStd` fields are set to `NaN`. For uncertainty quantification, use `sidFreqBT` (which smooths via the lag window) or apply optional smoothing (§4.2) and estimate variance empirically.
 
+**Verified by:**
+
+- ETFE ratio, smoothing, periodogram time-series mode — `cross-vector` (`reference_siso_etfe`), `unit(M)` `test_sidFreqETFE.m` / `test_compareEtfe.m`, `unit(Py)` `test_freq_etfe.py`.
+- §4.5 `ResponseStd`/`NoiseSpectrumStd = NaN` (no closed-form variance) — `unit` field-value assertion; ⚠️ confirm both languages.
+
 ---
 
 ## 5. `sidFreqBTFDR` — Frequency-Dependent Resolution
@@ -474,6 +510,8 @@ R = 2π / min(floor(N/10), 30)
 ```
 
 This matches the default behavior of `sidFreqBT`.
+
+**Verified by:** `cross-vector` (`reference_siso_btfdr`), `unit(M)` `test_sidFreqBTFDR.m` / `test_compareSpafdr.m`, `unit(Py)` `test_freq_btfdr.py`. §5.2 resolution→`M_k` mapping (`M_k=ceil(2π/R_k)`) is exercised indirectly via the response vector; ⚠️ confirm a direct mapping assertion.
 
 ---
 
@@ -695,6 +733,12 @@ The key difference: `sidFreqMap` always produces time-varying output. Setting `S
 
 **Edge effects:** The first and last segments may produce less reliable estimates if the system is non-stationary near the boundaries. No special handling is applied — the uncertainty estimates from each segment naturally reflect the reduced confidence.
 
+**Verified by:**
+
+- Outer segmentation, BT inner path, output struct, time vector — `cross-vector` (`reference_freqmap_bt`), `unit(M)` `test_sidFreqMap.m`, `unit(Py)` `test_freq_map.py`.
+- §6.5 Welch inner path — `unit(M)` only (`test_compareWelch.m`); no cross-vector, no Python assertion (candidate gap).
+- §6.10 `tfestimate` compatibility — `unit(M)` `test_compareWelch.m` (MATLAB-only).
+
 ---
 
 ## 7. `sidSpectrogram` — Short-Time Spectral Analysis
@@ -823,6 +867,8 @@ result = sidSpectrogram(x, 'WindowLength', 256, 'Overlap', 128, ...
 ```
 
 The normalization follows the PSD convention (power per unit frequency), matching the MathWorks default when `spectrogram` is called with the `'psd'` option.
+
+**Verified by:** `cross-vector` (`reference_spectrogram`), `unit(M)` `test_sidSpectrogram.m`, `unit(Py)` `test_spectrogram.py`. §7.7 MathWorks `spectrogram` compatibility — `manual` / `unit(M)` (no Python compat assertion).
 
 ---
 
@@ -1697,6 +1743,24 @@ The following are out of scope for v1.0:
 - **Parametric identification:** ARX, ARMAX, state-space subspace methods (`sidTfARX`, `sidSsN4SID`, etc.).
 - **LPV identification:** Structured parameter-varying models via direct least-squares or post-hoc regression on COSMIC output. See `spec/lpv_extension_theory.md` for design notes.
 
+**Verified by:**
+
+- §8.3 COSMIC core (data matrices, cost, forward-backward solve) — `cross-vector` (`reference_ltv_cosmic`, `reference_cosmic_internals`), `unit(M)` `test_sidLTVdisc.m`, `unit(Py)` `test_ltv_disc.py`.
+- §8.3.4 ill-conditioning warning (`rcond(Λ_{k-1})<eps`) — `none` (candidate gap).
+- §8.3.6 preconditioning `'not_implemented'` path — `unit(M)` `test_sidLTVdisc.m` field assertion; ⚠️ confirm Python.
+- §8.4.2 L-curve `'auto'` selection (`logspace(-3,15,50)`, max-curvature corner) — `none` (candidate gap; vectors use fixed λ).
+- §8.4.3 validation-based tuning — `unit(M)` `test_sidLTVdiscTune.m`, `unit(Py)` `test_ltv_disc_tune.py` (no cross-vector).
+- §8.5 output-struct field shapes — `unit` presence/shape; semantic fields (`NoiseCovEstimated`, `DegreesOfFreedom`) ⚠️ confirm.
+- §8.8 variable-length trajectories — `unit(M)` `test_sidLTVdiscVarLen.m` (+ `test_multiTrajectory.m`).
+- §8.9 Bayesian uncertainty (Schur-complement `P(k)`, `Σ` estimation, `AStd`/`BStd`) — `unit(M)` `test_sidLTVdiscUncertainty.m` only; **no cross-vector** → MATLAB↔Python equivalence unpinned (candidate gap).
+- §8.10 online/recursive COSMIC — `deferred` (v2).
+- §8.11 λ-tuning via frequency response — `unit(M)` `test_sidLTVdiscTune.m` (frequency mode); ⚠️ confirm coverage.
+- §8.12 Output-COSMIC (`sidLTVdiscIO`) — `cross-vector` (`reference_ltv_io`), `unit(M)` `test_sidLTVdiscIO.m`, `unit(Py)` `test_ltv_disc_io.py`. Frozen TF (`sidLTVdiscFrozen`) — `cross-vector` (`reference_ltv_frozen`), `unit(M)` `test_sidLTVdiscFrozen.m`, `unit(Py)` `test_ltv_disc_frozen.py`.
+- §8.12.12 `sidModelOrder` — `cross-vector` (`reference_model_order`), `unit(M)` `test_sidModelOrder.m`, `unit(Py)` `test_model_order.py`.
+- §8.12.13 `sidLTVStateEst` — `cross-vector` (`reference_ltv_state_est`), `unit(M)` `test_sidLTVStateEst.m`, `unit(Py)` `test_ltv_state_est.py`.
+- §8.13 `sidLTIfreqIO` — `cross-vector` (`reference_lti_freq_io`), `unit(M)` `test_sidLTIfreqIO.m`; **no Python unit test** (candidate gap).
+- §8.14 deferred extensions — `deferred`.
+
 ---
 
 ## 9. Output Struct
@@ -1725,6 +1789,8 @@ All `sidFreq*` functions return a struct with these fields:
 - MIMO: Dimensions are `(n_f × n_y × n_u)` for `Response` and `(n_f × n_y × n_y)` for `NoiseSpectrum`.
 
 **Time series mode:** `Response` and `ResponseStd` are empty (`[]`). `Coherence` is empty. `NoiseSpectrum` contains `Φ̂_y(ω)`.
+
+**Verified by:** field names, shapes, and semantics are exercised across the per-function `cross-vector` and `unit` suites that assert each result struct; the PascalCase↔snake_case mapping is enforced by `lint` (`check_python_headers.py`) plus the Python unit tests. ⚠️ confirm time-series empty-field (`[]`) cases in both languages.
 
 ---
 
@@ -1760,6 +1826,12 @@ All `sidFreq*` functions return a struct with these fields:
 | `y` is constant | Valid; `Φ̂_y ≈ 0` at all frequencies |
 | `u = y` (perfect coherence) | Valid; `γ̂² ≈ 1`, `Φ̂_v ≈ 0`, very small `σ_G` |
 
+**Verified by:**
+
+- §10.1 input-validation table (8 error/warning rows) — `unit(M)` `test_sidValidate.m`, `unit(Py)` `test_validate.py`; ⚠️ confirm every row is asserted in both languages.
+- §10.2 numerical edge cases (`Ĝ=NaN` on `Φ̂_u≈0`; clamp `Φ̂_v<0→0`, `γ̂²` into `[0,1]`) — `none` (candidate gap; possibly partial in `test_reviewFixes.m`).
+- §10.3 degenerate inputs (constant `u`, `u=y`) — `none` (candidate gap).
+
 ---
 
 ## 11. Plotting
@@ -1794,6 +1866,11 @@ Both plotting functions accept name-value options:
 | `'Color'` | MATLAB default | Line color |
 | `'LineWidth'` | `1.5` | Line width |
 | `'Axes'` | `[]` | Axes handle (creates new figure if empty) |
+
+**Verified by:**
+
+- Plot structure, axes, option handling (§11.3) — `unit(M)` `test_sidPlotting.m`, `unit(Py)` `test_plotting.py`.
+- §11.1/§11.2 confidence-band math (dB conversion, small-angle phase approximation) — `none` (candidate gap; structure-only today).
 
 ---
 
@@ -1893,6 +1970,8 @@ y_ds = sidDetrend(y, 'SegmentLength', 1000);
 [u_dt] = sidDetrend(u);
 result = sidFreqBT(y_dt, u_dt);
 ```
+
+**Verified by:** `cross-vector` (`reference_detrend`), `unit(M)` `test_sidDetrend.m`, `unit(Py)` `test_detrend.py` (orders 0–2, segment-wise, multi-channel, 3D multi-trajectory).
 
 ---
 
@@ -2005,6 +2084,8 @@ resid = sidResidual(ltv, X, U);
 sidResidual(result, y, u, 'Plot', true);
 ```
 
+**Verified by:** `cross-vector` (`reference_residual`), `unit(M)` `test_sidResidual.m`, `unit(Py)` `test_residual.py` (whiteness + independence tests, autocorrelation).
+
 ---
 
 ## 15. `sidCompare` — Model Output Comparison
@@ -2084,3 +2165,7 @@ comp = sidCompare(ltv, X_val, U_val);
 % Plot comparison
 sidCompare(result, y, u, 'Plot', true);
 ```
+
+---
+
+**Verified by:** `cross-vector` (`reference_compare`, `reference_freq_domain_sim`), `unit(M)` `test_sidCompare.m`, `unit(Py)` `test_compare.py` (simulation, NRMSE fit metric). Note: `sidFreqDomainSim` has a cross-vector but no dedicated unit test in either language (candidate gap).
