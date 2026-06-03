@@ -86,6 +86,27 @@ field, or any edge-case behaviour:
 - [ ] Are tests written against the spec's requirements, not against the
       current output of the other language?
 
+## Design decisions (ADRs)
+
+Non-obvious tactical or engineering choices live in
+[`docs/decisions/`](docs/decisions/) as Architecture Decision Records. See
+[`docs/decisions/README.md`](docs/decisions/README.md) for the format,
+lifecycle (ADR-first / issue-first), and the current index.
+
+**Write an ADR when** you make a choice someone could reasonably challenge later
+— a regularization threshold, a fallback ordering, NaN-handling policy, a
+numerical-diagnostic cutoff — and future PRs will either follow it or explicitly
+deviate. **Don't write one** when the choice is already fixed by
+[`spec/SPEC.md`](spec/SPEC.md) (the spec owns the contract; ADRs capture the
+*why* of tactical choices beneath it) or is purely mechanical (formatter
+settings, import ordering, internal naming).
+
+When an ADR motivates a spec change, both land in the same PR (spec first, per
+"Workflow for algorithmic changes" above). Link ADRs from PR descriptions
+(`Implements X per ADR-NNNN.`) and from code comments beside tactical values
+(`% See ADR-NNNN`). Adding or revisiting a load-bearing decision is a "major
+decision" — see [`CLAUDE.md`](CLAUDE.md) §4.
+
 ## General Guidelines
 
 - The spec rules above apply to every implementation. The per-language

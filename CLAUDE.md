@@ -94,10 +94,11 @@ For any of the above:
 1. **Pause and surface the decision** — describe the choice, the alternatives,
    and the trade-off in the conversation. Wait for an explicit go-ahead before
    implementing.
-2. **If the decision is accepted and non-obvious, record it.** An ADR convention
-   for `docs/decisions/` is being added (tracked in #114); once it lands, write
-   the ADR there and link it from the PR. Until then, capture the rationale in
-   the PR description and the relevant spec change log.
+2. **If the decision is accepted and non-obvious, record it as an ADR** in
+   [`docs/decisions/`](docs/decisions/) following
+   [`docs/decisions/README.md`](docs/decisions/README.md), and link it from the
+   PR description. When an ADR motivates a spec change, both land in the same PR
+   (spec first).
 3. **Tactical and mechanical choices do not need this** — formatter settings,
    import ordering, internal naming, obvious refactors. When in doubt, ask; the
    cost of a question is lower than the cost of an unwanted commit.
