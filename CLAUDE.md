@@ -101,10 +101,11 @@ For any of the above:
    recommend-don't-decide posture is the default for *every* maintainer-facing
    question, not only the major decisions enumerated above: surface the options
    and your recommendation rather than picking silently.
-2. **If the decision is accepted and non-obvious, record it.** An ADR convention
-   for `docs/decisions/` is being added (tracked in #114); once it lands, write
-   the ADR there and link it from the PR. Until then, capture the rationale in
-   the PR description and the relevant spec change log.
+2. **If the decision is accepted and non-obvious, record it as an ADR** in
+   [`docs/decisions/`](docs/decisions/) following
+   [`docs/decisions/README.md`](docs/decisions/README.md), and link it from the
+   PR description. When an ADR motivates a spec change, both land in the same PR
+   (spec first).
 3. **Tactical and mechanical choices do not need this** — formatter settings,
    import ordering, internal naming, obvious refactors. When in doubt, ask; the
    cost of a question is lower than the cost of an unwanted commit.
