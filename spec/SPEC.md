@@ -1702,7 +1702,7 @@ The following are out of scope for v1.0:
 - **Time-varying observation matrix:** `H(k)` with smoothness prior; requires separate treatment.
 - **GCV lambda selection.**
 - **Parametric identification:** ARX, ARMAX, state-space subspace methods (`sidTfARX`, `sidSsN4SID`, etc.).
-- **LPV identification:** Structured parameter-varying models via direct least-squares or post-hoc regression on COSMIC output. See `spec/lpv_extension_theory.md` for design notes.
+- **LPV identification:** Structured parameter-varying models via direct least-squares or post-hoc regression on COSMIC output.
 
 ---
 

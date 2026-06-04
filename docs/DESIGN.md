@@ -134,5 +134,6 @@ scope now, and what would bring it in. Contract-level deferrals are tracked in
 - **Julia port.** The spec + reference vectors are designed to make a third port
   a matter of independent conformance, not redesign. *Trigger:* a maintainer or
   contributor to own it; implement the runner with auto-discovery from day one.
-- **LPV identification.** Structured parameter-varying models via post-hoc
-  regression on COSMIC output; design notes in `spec/lpv_extension_theory.md`.
+- **LPV identification.** Structured parameter-varying models via direct
+  least-squares or post-hoc regression on COSMIC output; tracked with the LPV
+  deferral in `spec/SPEC.md` §8.14.
