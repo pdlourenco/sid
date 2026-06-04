@@ -12,6 +12,13 @@ on:
       - 'python/**'
       - 'testdata/**'
 
+# Least-privilege token: these jobs only check out and run tests, so
+# contents: read is all actions/checkout needs. Declaring the block explicitly
+# also avoids the private-fork checkout 404 that bites any workflow which later
+# adds a write scope (e.g. issues: write) without re-listing contents.
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Tests (Python ${{ matrix.python-version }})
