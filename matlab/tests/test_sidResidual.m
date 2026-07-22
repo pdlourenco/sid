@@ -54,11 +54,17 @@ end
 ltv = sidLTVdisc(X, U, 'Lambda', 1e4);
 resid_ss = sidResidual(ltv, X, U);
 
-assert(isequal(size(resid_ss.Residual), [N, p]), ...
-    'SS residual should be N x p');
+% Multi-trajectory residual is per-trajectory (N x p x L), and the whiteness
+% bound uses the pooled sample count N_eff = L*N (issue #140).
+assert(isequal(size(resid_ss.Residual), [N, p, L]), ...
+    'SS multi-traj residual should be N x p x L');
 assert(isscalar(resid_ss.ConfidenceBound), 'Confidence bound should be scalar');
+assert(abs(resid_ss.ConfidenceBound - 2.58 / sqrt(L * N)) < 1e-12, ...
+    'Multi-traj bound should be 2.58/sqrt(L*N), got %.5f', resid_ss.ConfidenceBound);
+assert(resid_ss.DataLength == L * N, ...
+    'Multi-traj DataLength should be L*N = %d, got %d', L * N, resid_ss.DataLength);
 runner__nPassed = runner__nPassed + 1;
-fprintf('  Test 3 passed: state-space residual analysis.\n');
+fprintf('  Test 3 passed: state-space multi-trajectory residual (#140).\n');
 
 %% Test 4: Time-series mode (u=[])
 rng(6004);

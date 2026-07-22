@@ -176,3 +176,43 @@ class TestCompare:
         assert np.allclose(pred, 0.0, atol=1e-10) or (
             np.linalg.norm(pred) < 0.1 * np.linalg.norm(y)
         ), "Time-series predicted should be zero or very small"
+
+    # ------------------------------------------------------------------
+    # Multi-trajectory fit: per-trajectory NRMSE, averaged (SPEC §15.3, #140)
+    # ------------------------------------------------------------------
+    def test_multi_trajectory_per_trajectory_fit(self) -> None:
+        """predicted/measured/residual are per-trajectory (N, p, L)."""
+        rng = np.random.default_rng(140)
+        N, p, q, L = 60, 2, 1, 4
+        A = np.array([[0.9, 0.1], [-0.05, 0.85]])
+        B = np.array([[0.5], [0.3]])
+        X = np.zeros((N + 1, p, L))
+        U = rng.standard_normal((N, q, L))
+        for ll in range(L):
+            X[0, :, ll] = rng.standard_normal(p)
+            for k in range(N):
+                X[k + 1, :, ll] = A @ X[k, :, ll] + B.ravel() * U[k, :, ll]
+        model = ltv_disc(X, U, lambda_=1e6)
+        result = compare(model, X, U)
+        assert result.predicted.shape == (N, p, L)
+        assert result.residual.shape == (N, p, L)
+        assert np.all(result.fit > 90)
+
+    def test_mirror_trajectories_not_nan(self) -> None:
+        """[X, -X], [U, -U] is perfectly identifiable; the old signal-averaging
+        path gave measured == 0 and fit = NaN (issue #140)."""
+        rng = np.random.default_rng(141)
+        N, p, q = 60, 2, 1
+        A = np.array([[0.9, 0.1], [-0.05, 0.85]])
+        B = np.array([[0.5], [0.3]])
+        X = np.zeros((N + 1, p))
+        U = rng.standard_normal((N, q))
+        X[0] = rng.standard_normal(p)
+        for k in range(N):
+            X[k + 1] = A @ X[k] + B.ravel() * U[k, 0]
+        model = ltv_disc(X[:, :, None], U[:, :, None], lambda_=1e6)
+        X2 = np.stack([X, -X], axis=2)
+        U2 = np.stack([U, -U], axis=2)
+        result = compare(model, X2, U2)
+        assert np.all(np.isfinite(result.fit)), f"fit should be finite, got {result.fit}"
+        assert np.all(result.fit > 90), f"mirror trajectories should fit ~100%, got {result.fit}"

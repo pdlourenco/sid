@@ -179,3 +179,28 @@ class TestResidual:
 
         with pytest.raises((SidError, TypeError, AttributeError, KeyError, ValueError)):
             residual(bad_model, y, u)
+
+    # ------------------------------------------------------------------
+    # Multi-trajectory residual: pooled bound + own-input crosscorr (#140)
+    # ------------------------------------------------------------------
+    def test_multi_trajectory_pooled(self) -> None:
+        """Residual is per-trajectory (N, ny, L); the whiteness bound uses the
+        pooled sample count N_eff = L*N, not N (which would be anticonservative
+        after signal averaging)."""
+        rng = np.random.default_rng(140)
+        N, p, q, L = 200, 2, 1, 4
+        A = np.array([[0.9, 0.1], [-0.05, 0.85]])
+        B = np.array([[0.5], [0.3]])
+        X = np.zeros((N + 1, p, L))
+        U = rng.standard_normal((N, q, L))
+        for ll in range(L):
+            X[0, :, ll] = rng.standard_normal(p)
+            for k in range(N):
+                X[k + 1, :, ll] = (
+                    A @ X[k, :, ll] + B.ravel() * U[k, :, ll] + (0.01 * rng.standard_normal(p))
+                )
+        model = ltv_disc(X, U, lambda_=1e2)
+        res = residual(model, X, U)
+        assert np.asarray(res.residual).shape == (N, p, L)
+        assert res.data_length == L * N
+        assert abs(res.confidence_bound - 2.58 / np.sqrt(L * N)) < 1e-12

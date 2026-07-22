@@ -109,9 +109,9 @@ def residual(
     # Dispatch on model type
     # ------------------------------------------------------------------
     if hasattr(model, "a") and hasattr(model, "b"):
-        e, N_eff = _compute_residual_ss(model, y, u)
+        e, N = _compute_residual_ss(model, y, u)
     elif hasattr(model, "response"):
-        e, N_eff = _compute_residual_freq(model, y, u)
+        e, N = _compute_residual_freq(model, y, u)
     else:
         raise SidError(
             "bad_model",
@@ -119,11 +119,18 @@ def residual(
             "or 'a'/'b' attributes (state-space).",
         )
 
+    # Trajectory count. Correlograms are computed on the per-trajectory
+    # residual (3-D) via sid_cov's ensemble averaging; the whiteness /
+    # independence bound uses the pooled sample count N_eff = L*N, while the
+    # lag range is bounded by the per-trajectory length N (issue #140).
+    L_traj: int = e.shape[2] if e.ndim == 3 else 1
+    N_eff: int = L_traj * N
+
     # ------------------------------------------------------------------
     # Default max_lag
     # ------------------------------------------------------------------
     if max_lag is None:
-        max_lag = min(25, N_eff // 5)
+        max_lag = min(25, N // 5)
 
     # ------------------------------------------------------------------
     # Per-channel whiteness and independence tests
@@ -131,22 +138,17 @@ def residual(
     ny: int = e.shape[1]
     conf_bound: float = 2.58 / np.sqrt(N_eff)
 
-    # Prepare 2-D input for cross-correlation
+    # Keep the input per trajectory (3-D) so each trajectory's residual is
+    # cross-correlated against its own input, ensemble-averaged by sid_cov.
     if not is_time_series:
-        u_arr = np.asarray(u)
-        if u_arr.ndim == 3:
-            nu: int = u_arr.shape[1]
-            u_2d = u_arr[:, :, 0]  # first trajectory
-        else:
-            if u_arr.ndim == 1:
-                u_2d = u_arr[:, np.newaxis]
-            else:
-                u_2d = u_arr
-            nu = u_2d.shape[1]
-        N_use: int = min(e.shape[0], u_2d.shape[0])
+        u_arr = np.asarray(u, dtype=np.float64)
+        if u_arr.ndim == 1:
+            u_arr = u_arr[:, np.newaxis]
+        nu: int = u_arr.shape[1]
+        N_use: int = min(e.shape[0], u_arr.shape[0])
     else:
         nu = 0
-        u_2d = None
+        u_arr = None
         N_use = e.shape[0]
 
     # Storage
@@ -159,7 +161,12 @@ def residual(
         indep_pass_all = np.ones(n_pairs, dtype=bool)
 
     for ch in range(ny):
-        e_ch = e[:N_use, ch : ch + 1]  # (N_use, 1)
+        # Keep the trajectory axis so sid_cov ensemble-averages (N_use, 1, L);
+        # single-trajectory residuals stay 2-D (N_use, 1).
+        if e.ndim == 3:
+            e_ch = e[:N_use, ch : ch + 1, :]
+        else:
+            e_ch = e[:N_use, ch : ch + 1]
 
         # -- Whiteness: normalised autocorrelation --
         R_ee = sid_cov(e_ch, e_ch, max_lag)  # (max_lag+1,) scalar signal
@@ -172,12 +179,15 @@ def residual(
         if not is_time_series:
             for iu in range(nu):
                 pair_idx = ch * nu + iu
-                u_ch = u_2d[:N_use, iu : iu + 1]  # (N_use, 1)
+                if u_arr.ndim == 3:
+                    u_ch = u_arr[:N_use, iu : iu + 1, :]
+                else:
+                    u_ch = u_arr[:N_use, iu : iu + 1]
 
                 R_eu_pos = sid_cov(e_ch, u_ch, max_lag)  # (max_lag+1,)
                 R_ue_pos = sid_cov(u_ch, e_ch, max_lag)  # (max_lag+1,)
 
-                R_uu0 = float(u_ch.ravel() @ u_ch.ravel()) / N_use
+                R_uu0 = float(sid_cov(u_ch, u_ch, 0)[0])  # ensemble variance
                 denom = np.sqrt(R_ee0 * R_uu0)
 
                 if denom > 0:
@@ -242,8 +252,15 @@ def _compute_residual_ss(
 ) -> tuple[np.ndarray, int]:
     """Residuals from a state-space model (COSMIC).
 
-    Computes ``e[k] = x[k+1] - A[k] @ x[k] - B[k] @ u[k]``, averaged
-    over trajectories.
+    Computes ``e[k] = x[k+1] - A[k] @ x[k] - B[k] @ u[k]`` per trajectory.
+
+    Trajectories are kept separate (NOT averaged into one series): averaging
+    shrinks the residual variance by L while the whiteness bound stays at
+    2.58/sqrt(N), making the test anticonservative, and it discards each
+    trajectory's own input for the independence test. The 3-D result is passed
+    straight to sid_cov, which ensemble-averages the correlograms with the
+    correct 1/(L*N) normalization; the caller uses N_eff = L*N for the bound
+    (issue #140).
 
     Parameters
     ----------
@@ -256,10 +273,10 @@ def _compute_residual_ss(
 
     Returns
     -------
-    e : ndarray, shape ``(N, p)``
-        Residual time series.
+    e : ndarray, shape ``(N, p)`` or ``(N, p, L)``
+        Residual time series, per trajectory (2-D for a single trajectory).
     N : int
-        Number of time steps.
+        Number of time steps per trajectory.
     """
     X = np.asarray(X, dtype=np.float64)
     Nm: int = model.data_length
@@ -270,10 +287,10 @@ def _compute_residual_ss(
     else:
         L = 1
 
-    e_all = np.zeros((Nm, p), dtype=np.float64)
+    e = np.zeros((Nm, p, L), dtype=np.float64)
 
     for traj in range(L):
-        if L > 1:
+        if X.ndim == 3:
             Xl = X[:, :, traj]
             Ul = U[:, :, traj] if U is not None else None
         else:
@@ -282,9 +299,10 @@ def _compute_residual_ss(
 
         for k in range(Nm):
             x_pred = model.a[:, :, k] @ Xl[k, :].T + model.b[:, :, k] @ Ul[k, :].T
-            e_all[k, :] += Xl[k + 1, :] - x_pred.T
+            e[k, :, traj] = Xl[k + 1, :] - x_pred.T
 
-    e = e_all / L
+    if L == 1:
+        return e[:, :, 0], Nm
     return e, Nm
 
 
