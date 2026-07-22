@@ -364,4 +364,64 @@ assert(errD < 1e-12, ...
 runner__nPassed = runner__nPassed + 1;
 fprintf('  Test 11 passed: default params match explicit.\n');
 
+%% Test 12: Variable-length matches dense LSQ minimizer of J_state (#134)
+% The block-tridiagonal diagonal blocks are built for the maximal horizon
+% N, so a short trajectory (Nl < N) must use the terminal block
+% H'R^{-1}H + Q^{-1} at its endpoint, not the interior block. Before the
+% fix the sliced interior block leaked A(Nl)'Q^{-1}A(Nl), imposing a
+% phantom x(Nl+1)=0 constraint (~2.4 max-abs error here); the full-length
+% trajectory was unaffected, which is why loose checks (Test 9) miss it.
+rng(134);
+n = 2; q = 1; py = 2; N = 8;
+A12 = zeros(n, n, N); B12 = zeros(n, q, N);
+for k = 1:N
+    A12(:,:,k) = 0.5 * randn(n, n);
+    B12(:,:,k) = randn(n, q);
+end
+H12 = randn(py, n);
+R12 = [0.20 0.05; 0.05 0.15];       % general symmetric positive-definite
+Q12 = [0.10 -0.02; -0.02 0.08];
+
+horizons_12 = [N; N - 3];           % mixed horizons: 8 and 5
+L = numel(horizons_12);
+Y12 = cell(L, 1); U12 = cell(L, 1);
+for l = 1:L
+    Nl = horizons_12(l);
+    U12{l} = randn(Nl, q);
+    x = zeros(Nl + 1, n); x(1, :) = randn(1, n);
+    for k = 1:Nl
+        x(k+1, :) = (A12(:,:,k) * x(k, :)' + B12(:,:,k) * U12{l}(k, :)')';
+    end
+    Y12{l} = x * H12' + 0.05 * randn(Nl + 1, py);
+end
+
+X12 = sidLTVStateEst(Y12, U12, A12, B12, H12, 'R', R12, 'Q', Q12);
+
+% Independent dense minimizer of
+%   sum_k ||y(k)-H x(k)||^2_{R^-1} + sum_k ||x(k+1)-A x(k)-B u(k)||^2_{Q^-1}
+Wr = chol(inv(R12));                % Wr' * Wr = inv(R12)
+Wq = chol(inv(Q12));
+for l = 1:L
+    Nl = horizons_12(l); Kl = Nl + 1;
+    M = zeros(Kl*py + Nl*n, Kl*n); bvec = zeros(Kl*py + Nl*n, 1);
+    r = 0;
+    for k = 1:Kl                    % measurement residuals (all states)
+        M(r+1:r+py, (k-1)*n+1:k*n) = Wr * H12;
+        bvec(r+1:r+py) = Wr * Y12{l}(k, :)';
+        r = r + py;
+    end
+    for k = 1:Nl                    % dynamics residuals (transitions only)
+        M(r+1:r+n, (k-1)*n+1:k*n) = -Wq * A12(:,:,k);
+        M(r+1:r+n, k*n+1:(k+1)*n)  = Wq;
+        bvec(r+1:r+n) = Wq * (B12(:,:,k) * U12{l}(k, :)');
+        r = r + n;
+    end
+    Xref = reshape(M \ bvec, n, Kl)';
+    errL = max(abs(X12{l}(:) - Xref(:)));
+    assert(errL < 1e-10, ...
+        'VarLen J_state min: traj %d (Nl=%d) err %.2e', l, Nl, errL);
+end
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 12 passed: variable-length matches dense LSQ (#134).\n');
+
 fprintf('test_sidLTVStateEst: %d/%d passed\n', runner__nPassed, runner__nPassed);
