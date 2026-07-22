@@ -231,6 +231,17 @@ def validate_data(
 
     is_time_series = u is None
     if not is_time_series:
+        # Check for complex data BEFORE the float64 cast (mirroring the y
+        # path above and the list path). np.asarray(..., dtype=np.float64)
+        # silently discards the imaginary part with only a ComplexWarning,
+        # so a post-cast iscomplexobj check can never fire (SPEC §10.1
+        # mandates an error, not silent truncation).
+        u = np.asarray(u)
+        if np.iscomplexobj(u):
+            raise SidError(
+                "complex_data",
+                "Complex data is not supported in v1.0. Input u must be real.",
+            )
         u = np.asarray(u, dtype=np.float64)
         if u.ndim == 1:
             u = u[:, np.newaxis]
@@ -247,11 +258,6 @@ def validate_data(
     # ---- Validate data --------------------------------------------------
     if N < 2:
         raise SidError("too_short", "Data must have at least 2 samples.")
-    if np.iscomplexobj(y):
-        raise SidError(
-            "complex_data",
-            "Complex data is not supported in v1.0. Input y must be real.",
-        )
     if not np.all(np.isfinite(y)):
         raise SidError("non_finite", "Data y contains NaN or Inf values.")
 
@@ -263,11 +269,6 @@ def validate_data(
                 "size_mismatch",
                 f"Input u ({u.shape[0]} samples) and output y ({N} samples) "
                 f"must have the same length.",
-            )
-        if np.iscomplexobj(u):
-            raise SidError(
-                "complex_data",
-                "Complex data is not supported in v1.0. Input u must be real.",
             )
         if not np.all(np.isfinite(u)):
             raise SidError("non_finite", "Data u contains NaN or Inf values.")
