@@ -1,6 +1,7 @@
 # sid v0.1 — Full Codebase Review
 
 **Date:** 2026-07-12
+**Reviewed at:** `13ab1179f090b9b03e41dae285387b5e7bf77ee4` (`main` HEAD at review time — merge of PR #109). File:line anchors below refer to this commit.
 **Scope:** `spec/` (SPEC.md, EXAMPLES.md, cosmic/*.md), `python/` (all sources + tests), `matlab/` (all sources + tests), `testdata/`, `docs/`, `.github/`.
 **Method:** every source file was read in full and checked against the mathematical specification. On top of static review, the highest-risk math was verified **independently and numerically**:
 
