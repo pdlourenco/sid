@@ -176,6 +176,20 @@ class TestSpectrumPlot:
         assert len(h["ax"].collections) > 0, "Should have confidence band"
         plt.close(h["fig"])
 
+    def test_mimo_noise_spectrum(self) -> None:
+        """A MIMO noise spectrum (nf, ny, ny) reduces to a single 1-D curve
+        instead of failing the (line,) unpack (issue #135)."""
+        rng = np.random.default_rng(11)
+        N = 800
+        u = rng.standard_normal((N, 2))
+        y = rng.standard_normal((N, 2))
+        result = freq_bt(y, u)
+        h = spectrum_plot(result)
+        lines = h["ax"].get_lines()
+        assert len(lines) == 1, "MIMO spectrum should plot one reduced channel"
+        assert lines[0].get_ydata().ndim == 1
+        plt.close(h["fig"])
+
 
 # ======================================================================
 #  Map plot
@@ -217,6 +231,30 @@ class TestMapPlot:
     def test_invalid_plot_type(self, fmap_result) -> None:
         with pytest.raises(Exception):
             map_plot(fmap_result, plot_type="invalid_type")
+
+    @pytest.fixture()
+    def fmap_mimo(self):
+        rng = np.random.default_rng(7)
+        N = 2000
+        u = rng.standard_normal((N, 2))
+        y = np.column_stack(
+            [
+                lfilter([1], [1, -0.8], u[:, 0]) + 0.1 * rng.standard_normal(N),
+                lfilter([0.5], [1, -0.7], u[:, 1]) + 0.1 * rng.standard_normal(N),
+            ]
+        )
+        return freq_map(y, u, segment_length=400)
+
+    def test_mimo_plots(self, fmap_mimo) -> None:
+        """MIMO map (4-D response / noise) plots the (1,1) channel without a
+        pcolormesh dimensionality crash (issue #135)."""
+        for ptype in ("magnitude", "phase", "noise"):
+            h = map_plot(fmap_mimo, plot_type=ptype)
+            colls = h["ax"].collections
+            assert len(colls) > 0, f"{ptype}: expected pcolormesh"
+            # Colormap data must be 2-D (nf, K) after channel reduction.
+            assert colls[0].get_array().ndim <= 2
+            plt.close(h["fig"])
 
 
 # ======================================================================

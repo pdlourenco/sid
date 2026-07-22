@@ -124,4 +124,41 @@ assert(threw, 'Should have thrown sid:invalidPlotType');
 runner__nPassed = runner__nPassed + 1;
 fprintf('  Test 11 passed: error on invalid PlotType.\n');
 
+%% Test 12: MIMO map plots each type without a dimensionality crash (#135)
+rng(7);
+Nm = 3000;
+um = randn(Nm, 2);
+ym = [filter([1], [1 -0.8], um(:,1)), filter([0.5], [1 -0.7], um(:,2))] ...
+    + 0.1 * randn(Nm, 2);
+result_mimo = sidFreqMap(ym, um, 'SegmentLength', 512);
+for pt = {'magnitude', 'phase', 'noise'}
+    h = sidMapPlot(result_mimo, 'PlotType', pt{1});
+    surfKids = findobj(h.ax, 'Type', 'surface');
+    assert(~isempty(surfKids), 'MIMO %s: missing surface', pt{1});
+    % Color data must be 2-D (nf x K) after reducing to the (1,1) channel.
+    assert(ismatrix(get(surfKids(1), 'CData')), ...
+        'MIMO %s: CData must be 2-D', pt{1});
+    close(h.fig);
+end
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 12 passed: MIMO map plots (#135).\n');
+
+%% Test 13: sidSpectrogram plotted via sidMapPlot 'spectrum' (SPEC 7.5, #135)
+rng(13);
+xs = cos(2 * pi * (50 + 100 * (0:2999)' / 3000) .* (0:2999)' / 1000);
+sg = sidSpectrogram(xs, 'WindowLength', 256);
+h = sidMapPlot(sg, 'PlotType', 'spectrum');
+assert(~isempty(findobj(h.ax, 'Type', 'surface')), 'spectrogram spectrum: missing surface');
+close(h.fig);
+% Any other PlotType on a spectrogram result must error cleanly.
+threw = false;
+try
+    sidMapPlot(sg, 'PlotType', 'magnitude');
+catch e
+    threw = strcmp(e.identifier, 'sid:invalidPlotType');
+end
+assert(threw, 'spectrogram non-spectrum should throw sid:invalidPlotType');
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 13 passed: sidSpectrogram via sidMapPlot spectrum (#135).\n');
+
 fprintf('test_sidMapPlot: %d/%d passed\n', runner__nPassed, runner__nPassed);

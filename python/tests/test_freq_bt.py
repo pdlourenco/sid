@@ -227,3 +227,17 @@ class TestFreqBT:
             np.abs(result_direct.response)
         )
         assert rel_err < 1e-8, f"M={M}: FFT path vs direct path relErr={rel_err:.2e}"
+
+
+class TestFreqBTInputShapes:
+    """Documented input shapes that previously crashed (issue #135)."""
+
+    def test_single_trajectory_3d(self) -> None:
+        """3-D single-trajectory input (N, ch, 1) is one trajectory, not a
+        crash in the L==1 covariance path."""
+        rng = np.random.default_rng(0)
+        y = rng.standard_normal((500, 1, 1))
+        u = rng.standard_normal((500, 1, 1))
+        result = freq_bt(y, u)
+        ref = freq_bt(y[:, :, 0], u[:, :, 0])
+        np.testing.assert_allclose(result.response, ref.response, rtol=1e-12)

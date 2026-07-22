@@ -61,9 +61,31 @@ function varargout = sidMapPlot(result, varargin)
     defs.Axes = [];
     opts = sidParseOptions(defs, varargin);
 
-    if ~isfield(result, 'Method') || ~ismember(result.Method, {'sidFreqMap', 'sidFreqBTMap'})
+    if ~isfield(result, 'Method') || ...
+            ~ismember(result.Method, {'sidFreqMap', 'sidFreqBTMap', 'sidSpectrogram'})
         error('sid:invalidResult', ...
-            'Input must be a result struct from sidFreqMap.');
+            'Input must be a result struct from sidFreqMap or sidSpectrogram.');
+    end
+
+    % SPEC §7.5: a sidSpectrogram result can be plotted with sidMapPlot using
+    % PlotType 'spectrum'. Adapt its fields to the sidFreqMap layout the rest
+    % of this function expects (issue #135). sidSpectrogram stores the PSD in
+    % .Power (no IO response/coherence) and reports frequency in Hz
+    % (.Frequency) and rad/s (.FrequencyRad); sidFreqMap expects .Frequency in
+    % rad/sample and .FrequencyHz in Hz, so convert rad/s -> rad/sample.
+    if strcmp(result.Method, 'sidSpectrogram')
+        if ~strcmpi(opts.PlotType, 'spectrum')
+            error('sid:invalidPlotType', ...
+                ['sidSpectrogram results support only PlotType ''spectrum'' ' ...
+                 'in sidMapPlot; use sidSpectrogramPlot for other views.']);
+        end
+        result.NoiseSpectrum = result.Power;
+        result.Response      = [];
+        result.Coherence     = [];
+        result.FrequencyHz   = result.Frequency;
+        result.Frequency     = result.FrequencyRad * result.SampleTime;
+        result.SegmentLength = result.WindowLength;
+        result.WindowSize    = result.WindowLength;
     end
 
     % ---- Frequency axis ----
@@ -88,7 +110,10 @@ function varargout = sidMapPlot(result, varargin)
                 error('sid:noResponse', ...
                     'PlotType ''magnitude'' requires input-output data (not time series).');
             end
-            Z = 20 * log10(max(abs(result.Response(:, :, 1)), eps));
+            % (:, :, 1, 1) reduces a 4-D MIMO response (nf, K, ny, nu) to the
+            % (1,1) channel; a single (:, :, 1) leaves it 4-D and pcolor
+            % rejects it. SISO (nf, K) is unaffected (#135).
+            Z = 20 * log10(max(abs(result.Response(:, :, 1, 1)), eps));
             colorLabel = 'Magnitude (dB)';
             titleStr = 'Time-Varying Magnitude';
 
@@ -97,12 +122,12 @@ function varargout = sidMapPlot(result, varargin)
                 error('sid:noResponse', ...
                     'PlotType ''phase'' requires input-output data (not time series).');
             end
-            Z = angle(result.Response(:, :, 1)) * 180 / pi;
+            Z = angle(result.Response(:, :, 1, 1)) * 180 / pi;
             colorLabel = 'Phase (deg)';
             titleStr = 'Time-Varying Phase';
 
         case 'noise'
-            Z = 10 * log10(max(result.NoiseSpectrum(:, :, 1), eps));
+            Z = 10 * log10(max(result.NoiseSpectrum(:, :, 1, 1), eps));
             colorLabel = 'Noise PSD (dB)';
             titleStr = 'Time-Varying Noise Spectrum';
 
@@ -116,7 +141,7 @@ function varargout = sidMapPlot(result, varargin)
             titleStr = 'Time-Varying Coherence';
 
         case 'spectrum'
-            Z = 10 * log10(max(result.NoiseSpectrum(:, :, 1), eps));
+            Z = 10 * log10(max(result.NoiseSpectrum(:, :, 1, 1), eps));
             colorLabel = 'PSD (dB)';
             titleStr = 'Time-Varying Power Spectrum';
 
