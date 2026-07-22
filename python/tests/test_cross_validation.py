@@ -53,6 +53,25 @@ def _to_complex(data, base_key: str) -> np.ndarray:
     return re + 1j * im
 
 
+def _tol(ref: dict, field: str) -> dict:
+    """Look up ``(rtol, atol)`` for an output field as an ``assert_allclose``
+    kwargs dict, reading the JSON ``tolerance`` block as the single
+    authoritative source.
+
+    Mirrors ``testdata/validate_reference.m`` exactly: the default is
+    ``rtol=1e-6``, ``atol=0`` when the field carries no ``<field>_rel`` /
+    ``<field>_atol`` entry, so both language consumers apply identical
+    thresholds. Tests must not hardcode their own tolerances — tighten or
+    loosen a comparison by editing the vector's tolerance block in
+    ``generate_reference.m`` instead, where it binds every language.
+    """
+    tolerance = ref.get("tolerance", {})
+    return {
+        "rtol": tolerance.get(field + "_rel", 1e-6),
+        "atol": tolerance.get(field + "_atol", 0.0),
+    }
+
+
 class TestCrossValidationSISO:
     """SISO Blackman-Tukey: reference_siso_bt.json."""
 
@@ -69,7 +88,7 @@ class TestCrossValidationSISO:
         np.testing.assert_allclose(
             result.response,
             expected_resp.ravel(),
-            rtol=ref["tolerance"]["Response_rel"],
+            **_tol(ref, "Response"),
             err_msg="SISO BT response mismatch vs MATLAB reference",
         )
 
@@ -85,7 +104,7 @@ class TestCrossValidationSISO:
         np.testing.assert_allclose(
             result.frequency,
             expected_freq.ravel(),
-            rtol=1e-12,
+            **_tol(ref, "Frequency"),
             err_msg="SISO BT frequency grid mismatch",
         )
 
@@ -101,7 +120,7 @@ class TestCrossValidationSISO:
         np.testing.assert_allclose(
             result.noise_spectrum,
             expected_ns.ravel(),
-            rtol=ref["tolerance"]["NoiseSpectrum_rel"],
+            **_tol(ref, "NoiseSpectrum"),
             err_msg="SISO BT noise spectrum mismatch vs MATLAB reference",
         )
 
@@ -117,7 +136,7 @@ class TestCrossValidationSISO:
         np.testing.assert_allclose(
             result.coherence,
             expected_coh.ravel(),
-            rtol=1e-10,
+            **_tol(ref, "Coherence"),
             err_msg="SISO BT coherence mismatch vs MATLAB reference",
         )
 
@@ -146,7 +165,7 @@ class TestCrossValidationSISOLargeM:
         np.testing.assert_allclose(
             result.response,
             expected_resp.ravel(),
-            rtol=ref["tolerance"]["Response_rel"],
+            **_tol(ref, "Response"),
             err_msg="SISO BT (large M) response mismatch vs MATLAB reference",
         )
 
@@ -162,7 +181,7 @@ class TestCrossValidationSISOLargeM:
         np.testing.assert_allclose(
             result.frequency,
             expected_freq.ravel(),
-            rtol=1e-12,
+            **_tol(ref, "Frequency"),
             err_msg="SISO BT (large M) frequency grid mismatch",
         )
 
@@ -178,7 +197,7 @@ class TestCrossValidationSISOLargeM:
         np.testing.assert_allclose(
             result.noise_spectrum,
             expected_ns.ravel(),
-            rtol=ref["tolerance"]["NoiseSpectrum_rel"],
+            **_tol(ref, "NoiseSpectrum"),
             err_msg="SISO BT (large M) noise spectrum mismatch vs MATLAB reference",
         )
 
@@ -194,7 +213,7 @@ class TestCrossValidationSISOLargeM:
         np.testing.assert_allclose(
             result.coherence,
             expected_coh.ravel(),
-            rtol=1e-10,
+            **_tol(ref, "Coherence"),
             err_msg="SISO BT (large M) coherence mismatch vs MATLAB reference",
         )
 
@@ -221,7 +240,7 @@ class TestCrossValidationMIMO:
         np.testing.assert_allclose(
             result.response,
             expected_3d,
-            rtol=ref["tolerance"]["Response_rel"],
+            **_tol(ref, "Response"),
             err_msg="MIMO BT response mismatch vs MATLAB reference",
         )
 
@@ -241,7 +260,7 @@ class TestCrossValidationMIMO:
         np.testing.assert_allclose(
             result.noise_spectrum,
             expected_3d,
-            rtol=ref["tolerance"]["NoiseSpectrum_rel"],
+            **_tol(ref, "NoiseSpectrum"),
             err_msg="MIMO BT noise spectrum mismatch vs MATLAB reference",
         )
 
@@ -260,7 +279,7 @@ class TestCrossValidationTimeSeries:
         np.testing.assert_allclose(
             result.noise_spectrum,
             expected_ns.ravel(),
-            rtol=ref["tolerance"]["NoiseSpectrum_rel"],
+            **_tol(ref, "NoiseSpectrum"),
             err_msg="Time-series BT noise spectrum mismatch vs MATLAB reference",
         )
 
@@ -275,7 +294,7 @@ class TestCrossValidationTimeSeries:
         np.testing.assert_allclose(
             result.noise_spectrum_std,
             expected_std.ravel(),
-            rtol=1e-10,
+            **_tol(ref, "NoiseSpectrumStd"),
             err_msg="Time-series BT noise spectrum std mismatch vs MATLAB reference",
         )
 
@@ -295,7 +314,7 @@ class TestCrossValidationInternals:
         np.testing.assert_allclose(
             R,
             expected,
-            rtol=ref["tolerance"]["R_xx_rel"],
+            **_tol(ref, "R_xx"),
             err_msg="Auto-covariance mismatch vs MATLAB reference",
         )
 
@@ -311,7 +330,7 @@ class TestCrossValidationInternals:
         np.testing.assert_allclose(
             R,
             expected,
-            rtol=ref["tolerance"]["R_xz_rel"],
+            **_tol(ref, "R_xz"),
             err_msg="Cross-covariance mismatch vs MATLAB reference",
         )
 
@@ -325,7 +344,7 @@ class TestCrossValidationInternals:
         np.testing.assert_allclose(
             W,
             expected,
-            rtol=1e-15,
+            **_tol(ref, "W"),
             err_msg="Hann window mismatch vs MATLAB reference",
         )
 
@@ -389,7 +408,7 @@ class TestCrossValidationETFE:
         np.testing.assert_allclose(
             result.response,
             expected_resp.ravel(),
-            rtol=ref["tolerance"]["Response_rel"],
+            **_tol(ref, "Response"),
             err_msg="ETFE response mismatch vs MATLAB reference",
         )
 
@@ -405,7 +424,7 @@ class TestCrossValidationETFE:
         np.testing.assert_allclose(
             result.noise_spectrum,
             expected_ns.ravel(),
-            rtol=ref["tolerance"]["NoiseSpectrum_rel"],
+            **_tol(ref, "NoiseSpectrum"),
             err_msg="ETFE noise spectrum mismatch vs MATLAB reference",
         )
 
@@ -425,7 +444,7 @@ class TestCrossValidationBTFDR:
         np.testing.assert_allclose(
             result.response,
             expected_resp.ravel(),
-            rtol=ref["tolerance"]["Response_rel"],
+            **_tol(ref, "Response"),
             err_msg="BTFDR response mismatch vs MATLAB reference",
         )
 
@@ -440,7 +459,7 @@ class TestCrossValidationBTFDR:
         np.testing.assert_allclose(
             result.noise_spectrum,
             expected_ns.ravel(),
-            rtol=ref["tolerance"]["NoiseSpectrum_rel"],
+            **_tol(ref, "NoiseSpectrum"),
             err_msg="BTFDR noise spectrum mismatch vs MATLAB reference",
         )
 
@@ -463,7 +482,7 @@ class TestCrossValidationSpectrogram:
         np.testing.assert_allclose(
             result.time,
             expected_time.ravel(),
-            rtol=ref["tolerance"]["Time_rel"],
+            **_tol(ref, "Time"),
             err_msg="Spectrogram time vector mismatch vs MATLAB reference",
         )
 
@@ -482,7 +501,7 @@ class TestCrossValidationSpectrogram:
         np.testing.assert_allclose(
             result.power.ravel(),
             expected_power.ravel(),
-            rtol=ref["tolerance"]["Power_rel"],
+            **_tol(ref, "Power"),
             err_msg="Spectrogram power mismatch vs MATLAB reference",
         )
 
@@ -501,7 +520,7 @@ class TestCrossValidationSpectrogram:
         np.testing.assert_allclose(
             result.frequency,
             expected_freq.ravel(),
-            rtol=1e-12,
+            **_tol(ref, "Frequency"),
             err_msg="Spectrogram frequency mismatch vs MATLAB reference",
         )
 
@@ -525,7 +544,7 @@ class TestCrossValidationFreqMap:
         np.testing.assert_allclose(
             result.response.ravel(),
             expected_resp.ravel(),
-            rtol=ref["tolerance"]["Response_rel"],
+            **_tol(ref, "Response"),
             err_msg="FreqMap BT response mismatch vs MATLAB reference",
         )
 
@@ -545,7 +564,7 @@ class TestCrossValidationFreqMap:
         np.testing.assert_allclose(
             result.noise_spectrum.ravel(),
             expected_ns.ravel(),
-            rtol=ref["tolerance"]["NoiseSpectrum_rel"],
+            **_tol(ref, "NoiseSpectrum"),
             err_msg="FreqMap BT noise spectrum mismatch vs MATLAB reference",
         )
 
@@ -565,7 +584,7 @@ class TestCrossValidationFreqMap:
         np.testing.assert_allclose(
             result.coherence.ravel(),
             expected_coh.ravel(),
-            rtol=1e-10,
+            **_tol(ref, "Coherence"),
             err_msg="FreqMap BT coherence mismatch vs MATLAB reference",
         )
 
@@ -585,7 +604,7 @@ class TestCrossValidationFreqMap:
         np.testing.assert_allclose(
             result.time,
             expected_time.ravel(),
-            rtol=1e-12,
+            **_tol(ref, "Time"),
             err_msg="FreqMap BT time vector mismatch vs MATLAB reference",
         )
 
@@ -607,8 +626,7 @@ class TestCrossValidationLTVCosmic:
         np.testing.assert_allclose(
             result.a.ravel(),
             expected_A.ravel(),
-            rtol=ref["tolerance"]["A_rel"],
-            atol=1e-10,
+            **_tol(ref, "A"),
             err_msg="COSMIC A matrices mismatch vs MATLAB reference",
         )
 
@@ -626,8 +644,7 @@ class TestCrossValidationLTVCosmic:
         np.testing.assert_allclose(
             result.b.ravel(),
             expected_B.ravel(),
-            rtol=ref["tolerance"]["B_rel"],
-            atol=1e-10,
+            **_tol(ref, "B"),
             err_msg="COSMIC B matrices mismatch vs MATLAB reference",
         )
 
@@ -645,8 +662,7 @@ class TestCrossValidationLTVCosmic:
         np.testing.assert_allclose(
             result.cost,
             expected_cost.ravel(),
-            rtol=ref["tolerance"]["Cost_rel"],
-            atol=1e-10,
+            **_tol(ref, "Cost"),
             err_msg="COSMIC cost mismatch vs MATLAB reference",
         )
 
@@ -676,8 +692,12 @@ class TestCrossValidationTestMSD:
 
         expected_Ad = _to_array(ref["output"], "Ad")
         expected_Bd = _to_array(ref["output"], "Bd")
-        np.testing.assert_allclose(Ad, expected_Ad, rtol=1e-9, err_msg="MSD Ad mismatch vs MATLAB")
-        np.testing.assert_allclose(Bd, expected_Bd, rtol=1e-9, err_msg="MSD Bd mismatch vs MATLAB")
+        np.testing.assert_allclose(
+            Ad, expected_Ad, err_msg="MSD Ad mismatch vs MATLAB", **_tol(ref, "Ad")
+        )
+        np.testing.assert_allclose(
+            Bd, expected_Bd, err_msg="MSD Bd mismatch vs MATLAB", **_tol(ref, "Bd")
+        )
 
 
 class TestCrossValidationCosmicInternals:
@@ -695,10 +715,14 @@ class TestCrossValidationCosmicInternals:
         from sid._internal.ltv_build_block_terms import build_block_terms
         from sid._internal.ltv_cosmic_solve import cosmic_solve
         from sid._internal.ltv_evaluate_cost import evaluate_cost
+        from sid._internal.ltv_uncertainty_backward_pass import (
+            uncertainty_backward_pass,
+        )
 
         N = X.shape[0] - 1
         p = X.shape[1]
         q = U.shape[1]
+        d = p + q
         L = 1
         X3 = X[:, :, np.newaxis]
         U3 = U[:, :, np.newaxis]
@@ -713,18 +737,46 @@ class TestCrossValidationCosmicInternals:
         B_est = C[p:, :, :].transpose(1, 0, 2)
         cost, fid, reg, _ = evaluate_cost(A_est, B_est, D, Xl, lam, N, p, q)
 
+        # Bayesian posterior blocks. Pass S directly, matching production
+        # (ltv_disc.py:314): S already carries the 1/sqrt(N) normalization.
+        # The stored reference is generated the same way (issue #145a); the
+        # 3-D arrays (d,d,N) flatten in matching C-order on both sides.
+        P = uncertainty_backward_pass(S, lam, N, d)
+
+        # Intermediate matrices: data (D, Xl), block terms (S, T), and the
+        # COSMIC solution (C) — each an exact-arithmetic cross-check of the
+        # whole pipeline, not just the scalar cost triple.
+        for name, actual in [
+            ("D", D),
+            ("Xl", Xl),
+            ("S", S),
+            ("T", T),
+            ("C", C),
+            ("P", P),
+        ]:
+            expected = _to_array(ref["output"], name)
+            np.testing.assert_allclose(
+                actual.ravel(),
+                expected.ravel(),
+                err_msg=f"COSMIC {name} mismatch vs MATLAB reference",
+                **_tol(ref, name),
+            )
+
         expected_cost = float(ref["output"]["cost"])
         expected_fid = float(ref["output"]["fidelity"])
         expected_reg = float(ref["output"]["regularization"])
 
         np.testing.assert_allclose(
-            cost, expected_cost, rtol=1e-6, atol=1e-10, err_msg="COSMIC cost mismatch"
+            cost, expected_cost, err_msg="COSMIC cost mismatch", **_tol(ref, "cost")
         )
         np.testing.assert_allclose(
-            fid, expected_fid, rtol=1e-6, atol=1e-10, err_msg="COSMIC fidelity mismatch"
+            fid, expected_fid, err_msg="COSMIC fidelity mismatch", **_tol(ref, "fidelity")
         )
         np.testing.assert_allclose(
-            reg, expected_reg, rtol=1e-6, atol=1e-10, err_msg="COSMIC regularization mismatch"
+            reg,
+            expected_reg,
+            err_msg="COSMIC regularization mismatch",
+            **_tol(ref, "regularization"),
         )
 
 
@@ -752,8 +804,7 @@ class TestCrossValidationLTVFrozen:
         np.testing.assert_allclose(
             frz.response.ravel(),
             expected_resp.ravel(),
-            rtol=ref["tolerance"]["Response_rel"],
-            atol=1e-10,
+            **_tol(ref, "Response"),
             err_msg="Frozen TF response mismatch vs MATLAB",
         )
 
@@ -780,7 +831,7 @@ class TestCrossValidationModelOrder:
         np.testing.assert_allclose(
             sv["singular_values"][: len(expected_sv)],
             expected_sv,
-            rtol=ref["tolerance"]["SingularValues_rel"],
+            **_tol(ref, "SingularValues"),
             err_msg="Model order SVs mismatch vs MATLAB",
         )
 
@@ -808,8 +859,7 @@ class TestCrossValidationLTVStateEst:
         np.testing.assert_allclose(
             X_hat,
             expected,
-            rtol=ref["tolerance"]["X_hat_rel"],
-            atol=1e-10,
+            **_tol(ref, "X_hat"),
             err_msg="LTV state estimation mismatch vs MATLAB reference",
         )
 
@@ -837,15 +887,13 @@ class TestCrossValidationLTIFreqIO:
         np.testing.assert_allclose(
             A0,
             expected_A0,
-            rtol=ref["tolerance"]["A0_rel"],
-            atol=1e-8,
+            **_tol(ref, "A0"),
             err_msg="LTI A0 mismatch vs MATLAB reference",
         )
         np.testing.assert_allclose(
             B0,
             expected_B0,
-            rtol=ref["tolerance"]["B0_rel"],
-            atol=1e-8,
+            **_tol(ref, "B0"),
             err_msg="LTI B0 mismatch vs MATLAB reference",
         )
 
@@ -875,22 +923,19 @@ class TestCrossValidationResidual:
         np.testing.assert_allclose(
             result.residual.ravel(),
             expected_resid.ravel(),
-            rtol=ref["tolerance"]["Residual_rel"],
-            atol=1e-10,
+            **_tol(ref, "Residual"),
             err_msg="Residual mismatch vs MATLAB",
         )
         np.testing.assert_allclose(
             result.auto_corr.ravel(),
             expected_ac.ravel(),
-            rtol=ref["tolerance"]["AutoCorr_rel"],
-            atol=1e-10,
+            **_tol(ref, "AutoCorr"),
             err_msg="AutoCorr mismatch vs MATLAB",
         )
         np.testing.assert_allclose(
             result.cross_corr.ravel(),
             expected_cc.ravel(),
-            rtol=ref["tolerance"]["CrossCorr_rel"],
-            atol=1e-10,
+            **_tol(ref, "CrossCorr"),
             err_msg="CrossCorr mismatch vs MATLAB",
         )
 
@@ -918,14 +963,154 @@ class TestCrossValidationCompare:
         np.testing.assert_allclose(
             result.predicted.ravel(),
             expected_pred.ravel(),
-            rtol=ref["tolerance"]["Predicted_rel"],
-            atol=1e-10,
+            **_tol(ref, "Predicted"),
             err_msg="Compare predicted mismatch vs MATLAB",
         )
         np.testing.assert_allclose(
             result.fit.ravel(),
             expected_fit.ravel(),
-            rtol=ref["tolerance"]["Fit_rel"],
-            atol=1e-10,
+            **_tol(ref, "Fit"),
             err_msg="Compare fit mismatch vs MATLAB",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Previously-orphaned reference vectors (issue #145b).
+#
+# These four JSONs are generated by generate_reference.m and validated by
+# validate_reference.m under Octave, but until now no Python test consumed
+# them, leaving the Python ports of detrend, freq_domain_sim, ltv_disc_io,
+# and the frequency-domain uncertainty helper with no cross-language check.
+# Each test mirrors the corresponding branch of validate_reference.m's
+# callSidFunction() so both consumers exercise the same call.
+# ---------------------------------------------------------------------------
+
+
+class TestCrossValidationDetrend:
+    """Polynomial detrending: reference_detrend.json."""
+
+    def test_detrend(self):
+        ref = _load("reference_detrend.json")
+        x = _to_array(ref["input"], "x")
+        order = int(ref["params"]["Order"])
+
+        from sid.detrend import detrend
+
+        x_det, trend = detrend(x, order=order)
+
+        np.testing.assert_allclose(
+            x_det.ravel(),
+            _to_array(ref["output"], "x_detrended").ravel(),
+            err_msg="Detrend x_detrended mismatch vs MATLAB",
+            **_tol(ref, "x_detrended"),
+        )
+        np.testing.assert_allclose(
+            trend.ravel(),
+            _to_array(ref["output"], "trend").ravel(),
+            err_msg="Detrend trend mismatch vs MATLAB",
+            **_tol(ref, "trend"),
+        )
+
+
+class TestCrossValidationFreqDomainSim:
+    """Frequency-domain simulation: reference_freq_domain_sim.json.
+
+    Mirrors validate_reference.m: estimate a BT model of the noiseless
+    plant, then filter the input through it via the IFFT path.
+    """
+
+    def test_freq_domain_sim(self):
+        ref = _load("reference_freq_domain_sim.json")
+        y_noiseless = _to_array(ref["input"], "y_noiseless")
+        u = _to_array(ref["input"], "u")
+        if u.ndim == 1:
+            u = u[:, np.newaxis]
+        bt_ws = int(ref["params"]["bt_WindowSize"])
+
+        from sid.freq_bt import freq_bt
+        from sid._internal.freq_domain_sim import freq_domain_sim
+
+        r_bt = freq_bt(y_noiseless, u, window_size=bt_ws)
+        y_pred = freq_domain_sim(r_bt.response, r_bt.frequency, u, u.shape[0])
+
+        np.testing.assert_allclose(
+            y_pred.ravel(),
+            _to_array(ref["output"], "Y_pred").ravel(),
+            err_msg="FreqDomainSim Y_pred mismatch vs MATLAB",
+            **_tol(ref, "Y_pred"),
+        )
+
+
+class TestCrossValidationUncertainty:
+    """Frequency-domain asymptotic uncertainty: reference_uncertainty.json.
+
+    Exercises sid_uncertainty directly (via freq_bt's outputs), mirroring
+    validate_reference.m's sidUncertainty branch.
+    """
+
+    def test_uncertainty_std(self):
+        ref = _load("reference_uncertainty.json")
+        y = _to_array(ref["input"], "y")
+        u = _to_array(ref["input"], "u")
+        if u.ndim == 1:
+            u = u[:, np.newaxis]
+        bt_ws = int(ref["params"]["bt_WindowSize"])
+
+        from sid.freq_bt import freq_bt
+        from sid._internal.hann_win import hann_win
+        from sid._internal.uncertainty import sid_uncertainty
+
+        r_bt = freq_bt(y, u, window_size=bt_ws)
+        W = hann_win(bt_ws)
+        g_std, phi_v_std = sid_uncertainty(
+            r_bt.response, r_bt.noise_spectrum, r_bt.coherence, y.shape[0], W, 1
+        )
+
+        np.testing.assert_allclose(
+            g_std.ravel(),
+            _to_array(ref["output"], "GStd").ravel(),
+            err_msg="Uncertainty GStd mismatch vs MATLAB",
+            **_tol(ref, "GStd"),
+        )
+        np.testing.assert_allclose(
+            phi_v_std.ravel(),
+            _to_array(ref["output"], "PhiVStd").ravel(),
+            err_msg="Uncertainty PhiVStd mismatch vs MATLAB",
+            **_tol(ref, "PhiVStd"),
+        )
+
+
+class TestCrossValidationLTVdiscIO:
+    """Output-COSMIC LTV-IO identification: reference_ltv_io.json."""
+
+    def test_ltv_io(self):
+        ref = _load("reference_ltv_io.json")
+        Y = _to_array(ref["input"], "Y")
+        U = _to_array(ref["input"], "U")
+        if U.ndim == 1:
+            U = U[:, np.newaxis]
+        H = _to_array(ref["input"], "H")
+        lam = float(ref["params"]["Lambda"])
+
+        from sid.ltv_disc_io import ltv_disc_io
+
+        result = ltv_disc_io(Y, U, H, lambda_=lam)
+
+        np.testing.assert_allclose(
+            result.a.ravel(),
+            _to_array(ref["output"], "A").ravel(),
+            err_msg="LTV-IO A mismatch vs MATLAB",
+            **_tol(ref, "A"),
+        )
+        np.testing.assert_allclose(
+            result.b.ravel(),
+            _to_array(ref["output"], "B").ravel(),
+            err_msg="LTV-IO B mismatch vs MATLAB",
+            **_tol(ref, "B"),
+        )
+        np.testing.assert_allclose(
+            np.asarray(result.cost).ravel(),
+            _to_array(ref["output"], "Cost").ravel(),
+            err_msg="LTV-IO cost history mismatch vs MATLAB",
+            **_tol(ref, "Cost"),
         )

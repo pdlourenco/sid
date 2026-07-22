@@ -193,8 +193,10 @@ function result = callSidFunction(funcName, input, params)
             end
             [cost, fid, reg] = sidLTVevaluateCost( ...
                 A_est, B_est, D, Xl, lam, N_ci, p_ci, q_ci);
-            S_scaled = S / N_ci;
-            P = sidLTVuncertaintyBackwardPass(S_scaled, lam, N_ci, d_ci);
+            % Pass S directly, matching production (sidLTVdisc.m:200); S
+            % already carries the 1/sqrt(N) normalization from
+            % sidLTVbuildBlockTerms, so it must not be divided by N again.
+            P = sidLTVuncertaintyBackwardPass(S, lam, N_ci, d_ci);
             result = struct('D', D, 'Xl', Xl, 'S', S, 'T', T, 'C', C, ...
                             'cost', cost, 'fidelity', fid, ...
                             'regularization', reg, 'P', P);

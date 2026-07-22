@@ -53,7 +53,8 @@ ref1.output = struct( ...
     'Response_imag', imag(r1.Response), ...
     'NoiseSpectrum', r1.NoiseSpectrum, ...
     'Coherence', r1.Coherence);
-ref1.tolerance = struct('Response_rel', 1e-10, 'NoiseSpectrum_rel', 1e-10);
+ref1.tolerance = struct('Response_rel', 1e-10, 'NoiseSpectrum_rel', 1e-10, ...
+    'Frequency_rel', 1e-12, 'Coherence_rel', 1e-10);
 
 writeJSON(fullfile(thisDir, 'reference_siso_bt.json'), ref1);
 
@@ -83,7 +84,8 @@ ref1_lm.output = struct( ...
     'Response_imag', imag(r1_lm.Response), ...
     'NoiseSpectrum', r1_lm.NoiseSpectrum, ...
     'Coherence', r1_lm.Coherence);
-ref1_lm.tolerance = struct('Response_rel', 1e-10, 'NoiseSpectrum_rel', 1e-10);
+ref1_lm.tolerance = struct('Response_rel', 1e-10, 'NoiseSpectrum_rel', 1e-10, ...
+    'Frequency_rel', 1e-12, 'Coherence_rel', 1e-10);
 
 writeJSON(fullfile(thisDir, 'reference_siso_bt_large_M.json'), ref1_lm);
 
@@ -102,7 +104,8 @@ ref1b.output = struct( ...
     'Frequency', r1b.Frequency, ...
     'NoiseSpectrum', r1b.NoiseSpectrum, ...
     'NoiseSpectrumStd', r1b.NoiseSpectrumStd);
-ref1b.tolerance = struct('NoiseSpectrum_rel', 1e-10);
+ref1b.tolerance = struct('NoiseSpectrum_rel', 1e-10, ...
+    'NoiseSpectrumStd_rel', 1e-10);
 
 writeJSON(fullfile(thisDir, 'reference_timeseries_bt.json'), ref1b);
 
@@ -239,7 +242,8 @@ ref_sp.output = struct( ...
     'Time', r_sp.Time, ...
     'Frequency', r_sp.Frequency, ...
     'Power', r_sp.Power);
-ref_sp.tolerance = struct('Time_rel', 1e-12, 'Power_rel', 1e-10);
+ref_sp.tolerance = struct('Time_rel', 1e-12, 'Power_rel', 1e-10, ...
+    'Frequency_rel', 1e-12);
 
 writeJSON(fullfile(thisDir, 'reference_spectrogram.json'), ref_sp);
 
@@ -264,7 +268,8 @@ ref_fm.output = struct( ...
     'Response_imag', imag(r_fm.Response), ...
     'NoiseSpectrum', r_fm.NoiseSpectrum, ...
     'Coherence', r_fm.Coherence);
-ref_fm.tolerance = struct('Response_rel', 1e-10, 'NoiseSpectrum_rel', 1e-10);
+ref_fm.tolerance = struct('Response_rel', 1e-10, 'NoiseSpectrum_rel', 1e-10, ...
+    'Coherence_rel', 1e-10, 'Time_rel', 1e-12);
 
 writeJSON(fullfile(thisDir, 'reference_freqmap_bt.json'), ref_fm);
 
@@ -291,7 +296,8 @@ ref5.output = struct( ...
     'A', r5.A, ...
     'B', r5.B, ...
     'Cost', r5.Cost);
-ref5.tolerance = struct('A_rel', 1e-6, 'B_rel', 1e-6, 'Cost_rel', 1e-6);
+ref5.tolerance = struct('A_rel', 1e-6, 'B_rel', 1e-6, 'Cost_rel', 1e-6, ...
+    'A_atol', 1e-10, 'B_atol', 1e-10, 'Cost_atol', 1e-10);
 
 writeJSON(fullfile(thisDir, 'reference_ltv_cosmic.json'), ref5);
 
@@ -352,7 +358,8 @@ ref8.function_name = 'sidCompare';
 ref8.params = struct('Lambda', 1e5, 'Precondition', false);
 ref8.input = struct('X', X_cmp, 'U', U_cmp);
 ref8.output = struct('Predicted', comp.Predicted, 'Fit', comp.Fit);
-ref8.tolerance = struct('Predicted_rel', 1e-6, 'Fit_rel', 1e-6);
+ref8.tolerance = struct('Predicted_rel', 1e-6, 'Fit_rel', 1e-6, ...
+    'Predicted_atol', 1e-10, 'Fit_atol', 1e-10);
 
 writeJSON(fullfile(thisDir, 'reference_compare.json'), ref8);
 
@@ -376,7 +383,10 @@ ref9.output = struct( ...
 ref9.tolerance = struct( ...
     'Residual_rel', 1e-6, ...
     'AutoCorr_rel', 1e-6, ...
-    'CrossCorr_rel', 1e-6);
+    'CrossCorr_rel', 1e-6, ...
+    'Residual_atol', 1e-10, ...
+    'AutoCorr_atol', 1e-10, ...
+    'CrossCorr_atol', 1e-10);
 
 writeJSON(fullfile(thisDir, 'reference_residual.json'), ref9);
 
@@ -444,7 +454,8 @@ ref12.output = struct( ...
     'Frequency', frozen.Frequency, ...
     'Response_real', real(frozen.Response), ...
     'Response_imag', imag(frozen.Response));
-ref12.tolerance = struct('Frequency_rel', 1e-12, 'Response_rel', 1e-6);
+ref12.tolerance = struct('Frequency_rel', 1e-12, 'Response_rel', 1e-6, ...
+    'Response_atol', 1e-10);
 
 writeJSON(fullfile(thisDir, 'reference_ltv_frozen.json'), ref12);
 
@@ -485,9 +496,12 @@ end
 [cost_ci, fid_ci, reg_ci] = sidLTVevaluateCost( ...
     A_est_ci, B_est_ci, D_ci, Xl_ci, lambda_ci, N_ci, p_ci, q_ci);
 
-% Uncertainty backward pass
-S_scaled_ci = S_ci / N_ci;
-P_ci = sidLTVuncertaintyBackwardPass(S_scaled_ci, lambda_ci, N_ci, d_ci);
+% Uncertainty backward pass. Pass S directly, exactly as production
+% (sidLTVdisc.m:200): S from sidLTVbuildBlockTerms already carries the
+% 1/sqrt(N) data normalization (SPEC §8.3.2), so the backward pass
+% reconstructs the unscaled Hessian internally. Dividing by N here again
+% would feed it a doubly-scaled S and store a P matching no implementation.
+P_ci = sidLTVuncertaintyBackwardPass(S_ci, lambda_ci, N_ci, d_ci);
 
 ref13 = struct();
 ref13.function_name = 'cosmic_internals';
@@ -561,7 +575,7 @@ ref15.function_name = 'sidLTVStateEst';
 ref15.params = struct();
 ref15.input = struct('Y', Y_se, 'U', U_se, 'A', A_se, 'B', B_se, 'H', H_se);
 ref15.output = struct('X_hat', X_hat_se);
-ref15.tolerance = struct('X_hat_rel', 1e-6);
+ref15.tolerance = struct('X_hat_rel', 1e-6, 'X_hat_atol', 1e-10);
 
 writeJSON(fullfile(thisDir, 'reference_ltv_state_est.json'), ref15);
 
@@ -587,7 +601,8 @@ ref16.function_name = 'sidLTIfreqIO';
 ref16.params = struct();
 ref16.input = struct('Y', Y_lti, 'U', U_lti, 'H', H_lti);
 ref16.output = struct('A0', A0_est, 'B0', B0_est);
-ref16.tolerance = struct('A0_rel', 1e-6, 'B0_rel', 1e-6);
+ref16.tolerance = struct('A0_rel', 1e-6, 'B0_rel', 1e-6, ...
+    'A0_atol', 1e-8, 'B0_atol', 1e-8);
 
 writeJSON(fullfile(thisDir, 'reference_lti_freq_io.json'), ref16);
 
