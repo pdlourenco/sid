@@ -192,11 +192,10 @@ fprintf('  Test 17 passed: collinear MIMO -> NaN + Inf sigma (#141).\n');
 rng(3);
 N18 = 300;
 y18 = filter(1, [1 -0.8], randn(N18, 1));
+% Warnings ENABLED so lastwarn captures the id on CI's Octave 8.4.
 lastwarn('');
-ws = warning('off', 'all');
 r18 = sidFreqBTFDR(y18, ones(N18, 1), 'Resolution', 0.3);
 [~, id18] = lastwarn();
-warning(ws);
 assert(all(isnan(r18.Response)), 'Constant input -> Response all NaN');
 assert(strcmp(id18, 'sid:constantInput'), 'Constant input should warn sid:constantInput');
 runner__nPassed = runner__nPassed + 1;

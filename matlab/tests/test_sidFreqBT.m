@@ -246,11 +246,12 @@ fprintf('  Test 17 passed: large WindowSize (FFT-path regression).\n');
 rng(18);
 N18 = 400;
 y18 = filter(1, [1 -0.8], randn(N18, 1));
+% Warnings stay ENABLED so lastwarn captures the id on CI's Octave 8.4, where a
+% disabled warning never reaches lastwarn (the extra runner output is tolerated,
+% matching test_sidLTVdiscTune.m).
 lastwarn('');
-ws = warning('off', 'all');
 r18 = sidFreqBT(y18, ones(N18, 1));
 [~, id18] = lastwarn();
-warning(ws);
 assert(all(isnan(r18.Response)), 'Constant input -> Response all NaN');
 assert(all(isinf(r18.ResponseStd)), 'Constant input -> sigma_G all Inf');
 assert(strcmp(id18, 'sid:constantInput'), 'Constant input should warn sid:constantInput');
@@ -263,10 +264,8 @@ N19 = 500;
 u19 = [randn(N19, 1), ones(N19, 1)];       % channel 2 constant
 y19 = [u19(:, 1) + 0.1 * randn(N19, 1), u19(:, 1) + 0.1 * randn(N19, 1)];
 lastwarn('');
-ws = warning('off', 'all');
 r19 = sidFreqBT(y19, u19);
 [~, id19] = lastwarn();
-warning(ws);
 assert(strcmp(id19, 'sid:deadInputChannel'), 'Dead channel should warn sid:deadInputChannel');
 healthyCol = isfinite(r19.Response(:, :, 1));
 assert(all(healthyCol(:)), 'Healthy channel-1 columns stay finite');
