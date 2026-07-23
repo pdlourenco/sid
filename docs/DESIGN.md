@@ -93,7 +93,7 @@ unrelated tools.
 ## Constraints
 
 - **Permissive license only.** sid is MIT; dependencies must be license-compatible.
-- **Runtime compatibility.** MATLAB R2016b+ and GNU Octave 8.0+ for the
+- **Runtime compatibility.** MATLAB R2024a+ and GNU Octave 11+ for the
   MATLAB/Octave port; Python 3.10+ with NumPy/SciPy for the Python port. Octave
   compatibility in particular constrains the MATLAB subset used (no
   newer-MATLAB-only syntax).
