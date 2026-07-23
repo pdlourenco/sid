@@ -251,7 +251,7 @@ def freq_bt(
             dead = dead_input_channels(u)
             if np.any(dead):
                 warnings.warn(
-                    f"Input channel(s) {list(np.nonzero(dead)[0])} are "
+                    f"Input channel(s) {list(map(int, np.nonzero(dead)[0]))} are "
                     "(near-)constant; their frequency-response columns are "
                     "unreliable (SPEC.md §10.3).",
                     stacklevel=2,
