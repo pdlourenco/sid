@@ -24,9 +24,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 from scipy.linalg import expm
-
 from util_msd import util_msd, util_msd_ltv, util_msd_nl  # noqa: E402
-
 
 # ----------------------------------------------------------------------
 # LTI chain — analytical and shape checks

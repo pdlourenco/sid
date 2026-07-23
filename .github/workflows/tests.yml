@@ -22,6 +22,8 @@ jobs:
   octave:
     name: Octave tests & examples
     runs-on: ubuntu-latest
+    # A hung engine should fail loudly and fast, not run to the 6-hour default.
+    timeout-minutes: 20
     env:
       DEBIAN_FRONTEND: noninteractive
 
@@ -49,31 +51,37 @@ jobs:
           echo "run=$run" >> "$GITHUB_OUTPUT"
           echo "Run engine steps: $run"
 
-      - name: Install GNU Octave 11.x
+      # Octave 11.x from conda-forge (not apt's 8.4, not snap): an unconfined
+      # binary pinned to an exact version -- "test what we claim" (#163) rather
+      # than snap's forward-floating channel, and no sandbox to fight.
+      - name: Install GNU Octave 11.x (conda-forge)
         if: steps.changes.outputs.run == 'true'
-        run: |
-          # Ubuntu apt ships Octave 8.4, below the supported floor (#163). The
-          # snap channel is 11.x and snapd is preinstalled on ubuntu runners;
-          # /snap/bin is already on PATH.
-          sudo snap install octave
-          octave --version | head -1
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: octave
+          create-args: octave=11.*
+          condarc: |
+            channels:
+              - conda-forge
 
-      # Run headless via Qt's offscreen platform rather than xvfb: the snap
-      # Octave binary links Qt and, under xvfb-run, deadlocks at startup. Qt
-      # offscreen needs no X server. Figures are made invisible so the plotting
-      # examples never touch a display. stdin is closed and a timeout guards
-      # against any residual hang (vs GitHub's 6-hour default).
+      - name: Report Octave version
+        if: steps.changes.outputs.run == 'true'
+        run: micromamba run -n octave octave --version | head -1
+
+      # Run headless via Qt's offscreen platform (no X server); figures are made
+      # invisible so the plotting examples never touch a display. stdin is closed
+      # and a `timeout` guards against any residual hang.
       - name: Run test suite
         if: steps.changes.outputs.run == 'true'
         env:
           QT_QPA_PLATFORM: offscreen
-        run: timeout 900 octave --no-gui --eval "run('matlab/tests/runAllTests.m')" < /dev/null
+        run: timeout 900 micromamba run -n octave octave --no-gui --eval "run('matlab/tests/runAllTests.m')" < /dev/null
 
       - name: Run examples
         if: steps.changes.outputs.run == 'true'
         env:
           QT_QPA_PLATFORM: offscreen
-        run: timeout 900 octave --no-gui --eval "set(0, 'defaultfigurevisible', 'off'); run('matlab/examples/runAllExamples.m')" < /dev/null
+        run: timeout 900 micromamba run -n octave octave --no-gui --eval "set(0, 'defaultfigurevisible', 'off'); run('matlab/examples/runAllExamples.m')" < /dev/null
 
   matlab:
     name: MATLAB tests & examples

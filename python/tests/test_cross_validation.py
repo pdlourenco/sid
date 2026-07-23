@@ -711,8 +711,8 @@ class TestCrossValidationCosmicInternals:
             U = U[:, np.newaxis]
         lam_val = float(ref["input"]["lambda"])
 
-        from sid._internal.ltv_build_data_matrices import build_data_matrices
         from sid._internal.ltv_build_block_terms import build_block_terms
+        from sid._internal.ltv_build_data_matrices import build_data_matrices
         from sid._internal.ltv_cosmic_solve import cosmic_solve
         from sid._internal.ltv_evaluate_cost import evaluate_cost
         from sid._internal.ltv_uncertainty_backward_pass import (
@@ -951,8 +951,8 @@ class TestCrossValidationCompare:
             U = U[:, np.newaxis]
         lam = ref["params"]["Lambda"]
 
-        from sid.ltv_disc import ltv_disc
         from sid.compare import compare
+        from sid.ltv_disc import ltv_disc
 
         model = ltv_disc(X, U, lambda_=lam)
         result = compare(model, X, U)
@@ -1027,8 +1027,8 @@ class TestCrossValidationFreqDomainSim:
             u = u[:, np.newaxis]
         bt_ws = int(ref["params"]["bt_WindowSize"])
 
-        from sid.freq_bt import freq_bt
         from sid._internal.freq_domain_sim import freq_domain_sim
+        from sid.freq_bt import freq_bt
 
         r_bt = freq_bt(y_noiseless, u, window_size=bt_ws)
         y_pred = freq_domain_sim(r_bt.response, r_bt.frequency, u, u.shape[0])
@@ -1056,9 +1056,9 @@ class TestCrossValidationUncertainty:
             u = u[:, np.newaxis]
         bt_ws = int(ref["params"]["bt_WindowSize"])
 
-        from sid.freq_bt import freq_bt
         from sid._internal.hann_win import hann_win
         from sid._internal.uncertainty import sid_uncertainty
+        from sid.freq_bt import freq_bt
 
         r_bt = freq_bt(y, u, window_size=bt_ws)
         W = hann_win(bt_ws)

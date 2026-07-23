@@ -15,8 +15,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from sid.ltv_disc_tune import ltv_disc_tune
 from sid.ltv_disc import ltv_disc
+from sid.ltv_disc_tune import ltv_disc_tune
 
 
 def _generate_shared_ltv_data():
