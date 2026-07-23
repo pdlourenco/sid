@@ -19,7 +19,7 @@ dev = [
     "pytest >= 7.0",
     "matplotlib >= 3.5",
     "nbmake >= 1.0",
-    "ruff",
+    "ruff == 0.15.*",
 ]
 
 [tool.ruff]
