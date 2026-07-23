@@ -59,25 +59,19 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v5
 
-      # Octave 11.x from conda-forge (exact version pin, unconfined) -- see the
-      # tests.yml Octave job for the rationale (#163).
-      - name: Install GNU Octave 11.x (conda-forge)
-        uses: mamba-org/setup-micromamba@v2
-        with:
-          environment-name: octave
-          create-args: octave=11.*
-          condarc: |
-            channels:
-              - conda-forge
+      # Octave 11.x via snap (conda-forge has no octave 11; apt ships 8.4). See
+      # the tests.yml Octave job for the rationale (#163).
+      - name: Install GNU Octave 11.x
+        run: |
+          sudo snap install octave
+          octave --version | head -1
 
-      - name: Report Octave version
-        run: micromamba run -n octave octave --version | head -1
-
-      # Qt offscreen (no X server); no plotting here. stdin closed, timeout-guarded.
+      # Qt offscreen (no X server), NOT xvfb (snap Octave deadlocks under it);
+      # no plotting here. stdin closed, timeout-guarded.
       - name: Run cross-language validation
         env:
           QT_QPA_PLATFORM: offscreen
-        run: timeout 600 micromamba run -n octave octave --no-gui --eval "run('testdata/validate_reference.m')" < /dev/null
+        run: timeout 600 octave --no-gui --eval "run('testdata/validate_reference.m')" < /dev/null
 
   validate-python:
     name: Validate Python port
