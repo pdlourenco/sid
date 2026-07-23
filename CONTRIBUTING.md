@@ -128,9 +128,14 @@ against what the project cares about. The prompt:
 >    in `spec/SPEC.md` *first* (principle 3)? Does a touched shared helper have
 >    every caller audited (principle 4)?
 > 2. **Verification** — does a new/changed spec rule name a `Verified by:`
->    mechanism (principle 6)? Are tests written against spec requirements, not
->    against the other language's current output (principle 5)?
-> 3. **Scope drift** — files or refactors outside the PR's stated purpose.
+>    mechanism — or, until #113 lands, is it pinned by a test (principle 6)? Are
+>    tests written against spec requirements, not against the other language's
+>    current output (principle 5)? Are NaN/Inf substitutions, clamps, or warning
+>    identifiers changed without a spec update (principle 8)?
+> 3. **Scope & docs hygiene** — files or refactors outside the PR's stated
+>    purpose; user-facing docs (README, API reference, examples) carrying
+>    dev-tracking references (`ADR-NNNN` / `#issue`) or "recently changed"
+>    narration (principle 9).
 > 4. **Decisions deserving an ADR** — new thresholds, fallbacks, NaN policy,
 >    magic numbers (see `docs/decisions/`); and missing ADR links in the PR.
 > 5. **Catalogue / naming / auto-discovery** — new public functions follow the

@@ -10,8 +10,9 @@ from reading it too.
 
 Key documents:
 
-- [`spec/SPEC.md`](../spec/SPEC.md) — the binding algorithm contract (with
-  per-rule `Verified by:` mechanisms).
+- [`spec/SPEC.md`](../spec/SPEC.md) — the binding algorithm contract (the
+  per-rule `Verified by:` mechanisms are re-derived post-remediation-Phase-3 and
+  land with #113).
 - [`spec/EXAMPLES.md`](../spec/EXAMPLES.md) — the example-suite contract.
 - [`CONTRIBUTING.md`](../CONTRIBUTING.md) — spec discipline, workflow, CI,
   auto-discovery; per-language guides under `matlab/` and `python/`.
@@ -64,16 +65,24 @@ because one was copied from the other.
    behaviour needs a direct spec-to-implementation read-through, not only a
    vector comparison. A test of the form "assert it equals what MATLAB returned
    today" does not detect joint drift.
-6. **Every normative rule names its verifier.** Per `spec/SPEC.md` §"Verification
-   (right-side mechanisms)", each rule carries a `Verified by:` mechanism. A new
-   or changed rule with `Verified by: none` is visible debt and should be flagged
-   (or the gap tracked as an issue).
+6. **Every normative rule names its verifier.** The per-rule `Verified by:`
+   annotations (a `spec/SPEC.md` §"Verification (right-side mechanisms)" section)
+   are being re-derived after remediation Phase 3 and land with #113. Once they
+   do, each rule carries a `Verified by:` mechanism and a rule tagged
+   `Verified by: none` is visible debt to flag (or track as a gap issue). Until
+   then, check that a new or changed rule is actually pinned by a test, not just
+   asserted.
 7. **Tests and examples are auto-discovered.** New tests/examples must match the
    naming convention (`test_*`, `example*`/`example_*`) so runners pick them up;
    never maintain a hardcoded manifest.
 8. **Numerical diagnostics are contract, not incident.** NaN/Inf substitutions,
    clamps, and ill-conditioning warnings are specified behaviour with stable
    warning identifiers — changing them is a contract change.
+9. **User-facing docs are state-based and release-relative.** README, the API
+   reference, and the examples describe *current* behaviour as of the release —
+   no dev-tracking references (`ADR-NNNN`, `#issue`, internal revision tags) and
+   no "recently changed" narration. The audit trail lives in dev docs, ADRs,
+   code comments, and git history, not in what a user reads.
 
 ## Terminology (enforce consistency)
 
@@ -109,6 +118,10 @@ because one was copied from the other.
   `cross-validate` to make a PR green.
 - **Catalogue drift** — a new public function whose name doesn't follow the
   `sid + Domain + Method` convention or isn't reflected in `docs/roadmap.md`.
+- **Dev-tracking leakage into user docs** — an `ADR-NNNN`, `#issue`, or
+  "recently changed / previously" narration landing in the README, API
+  reference, or examples (principle 9); that trail belongs in dev docs and git
+  history.
 
 ## What to be lenient about
 
