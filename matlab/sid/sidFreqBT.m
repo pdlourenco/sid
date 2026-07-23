@@ -175,76 +175,26 @@ function result = sidFreqBT(y, u, varargin)
         G = [];
         PhiV = real(PhiY);
         Coh = [];
-    elseif ny == 1 && nu == 1
-        % SISO: G(w) = Phi_yu(w) / Phi_u(w)  (SPEC.md §2.6)
-        % Regularization: if |Phi_u(w_k)| < eps * max(|Phi_u|), set G = NaN
-        epsReg = 1e-10;
-        PhiU_abs = abs(real(PhiU));
-        PhiU_max = max(PhiU_abs);
-        singularMask = PhiU_abs < epsReg * PhiU_max;
-
-        G = PhiYU ./ PhiU;
-        if any(singularMask)
-            G(singularMask) = NaN + 1j*NaN;
-            warning('sid:singularPhiU', ...
-                ['Input spectrum Phi_u is near-singular at some ' ...
-                 'frequencies. G set to NaN at those points.']);
-        end
-        % Phi_v(w) = Phi_y(w) - |Phi_yu(w)|^2 / Phi_u(w)
-        PhiV = real(PhiY) - abs(PhiYU).^2 ./ real(PhiU);
-        if any(singularMask)
-            PhiV(singularMask) = real(PhiY(singularMask));
-        end
-        PhiV = max(PhiV, 0);
-        % gamma^2(w) = |Phi_yu|^2 / (Phi_y * Phi_u) — squared coherence
-        Coh = abs(PhiYU).^2 ./ (real(PhiY) .* real(PhiU));
-        if any(singularMask)
-            Coh(singularMask) = 0;
-        end
-        Coh = min(max(Coh, 0), 1);
     else
-        % MIMO: G(w) = Phi_yu(w) * Phi_u(w)^{-1} (SPEC.md §3.2)
-        G = zeros(nf, ny, nu);
-        PhiV = zeros(nf, ny, ny);
-        epsReg = 1e-10;
-        warnedSingular = false;
-        for k = 1:nf
-            PhiU_k = reshape(PhiU(k, :, :), nu, nu);
-            PhiYU_k = reshape(PhiYU(k, :, :), ny, nu);
-            PhiY_k = reshape(PhiY(k, :, :), ny, ny);
-
-            % Regularization: check condition of Phi_u (SPEC.md §2.6)
-            rc = rcond(PhiU_k);
-            if rc < epsReg
-                G(k, :, :) = NaN;
-                PhiV(k, :, :) = real(PhiY_k);
-                if ~warnedSingular
-                    warning('sid:singularPhiU', ...
-                        ['Input spectrum Phi_u is near-singular at some ' ...
-                         'frequencies. G set to NaN at those points.']);
-                    warnedSingular = true;
-                end
-            else
-                G(k, :, :) = PhiYU_k / PhiU_k;
-                PhiV(k, :, :) = PhiY_k - PhiYU_k / PhiU_k * PhiYU_k';
+        % Whole-signal input-excitation check (SPEC.md §10.3): a constant or
+        % zero input is unidentifiable at every frequency, and the relative
+        % per-frequency floor of §10.2 can never detect it.
+        forceDegenerate = sidInputExcitationDegenerate(u);
+        % Partial degeneracy (§10.3): a single dead channel among active ones
+        % does not fail the whole-signal check, but its response column is
+        % unreliable -- warn without NaNing the healthy channels.
+        if ~forceDegenerate
+            dead = sidDeadInputChannels(u);
+            if any(dead)
+                warning('sid:deadInputChannel', ...
+                    ['Input channel(s) %s are (near-)constant; their ' ...
+                     'frequency-response columns are unreliable ' ...
+                     '(SPEC.md 10.3).'], mat2str(find(dead)));
             end
         end
-        PhiV = real(PhiV);
-
-        % Clamp MIMO noise spectrum to PSD (SPEC.md §2.7):
-        % zero any negative eigenvalues at each frequency.
-        for k = 1:nf
-            Vk = reshape(PhiV(k, :, :), ny, ny);
-            Vk = (Vk + Vk') / 2;  % enforce symmetry
-            [Veig, Deig] = eig(Vk);
-            d = diag(Deig);
-            if any(d < 0)
-                d = max(d, 0);
-                Vk = Veig * diag(d) * Veig';
-                PhiV(k, :, :) = real(Vk);
-            end
-        end
-        Coh = [];
+        % Shared per-frequency Phi_u guard, NaN substitution and PSD clamp
+        % (SPEC.md §2.6/§2.7), extracted so BT/BTFDR/Welch cannot drift.
+        [G, PhiV, Coh] = sidRegularizeResponse(PhiYU, PhiU, PhiY, ny, nu, forceDegenerate);
     end
 
     % ---- Asymptotic uncertainty (SPEC.md §3) ----

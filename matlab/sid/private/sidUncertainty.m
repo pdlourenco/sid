@@ -85,9 +85,13 @@ function [GStd, PhiVStd] = sidUncertainty(G, PhiV, Coh, N, W, nTraj, PhiU)
         % SISO case
         % Var{G(w)} = (C_W / Neff) * |G(w)|^2 * (1 - gamma^2(w)) / gamma^2(w)
         eps_floor = 1e-10;
-        cohSafe = max(Coh, eps_floor);
-        GVar = (CW / Neff) .* abs(G).^2 .* (1 - cohSafe) ./ cohSafe;
+        GVar = (CW / Neff) .* abs(G).^2 .* (1 - Coh) ./ Coh;
         GStd = sqrt(GVar);
+        % SPEC §3.3: where the coherence is below eps the input carries no
+        % usable information, so sigma_G is Inf (the single convention for
+        % every estimator) -- NOT a finite value from flooring the coherence,
+        % and NOT NaN.
+        GStd(Coh < eps_floor) = Inf;
     elseif ~isempty(PhiU)
         % MIMO case: diagonal approximation using noise and input spectra.
         % Var{G_{ij}(w)} ≈ (C_W / Neff) * Phi_v_{ii}(w) / Phi_u_{jj}(w)
@@ -115,6 +119,11 @@ function [GStd, PhiVStd] = sidUncertainty(G, PhiV, Coh, N, W, nTraj, PhiU)
                 end
             end
         end
+        % SPEC §3.3 (the "equivalently" clause): MIMO has no coherence, so the
+        % Inf sentinel keys on the NaN mask of G -- a singular Phi_u (collinear
+        % inputs) NaNs the whole G(w) slice, and its sigma_G must be Inf, not a
+        % finite value from a merely ill-conditioned diagonal (issue #143).
+        GStd(isnan(G)) = Inf;
     else
         % MIMO case without PhiU: cannot compute uncertainty.
         GStd = nan(size(G));

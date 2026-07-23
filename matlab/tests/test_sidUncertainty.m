@@ -79,13 +79,16 @@ assert(abs(PhiVStd - expected) < 1e-12, 'CW should be 1.5 for M=2 Hann window');
 runner__nPassed = runner__nPassed + 1;
 fprintf('  Test 7 passed: window norm CW computation.\n');
 
-%% Test 8: Zero coherence handling (clamped to eps)
+%% Test 8: Zero coherence -> sigma_G = Inf sentinel (SPEC 3.3)
+% A zero-coherence frequency carries no usable input information, so sigma_G
+% is the single Inf sentinel used by every estimator (not a finite value from
+% flooring the coherence, and not NaN).
 G = 1 + 0j;
 PhiV = 1.0;
 Coh = 0;
 [GStd, ~] = sidUncertainty(G, PhiV, Coh, 1000, sidHannWin(10));
-assert(isfinite(GStd), 'Zero coherence should not produce Inf (clamped to eps)');
+assert(isinf(GStd), 'Zero coherence should give the sigma_G = Inf sentinel (SPEC 3.3)');
 runner__nPassed = runner__nPassed + 1;
-fprintf('  Test 8 passed: zero coherence handling.\n');
+fprintf('  Test 8 passed: zero coherence -> Inf sentinel.\n');
 
 fprintf('test_sidUncertainty: %d/%d passed\n', runner__nPassed, runner__nPassed);

@@ -177,6 +177,8 @@ function result = sidFreqETFE(y, u, varargin)
     elseif ny == 1 && nu == 1
         % SISO: G(w) = Phi_yu(w) / Phi_u(w) via H1 estimator (SPEC.md §4.2)
         epsReg = 1e-10;
+        forceDegenerate = sidInputExcitationDegenerate(u);  % §10.3 whole-signal
+        anySingular = false;
 
         if nTraj == 1
             % Single trajectory: G = Y / U directly
@@ -187,6 +189,7 @@ function result = sidFreqETFE(y, u, varargin)
             for kk = 1:nf
                 if Uabs(kk) < epsReg * Umax
                     G(kk) = NaN + 1j*NaN;
+                    anySingular = true;
                 else
                     G(kk) = Ydft(kk) / Udft(kk);
                 end
@@ -211,11 +214,21 @@ function result = sidFreqETFE(y, u, varargin)
             for kk = 1:nf
                 if PhiU(kk) < epsReg * Umax
                     G(kk) = NaN + 1j*NaN;
+                    anySingular = true;
                 else
                     G(kk) = PhiYU(kk) / PhiU(kk);
                 end
             end
         end
+
+        % §10.3: a constant/zero input is unidentifiable at every frequency.
+        % The relative per-frequency floor cannot see it (a constant signal's
+        % DFT is a nonzero Dirichlet kernel off DC), so force the whole
+        % response to NaN, keyed on the time-domain excitation check.
+        if forceDegenerate
+            G(:) = NaN + 1j*NaN;
+        end
+        etfeWarnDegenerate(anySingular, forceDegenerate);
 
         % Optional smoothing
         if S > 1
@@ -243,6 +256,8 @@ function result = sidFreqETFE(y, u, varargin)
     else
         % MIMO: G(w) = Phi_yu(w) * Phi_u(w)^{-1} via H1 estimator (SPEC.md §4.2)
         epsReg = 1e-10;
+        forceDegenerate = sidInputExcitationDegenerate(u);  % §10.3 whole-signal
+        anySingular = false;
 
         if nTraj == 1
             % Single trajectory: rank-1 cross/auto-periodograms
@@ -280,6 +295,7 @@ function result = sidFreqETFE(y, u, varargin)
             if nu == 1
                 if abs(PhiU_k) < epsReg * max(abs(PhiU(:)))
                     G(kk, :, :) = NaN;
+                    anySingular = true;
                 else
                     G(kk, :, :) = PhiYU_k / PhiU_k;
                 end
@@ -287,11 +303,17 @@ function result = sidFreqETFE(y, u, varargin)
                 rc = rcond(PhiU_k);
                 if rc < epsReg
                     G(kk, :, :) = NaN;
+                    anySingular = true;
                 else
                     G(kk, :, :) = PhiYU_k / PhiU_k;
                 end
             end
         end
+
+        if forceDegenerate  % §10.3, see the SISO branch note
+            G(:) = NaN;
+        end
+        etfeWarnDegenerate(anySingular, forceDegenerate);
 
         % Optional smoothing (element-wise)
         if S > 1
@@ -367,5 +389,23 @@ function xSmooth = boxcarSmooth(x, S)
         lo = max(1, k - halfS);
         hi = min(nf, k + halfS);
         xSmooth(k) = mean(x(lo:hi));
+    end
+end
+
+function etfeWarnDegenerate(anySingular, forceDegenerate)
+% ETFEWARNDEGENERATE Emit the shared degenerate-input warning (SPEC.md 10.2/10.3).
+%   The ETFE forms G = Y/U directly (no windowed covariances), so it cannot
+%   share sidRegularizeResponse; this restores warning parity -- a whole-signal
+%   constant/zero input (10.3) and any per-frequency near-singular U(w) (10.2)
+%   both warn, with the same wording as the other estimators.
+    if forceDegenerate
+        warning('sid:constantInput', ...
+            ['Input u has negligible variation (constant or zero). The ' ...
+             'frequency response is unidentifiable; G set to NaN and ' ...
+             'sigma_G to Inf everywhere.']);
+    elseif anySingular
+        warning('sid:singularPhiU', ...
+            ['Input spectrum Phi_u is near-singular at some frequencies. ' ...
+             'G set to NaN at those points.']);
     end
 end

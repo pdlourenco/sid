@@ -252,3 +252,89 @@ class TestFreqBTFDR:
         assert ratio < expected * 2.5 and ratio > expected * 0.2, (
             f"Variance reduction ratio {ratio:.3f} should be near {expected:.3f}"
         )
+
+
+class TestFreqBTFDRDegenerate:
+    """Degenerate-excitation handling (issues #143, #141, SPEC.md §2.6/§3.3/§10.3)."""
+
+    def test_constant_input_all_nan_inf_warn(self) -> None:
+        """Constant u => G all NaN, sigma_G all Inf, and a warning."""
+        rng = np.random.default_rng(0)
+        N = 400
+        y = lfilter([1], [1, -0.8], rng.standard_normal(N))
+        with pytest.warns(UserWarning, match="constant|unidentifiable"):
+            r = freq_btfdr(y, np.ones(N), resolution=0.3)
+        assert np.all(np.isnan(r.response))
+        assert np.all(np.isinf(r.response_std))
+
+    def test_zero_input_all_nan(self) -> None:
+        """Identically-zero u => G all NaN (defense-in-depth path)."""
+        rng = np.random.default_rng(1)
+        N = 300
+        y = rng.standard_normal(N)
+        with pytest.warns(UserWarning):
+            r = freq_btfdr(y, np.zeros(N), resolution=0.3)
+        assert np.all(np.isnan(r.response))
+        assert np.all(np.isinf(r.response_std))
+
+    def test_collinear_mimo_nan_and_inf_sigma(self) -> None:
+        """#141: collinear MIMO inputs => NaN + Inf, not a LinAlgError."""
+        rng = np.random.default_rng(2)
+        N = 400
+        u0 = rng.standard_normal(N)
+        u = np.column_stack([u0, 2.0 * u0])  # rank-deficient Phi_u
+        y = np.column_stack([u0 + 0.1 * rng.standard_normal(N), u0 + 0.1 * rng.standard_normal(N)])
+        with pytest.warns(UserWarning, match="singular|constant"):
+            r = freq_btfdr(y, u, resolution=0.3)
+        assert np.all(np.isnan(r.response))
+        assert np.all(np.isinf(r.response_std))
+
+    def test_partial_degeneracy_warns_channel(self) -> None:
+        """One dead channel among active ones warns, without failing the whole fit."""
+        rng = np.random.default_rng(3)
+        N = 500
+        u = np.column_stack([rng.standard_normal(N), np.ones(N)])  # ch 1 constant
+        y = u[:, 0] + 0.1 * rng.standard_normal(N)
+        y = np.column_stack([y, y])
+        with pytest.warns(UserWarning, match=r"channel\(s\) \[1\]"):
+            r = freq_btfdr(y, u, resolution=0.3)
+        # Healthy channel-0 columns are finite (not NaN'd by the whole-signal path).
+        assert np.all(np.isfinite(r.response[:, :, 0]))
+
+    def test_coarse_resolution_raises(self) -> None:
+        """M_k < 2 (resolution too coarse) is an error, not a silent clamp (§5.2)."""
+        rng = np.random.default_rng(4)
+        N = 400
+        with pytest.raises(SidError) as exc:
+            freq_btfdr(rng.standard_normal(N), rng.standard_normal(N), resolution=10.0)
+        assert exc.value.code == "bad_resolution"
+
+    def test_window_reduced_warns(self) -> None:
+        """M_k reduced to floor(N/2) warns rather than clamping silently (§5.2)."""
+        rng = np.random.default_rng(5)
+        N = 20
+        with pytest.warns(UserWarning, match="reduced to N/2"):
+            r = freq_btfdr(rng.standard_normal(N), rng.standard_normal(N), resolution=0.01)
+        assert np.all(r.window_size <= N // 2)
+
+    def test_btfdr_equals_bt_at_constant_resolution(self) -> None:
+        """Oracle: a uniform resolution R with M = ceil(2*pi/R) reproduces freq_bt(M).
+
+        Blackman-Tukey with a fixed window and BTFDR with a constant resolution
+        are the same estimator; the only difference is FFT vs direct DFT, so the
+        estimates must agree to numerical precision.
+        """
+        from sid import freq_bt
+
+        rng = np.random.default_rng(6)
+        N = 800
+        u = rng.standard_normal(N)
+        y = lfilter([1], [1, -0.8], u) + 0.05 * rng.standard_normal(N)
+        w = np.linspace(0.05, np.pi, 100)
+        M = 20
+        r_bt = freq_bt(y, u, window_size=M, frequencies=w)
+        r_fdr = freq_btfdr(y, u, resolution=2.0 * np.pi / M, frequencies=w)
+        assert np.all(r_fdr.window_size == M)
+        np.testing.assert_allclose(r_fdr.response, r_bt.response, rtol=1e-8, atol=1e-10)
+        np.testing.assert_allclose(r_fdr.noise_spectrum, r_bt.noise_spectrum, rtol=1e-8, atol=1e-10)
+        np.testing.assert_allclose(r_fdr.coherence, r_bt.coherence, rtol=1e-8, atol=1e-10)

@@ -654,3 +654,30 @@ class TestFreqMapInputShapes:
                 segment_length=8,
                 algorithm="welch",
             )
+
+
+class TestFreqMapWelchDegenerate:
+    """Welch-path degenerate handling (issues #141, #143, SPEC.md §2.6/§3.3)."""
+
+    def test_welch_mimo_collinear_no_crash(self) -> None:
+        """#141: collinear MIMO inputs no longer raise LinAlgError from the solve."""
+        rng = np.random.default_rng(0)
+        N = 1024
+        u0 = rng.standard_normal(N)
+        u = np.column_stack([u0, 2.0 * u0])  # rank-deficient Phi_u
+        y = np.column_stack([u0 + 0.1 * rng.standard_normal(N)] * 2)
+        with pytest.warns(UserWarning, match="singular|constant"):
+            r = freq_map(y, u, algorithm="welch", segment_length=256)
+        resp = r.response[0] if isinstance(r.response, list) else r.response
+        assert np.any(np.isnan(resp))  # degenerate bins are NaN, not garbage
+
+    def test_welch_siso_low_coherence_sigma_inf(self) -> None:
+        """SISO sigma_G uses the Inf sentinel (not NaN) at zero-coherence bins."""
+        rng = np.random.default_rng(1)
+        N = 1024
+        u = rng.standard_normal(N)
+        # Pure-noise output => coherence ~ 0 at many bins => sigma must be Inf.
+        y = rng.standard_normal(N)
+        r = freq_map(y, u, algorithm="welch", segment_length=256)
+        gstd = r.response_std[0] if isinstance(r.response_std, list) else r.response_std
+        assert not np.any(np.isnan(gstd)), "low-coherence sigma should be Inf, never NaN"

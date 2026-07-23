@@ -9,11 +9,17 @@
 
 from __future__ import annotations
 
+import warnings
 
 import numpy as np
 
 from sid._exceptions import SidError
 from sid._internal.cov import sid_cov
+from sid._internal.degenerate import (
+    dead_input_channels,
+    input_excitation_degenerate,
+    regularize_response,
+)
 from sid._internal.hann_win import hann_win
 from sid._internal.validate_data import validate_data
 from sid._results import FreqResult
@@ -230,10 +236,28 @@ def freq_btfdr(
                 f"Resolution vector length ({len(R)}) must match frequency vector length ({nf}).",
             )
 
-    # ---- Resolution to window size (SPEC.md S5.2) ----
-    Mk = np.clip(np.ceil(2.0 * np.pi / R).astype(int), 2, N // 2)
+    # ---- Resolution to window size (SPEC.md §5.2) ----
+    # M_k = ceil(2*pi / R_k). Reaching a bound is reported, not silently
+    # clamped (SPEC.md §5.2): an error when the requested resolution implies
+    # M_k < 2, and a `sid:windowReduced`-style warning when any M_k is reduced
+    # to floor(N/2). Mirrors the fixed-window sidFreqBT handling.
+    Mk_raw = np.ceil(2.0 * np.pi / R).astype(int)
+    if np.any(Mk_raw < 2):
+        raise SidError(
+            "bad_resolution",
+            "Resolution too coarse: it implies a lag-window size M_k < 2. "
+            "Decrease the resolution value.",
+        )
+    Nhalf = N // 2
+    if np.any(Mk_raw > Nhalf):
+        warnings.warn(
+            "Resolution finer than the data supports at some frequencies; "
+            f"window size reduced to N/2 = {Nhalf}.",
+            stacklevel=2,
+        )
+    Mk = np.clip(Mk_raw, 2, Nhalf)
 
-    # ---- Pre-compute biased covariances up to max(Mk) (SPEC.md S2.3) ----
+    # ---- Pre-compute biased covariances up to max(Mk) (SPEC.md §2.3) ----
     Mmax = int(np.max(Mk))
     Ryy = sid_cov(y, y, Mmax)  # (Mmax+1, ny, ny) or (Mmax+1,) for scalar
 
@@ -242,177 +266,111 @@ def freq_btfdr(
         Ryu = sid_cov(y, u, Mmax)  # (Mmax+1, ny, nu) or (Mmax+1,)
         Ruy = sid_cov(u, y, Mmax)  # (Mmax+1, nu, ny) or (Mmax+1,) neg lags
 
-    # ---- Per-frequency spectral estimation (SPEC.md S5.2) ----
     is_siso = ny == 1 and nu == 1 and not is_time_series
+    eps_floor = 1e-10
+
+    # ---- Per-frequency Hann windows and their norms (SPEC.md §5.3) ----
+    # The window size varies per frequency, so C_W -- and thus every asymptotic
+    # variance -- is per-frequency; cache both the windows and their norms.
+    W_list = [hann_win(int(Mk[k])) for k in range(nf)]
+    CW_all = np.array([float(W[0] ** 2 + 2.0 * np.sum(W[1:] ** 2)) for W in W_list])
 
     if is_time_series:
-        # ---- Time-series path ----
+        # ---- Time-series path: output spectrum only ----
         G: np.ndarray | None = None
         GStd: np.ndarray | None = None
         Coh: np.ndarray | None = None
 
         PhiV = np.zeros((nf, ny, ny))
         PhiVStd = np.zeros((nf, ny, ny))
-
         for k in range(nf):
-            Mk_k = Mk[k]
-            W = hann_win(Mk_k)
-            Ryy_k = _truncate_cov(Ryy, Mk_k)
-
-            # Direct DFT at single frequency
-            PhiY_k = _matrix_single_freq_dft(Ryy_k, W, freqs[k], ny, ny)
+            PhiY_k = _matrix_single_freq_dft(
+                _truncate_cov(Ryy, int(Mk[k])), W_list[k], freqs[k], ny, ny
+            )
             PhiV[k, :, :] = np.real(PhiY_k)
+            PhiVStd[k, :, :] = np.sqrt(2.0 * CW_all[k] / Neff) * np.abs(PhiY_k)
 
-            # Uncertainty: Var{Phi_y} = (2*C_W/Neff) * Phi_y^2
-            CW = float(W[0] ** 2 + 2.0 * np.sum(W[1:] ** 2))
-            PhiVStd[k, :, :] = np.sqrt(2.0 * CW / Neff) * np.abs(PhiY_k)
-
-        # Squeeze if scalar output
         if ny == 1:
             PhiV = PhiV.ravel()
             PhiVStd = PhiVStd.ravel()
 
-    elif is_siso:
-        # ---- SISO path ----
-        # Covariances are 1-D (scalar signals)
-        G_arr = np.zeros(nf, dtype=complex)
-        PhiV_arr = np.zeros(nf)
-        GStd_arr = np.zeros(nf)
-        PhiVStd_arr = np.zeros(nf)
-        Coh_arr = np.zeros(nf)
-
-        eps_reg = 1e-10
-
-        # Pass 1: compute all spectral estimates
-        PhiY_all = np.zeros(nf, dtype=complex)
-        PhiU_all = np.zeros(nf, dtype=complex)
-        PhiYU_all = np.zeros(nf, dtype=complex)
-        W_store: list[np.ndarray] = []
-
-        for k in range(nf):
-            Mk_k = Mk[k]
-            W = hann_win(Mk_k)
-            W_store.append(W)
-
-            PhiY_all[k] = _scalar_single_freq_dft(
-                Ryy[: Mk_k + 1],
-                W,
-                freqs[k],
-            )
-            PhiU_all[k] = _scalar_single_freq_dft(
-                Ruu[: Mk_k + 1],
-                W,
-                freqs[k],
-            )
-            PhiYU_all[k] = _scalar_single_freq_dft(
-                Ryu[: Mk_k + 1],
-                W,
-                freqs[k],
-                R_neg=Ruy[: Mk_k + 1],
-            )
-
-        PhiU_max = np.max(np.abs(PhiU_all))
-
-        # Pass 2: form G, PhiV, uncertainty
-        for k in range(nf):
-            W = W_store[k]
-            PhiY_k = PhiY_all[k]
-            PhiU_k = PhiU_all[k]
-            PhiYU_k = PhiYU_all[k]
-
-            if np.abs(PhiU_k) < eps_reg * PhiU_max:
-                G_arr[k] = np.nan + 1j * np.nan
-                PhiV_arr[k] = np.real(PhiY_k)
-                Coh_arr[k] = 0.0
-                GStd_arr[k] = np.inf
-            else:
-                G_arr[k] = PhiYU_k / PhiU_k
-                PhiV_arr[k] = max(
-                    np.real(PhiY_k) - np.abs(PhiYU_k) ** 2 / np.real(PhiU_k),
-                    0.0,
-                )
-                Coh_arr[k] = float(
-                    np.clip(
-                        np.abs(PhiYU_k) ** 2 / (np.real(PhiY_k) * np.real(PhiU_k)),
-                        0.0,
-                        1.0,
-                    )
-                )
-
-                # Uncertainty with local window norm (SPEC.md S5.3)
-                CW = float(W[0] ** 2 + 2.0 * np.sum(W[1:] ** 2))
-                coh_safe = max(Coh_arr[k], eps_reg)
-                GStd_arr[k] = np.sqrt(
-                    (CW / Neff) * np.abs(G_arr[k]) ** 2 * (1.0 - coh_safe) / coh_safe
-                )
-
-            # Noise uncertainty
-            CW = float(W[0] ** 2 + 2.0 * np.sum(W[1:] ** 2))
-            PhiVStd_arr[k] = np.sqrt(2.0 * CW / Neff) * np.abs(PhiV_arr[k])
-
-        G = G_arr
-        PhiV = PhiV_arr
-        GStd = GStd_arr
-        PhiVStd = PhiVStd_arr
-        Coh = Coh_arr
-
     else:
-        # ---- MIMO path ----
-        G_mat = np.zeros((nf, ny, nu), dtype=complex)
-        PhiV_mat = np.zeros((nf, ny, ny))
-        GStd_mat = np.zeros((nf, ny, nu))
-        PhiVStd_mat = np.zeros((nf, ny, ny))
-        Coh = None
+        # ---- Input/output path ----
+        # Assemble the per-frequency spectra into stacked arrays, then apply
+        # the shared degenerate handling (SPEC.md §2.6/§2.7/§10.3) so BT and
+        # BTFDR cannot drift. #141: a singular Phi_u now yields NaN + Inf here
+        # rather than a raw LinAlgError from the MIMO solve.
+        if is_siso:
+            PhiY = np.zeros(nf, dtype=complex)
+            PhiU = np.zeros(nf, dtype=complex)
+            PhiYU = np.zeros(nf, dtype=complex)
+            for k in range(nf):
+                Mk_k = int(Mk[k])
+                PhiY[k] = _scalar_single_freq_dft(Ryy[: Mk_k + 1], W_list[k], freqs[k])
+                PhiU[k] = _scalar_single_freq_dft(Ruu[: Mk_k + 1], W_list[k], freqs[k])
+                PhiYU[k] = _scalar_single_freq_dft(
+                    Ryu[: Mk_k + 1], W_list[k], freqs[k], R_neg=Ruy[: Mk_k + 1]
+                )
+        else:
+            PhiY = np.zeros((nf, ny, ny), dtype=complex)
+            PhiU = np.zeros((nf, nu, nu), dtype=complex)
+            PhiYU = np.zeros((nf, ny, nu), dtype=complex)
+            for k in range(nf):
+                Mk_k = int(Mk[k])
+                PhiY[k] = _matrix_single_freq_dft(
+                    _truncate_cov(Ryy, Mk_k), W_list[k], freqs[k], ny, ny
+                )
+                PhiU[k] = _matrix_single_freq_dft(
+                    _truncate_cov(Ruu, Mk_k), W_list[k], freqs[k], nu, nu
+                )
+                PhiYU[k] = _matrix_single_freq_dft(
+                    _truncate_cov(Ryu, Mk_k),
+                    W_list[k],
+                    freqs[k],
+                    ny,
+                    nu,
+                    R_neg=_truncate_cov(Ruy, Mk_k),
+                )
 
-        eps_floor = 1e-10
+        force_degenerate = input_excitation_degenerate(u)
+        # Partial degeneracy (§10.3): a single dead channel among active ones
+        # does not fail the whole-signal check, but its response column is
+        # unreliable -- warn without NaNing the healthy channels.
+        if not force_degenerate:
+            dead = dead_input_channels(u)
+            if np.any(dead):
+                warnings.warn(
+                    f"Input channel(s) {list(map(int, np.nonzero(dead)[0]))} are "
+                    "(near-)constant; their frequency-response columns are "
+                    "unreliable (SPEC.md §10.3).",
+                    stacklevel=2,
+                )
 
-        for k in range(nf):
-            Mk_k = Mk[k]
-            W = hann_win(Mk_k)
+        G, PhiV, Coh = regularize_response(PhiYU, PhiU, PhiY, force_degenerate=force_degenerate)
 
-            Ryy_k = _truncate_cov(Ryy, Mk_k)
-            Ruu_k = _truncate_cov(Ruu, Mk_k)
-            Ryu_k = _truncate_cov(Ryu, Mk_k)
-            Ruy_k = _truncate_cov(Ruy, Mk_k)
-
-            PhiY_k = _matrix_single_freq_dft(Ryy_k, W, freqs[k], ny, ny)
-            PhiU_k = _matrix_single_freq_dft(Ruu_k, W, freqs[k], nu, nu)
-            PhiYU_k = _matrix_single_freq_dft(
-                Ryu_k,
-                W,
-                freqs[k],
-                ny,
-                nu,
-                R_neg=Ruy_k,
-            )
-
-            # G(w_k) = Phi_yu * Phi_u^{-1}  (MATLAB: PhiYU_k / PhiU_k)
-            G_mat[k, :, :] = np.linalg.solve(PhiU_k.T, PhiYU_k.T).T
-
-            # Phi_v = Phi_y - Phi_yu * Phi_u^{-1} * Phi_yu'
-            Gk = G_mat[k, :, :]
-            PhiV_k = PhiY_k - Gk @ PhiYU_k.conj().T
-            PhiV_mat[k, :, :] = np.real(PhiV_k)
-
-            # Noise uncertainty (SPEC.md S5.3)
-            CW = float(W[0] ** 2 + 2.0 * np.sum(W[1:] ** 2))
-            PhiVStd_mat[k, :, :] = np.sqrt(2.0 * CW / Neff) * np.abs(PhiV_k)
-
-            # Diagonal MIMO G uncertainty:
-            # Var{G_{ij}} ~ C_W / Neff * Phi_v_{ii} / Phi_u_{jj}
-            for ii in range(ny):
-                phiV_ii = max(np.real(PhiV_k[ii, ii]), 0.0)
-                for jj in range(nu):
-                    phiU_jj = np.real(PhiU_k[jj, jj])
-                    if phiU_jj > eps_floor:
-                        GStd_mat[k, ii, jj] = np.sqrt(CW / Neff * phiV_ii / phiU_jj)
-                    else:
-                        GStd_mat[k, ii, jj] = np.inf
-
-        G = G_mat
-        PhiV = PhiV_mat
-        GStd = GStd_mat
-        PhiVStd = PhiVStd_mat
+        # ---- Per-frequency asymptotic uncertainty (SPEC.md §5.3, §3.3) ----
+        if is_siso:
+            with np.errstate(divide="ignore", invalid="ignore"):
+                g_var = (CW_all / Neff) * np.abs(G) ** 2 * (1.0 - Coh) / Coh
+            GStd = np.sqrt(g_var)
+            # §3.3: sigma_G = Inf where the input carries no usable information.
+            GStd = np.where(np.asarray(Coh) < eps_floor, np.inf, GStd)
+            PhiVStd = np.sqrt(2.0 * CW_all / Neff) * np.abs(PhiV)
+        else:
+            GStd = np.zeros((nf, ny, nu))
+            PhiVStd = np.zeros((nf, ny, ny))
+            for k in range(nf):
+                PhiVStd[k, :, :] = np.sqrt(2.0 * CW_all[k] / Neff) * np.abs(PhiV[k])
+                for ii in range(ny):
+                    phiV_ii = max(float(PhiV[k, ii, ii]), 0.0)
+                    for jj in range(nu):
+                        phiU_jj = float(np.real(PhiU[k, jj, jj]))
+                        if phiU_jj > eps_floor:
+                            GStd[k, ii, jj] = np.sqrt(CW_all[k] / Neff * phiV_ii / phiU_jj)
+                        else:
+                            GStd[k, ii, jj] = np.inf
+            # §3.3 (equivalently): Inf where a singular Phi_u NaN'd the G slice.
+            GStd = np.where(np.isnan(G), np.inf, GStd)
 
     # ---- Pack result ----
     return FreqResult(

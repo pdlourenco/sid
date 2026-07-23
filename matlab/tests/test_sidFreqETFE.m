@@ -176,4 +176,33 @@ assert(err_mt < err_st * 1.5, ...
 runner__nPassed = runner__nPassed + 1;
 fprintf('  Test 15 passed: multi-trajectory ETFE (L=%d).\n', L15);
 
+%% Test 16: Constant input -> all NaN + warning (SPEC 10.3)
+% A constant signal's DFT is a nonzero Dirichlet kernel off DC, so the
+% relative floor cannot see it; the whole-signal 10.3 check forces NaN.
+rng(16);
+N16 = 300;
+y16 = filter(1, [1 -0.8], randn(N16, 1));
+% Warnings ENABLED so lastwarn captures the id on CI's Octave 8.4.
+lastwarn('');
+r16 = sidFreqETFE(y16, ones(N16, 1));
+[~, id16] = lastwarn();
+assert(all(isnan(r16.Response)), 'Constant input -> Response all NaN');
+assert(strcmp(id16, 'sid:constantInput'), 'Constant input should warn sid:constantInput');
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 16 passed: constant input -> all NaN + warning (SPEC 10.3).\n');
+
+%% Test 17: Collinear MIMO inputs warn (previously silent) and NaN the response
+rng(17);
+N17 = 400;
+u0 = randn(N17, 1);
+u17 = [u0, 2 * u0];
+y17 = [u0 + 0.1 * randn(N17, 1), u0 + 0.1 * randn(N17, 1)];
+lastwarn('');
+r17 = sidFreqETFE(y17, u17);
+[~, id17] = lastwarn();
+assert(any(isnan(r17.Response(:))), 'Collinear MIMO -> some Response NaN');
+assert(strcmp(id17, 'sid:singularPhiU'), 'Collinear MIMO should warn sid:singularPhiU');
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 17 passed: collinear MIMO warns + NaN (SPEC 10.2).\n');
+
 fprintf('test_sidFreqETFE: %d/%d passed\n', runner__nPassed, runner__nPassed);

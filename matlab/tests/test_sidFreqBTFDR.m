@@ -174,4 +174,61 @@ runner__nPassed = runner__nPassed + 1;
 fprintf('  Test 16 passed: multi-trajectory (L=%d, ratio=%.3f).\n', ...
     L16, ratio);
 
+%% Test 17: Collinear MIMO inputs -> NaN + Inf sigma, no crash (#141)
+rng(2);
+N17 = 400;
+u0 = randn(N17, 1);
+u17 = [u0, 2 * u0];                     % rank-deficient Phi_u
+y17 = [u0 + 0.1 * randn(N17, 1), u0 + 0.1 * randn(N17, 1)];
+ws = warning('off', 'all');
+r17 = sidFreqBTFDR(y17, u17, 'Resolution', 0.3);
+warning(ws);
+assert(all(isnan(r17.Response(:))), 'Collinear MIMO -> Response all NaN');
+assert(all(isinf(r17.ResponseStd(:))), 'Collinear MIMO -> sigma_G all Inf');
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 17 passed: collinear MIMO -> NaN + Inf sigma (#141).\n');
+
+%% Test 18: Constant input -> all NaN with warning (SPEC 10.3)
+rng(3);
+N18 = 300;
+y18 = filter(1, [1 -0.8], randn(N18, 1));
+% Warnings ENABLED so lastwarn captures the id on CI's Octave 8.4.
+lastwarn('');
+r18 = sidFreqBTFDR(y18, ones(N18, 1), 'Resolution', 0.3);
+[~, id18] = lastwarn();
+assert(all(isnan(r18.Response)), 'Constant input -> Response all NaN');
+assert(strcmp(id18, 'sid:constantInput'), 'Constant input should warn sid:constantInput');
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 18 passed: constant input -> all NaN + warning.\n');
+
+%% Test 19: Resolution too coarse (M_k < 2) is an error, not a silent clamp
+rng(4);
+N19 = 400;
+threw19 = false;
+try
+    sidFreqBTFDR(randn(N19, 1), randn(N19, 1), 'Resolution', 10);
+catch err19
+    threw19 = strcmp(err19.identifier, 'sid:badResolution');
+end
+assert(threw19, 'Coarse resolution (M_k < 2) should raise sid:badResolution');
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 19 passed: coarse resolution errors (SPEC 5.2).\n');
+
+%% Test 20: Oracle -- BTFDR at constant resolution equals BT with M = ceil(2*pi/R)
+rng(6);
+N20 = 800;
+u20 = randn(N20, 1);
+y20 = filter(1, [1 -0.8], u20) + 0.05 * randn(N20, 1);
+w20 = linspace(0.05, pi, 100)';
+M20 = 20;
+rBT  = sidFreqBT(y20, u20, 'WindowSize', M20, 'Frequencies', w20);
+rFDR = sidFreqBTFDR(y20, u20, 'Resolution', 2 * pi / M20, 'Frequencies', w20);
+assert(all(rFDR.WindowSize == M20), 'Constant resolution should give uniform M');
+assert(max(abs(rFDR.Response - rBT.Response)) < 1e-8, 'BTFDR Response must match BT');
+assert(max(abs(rFDR.NoiseSpectrum - rBT.NoiseSpectrum)) < 1e-8, ...
+    'BTFDR NoiseSpectrum must match BT');
+assert(max(abs(rFDR.Coherence - rBT.Coherence)) < 1e-8, 'BTFDR Coherence must match BT');
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 20 passed: BTFDR == BT at constant resolution (oracle).\n');
+
 fprintf('test_sidFreqBTFDR: %d/%d passed\n', runner__nPassed, runner__nPassed);

@@ -254,3 +254,43 @@ class TestFreqETFE:
         assert err_mt < err_st * 1.5, (
             f"Multi-traj error {err_mt:.4f} should improve on single {err_st:.4f}"
         )
+
+
+class TestFreqETFEDegenerate:
+    """ETFE degenerate-input warnings (SPEC.md §10.2/§10.3, issue #143).
+
+    ETFE forms G = Y/U directly, so it cannot share ``regularize_response``;
+    these pin that its NaN branches now warn like the other estimators.
+    """
+
+    def test_constant_input_warns_and_nan(self) -> None:
+        """Constant u => all-NaN G with the whole-signal (§10.3) warning."""
+        rng = np.random.default_rng(0)
+        N = 300
+        y = lfilter([1], [1, -0.8], rng.standard_normal(N))
+        with pytest.warns(UserWarning, match="constant|unidentifiable"):
+            r = freq_etfe(y, np.ones(N))
+        assert np.all(np.isnan(r.response))
+
+    def test_collinear_mimo_warns(self) -> None:
+        """Collinear MIMO inputs => near-singular warning, NaN response, no crash."""
+        rng = np.random.default_rng(1)
+        N = 400
+        u0 = rng.standard_normal(N)
+        u = np.column_stack([u0, 2.0 * u0])
+        y = np.column_stack([u0 + 0.1 * rng.standard_normal(N), u0 + 0.1 * rng.standard_normal(N)])
+        with pytest.warns(UserWarning, match="singular|constant"):
+            r = freq_etfe(y, u)
+        assert np.any(np.isnan(r.response))
+
+    def test_well_excited_no_warning(self) -> None:
+        """A well-excited SISO input must not spuriously warn."""
+        import warnings
+
+        rng = np.random.default_rng(2)
+        N = 500
+        u = rng.standard_normal(N)
+        y = lfilter([1], [1, -0.8], u)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")  # any warning fails the test
+            freq_etfe(y, u)
