@@ -283,7 +283,7 @@ def model_order(
             # aware noise floor first: the machine-eps floor above keeps the
             # entire noisy tail of an estimated (non-exact) G "resolvable", so
             # an unguarded search locks onto spurious tail gaps (AR(1) -> n=40).
-            # Tracked separately from the lag-0 fix (issue #139).
+            # Data-aware-floor follow-up: issue #160.
             max_k = min(last_sig, n_sigma // 2)
             max_k = max(max_k, 1)
 

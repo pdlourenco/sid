@@ -239,7 +239,7 @@ function [n, sv] = sidModelOrder(result, varargin)
             % aware noise floor first: the machine-eps floor below keeps the
             % entire noisy tail of an estimated (non-exact) G "resolvable", so
             % an unguarded search locks onto spurious tail gaps (AR(1) -> n=40).
-            % Tracked separately from the lag-0 fix (issue #139).
+            % Data-aware-floor follow-up: issue #160.
             noiseFloor = sigmas(1) * sqrt(nSigma) * eps;
             lastSig = find(sigmas > noiseFloor, 1, 'last');
             maxK = min(lastSig, floor(nSigma / 2));
