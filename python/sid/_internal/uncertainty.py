@@ -94,11 +94,15 @@ def sid_uncertainty(
         return None, phi_v_std
 
     if coh is not None:
-        # SISO case
+        # SISO case. SPEC §3.3: where the coherence is below eps the input
+        # carries no usable information, so sigma_G is Inf (the single
+        # convention for every estimator) -- NOT a finite value from flooring
+        # the coherence, and NOT NaN.
         eps_floor = 1e-10
-        coh_safe = np.maximum(coh, eps_floor)
-        g_var = (CW / Neff) * np.abs(G) ** 2 * (1.0 - coh_safe) / coh_safe
+        with np.errstate(divide="ignore", invalid="ignore"):
+            g_var = (CW / Neff) * np.abs(G) ** 2 * (1.0 - coh) / coh
         g_std = np.sqrt(g_var)
+        g_std = np.where(np.asarray(coh) < eps_floor, np.inf, g_std)
 
     elif phi_u is not None:
         # MIMO case: diagonal approximation

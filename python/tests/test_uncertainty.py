@@ -96,10 +96,15 @@ class TestSidUncertainty:
         expected = np.sqrt(2 * 1.5 / 100) * 1.0
         np.testing.assert_allclose(PhiVStd[0], expected, atol=1e-12)
 
-    def test_zero_coherence_clamp(self) -> None:
-        """Zero coherence is clamped to 1e-10, result stays finite."""
+    def test_zero_coherence_inf(self) -> None:
+        """Zero coherence -> sigma_G = Inf (SPEC §3.3, issue #143).
+
+        Previously the coherence was floored to 1e-10 to keep sigma finite;
+        the spec's single convention is the Inf sentinel: a coherence below
+        eps means the response is unidentifiable there.
+        """
         G = np.array([1.0 + 0j])
         PhiV = np.array([1.0])
         Coh = np.array([0.0])
         GStd, _ = sid_uncertainty(G, PhiV, Coh, 1000, hann_win(10))
-        assert np.all(np.isfinite(GStd))
+        assert np.all(np.isinf(GStd))

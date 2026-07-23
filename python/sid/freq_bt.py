@@ -15,6 +15,7 @@ import numpy as np
 
 from sid._exceptions import SidError
 from sid._internal.cov import sid_cov
+from sid._internal.degenerate import input_excitation_degenerate, regularize_response
 from sid._internal.hann_win import hann_win
 from sid._internal.is_default_freqs import is_default_freqs
 from sid._internal.uncertainty import sid_uncertainty
@@ -206,7 +207,6 @@ def freq_bt(
             "Frequencies must be in the range (0, pi] rad/sample.",
         )
 
-    nf = len(freqs)
     # Use FFT fast path when frequencies match the default 128-point grid
     use_fft = (frequencies is None) or is_default_freqs(freqs)
 
@@ -236,95 +236,13 @@ def freq_bt(
         PhiV = np.real(PhiY)
         Coh: np.ndarray | None = None
 
-    elif ny == 1 and nu == 1:
-        # SISO: G(w) = Phi_yu(w) / Phi_u(w)  (SPEC.md S2.6)
-        # Regularization: if |Phi_u(w_k)| < eps * max(|Phi_u|), set G = NaN
-        eps_reg = 1e-10
-        PhiU_abs = np.abs(np.real(PhiU))
-        PhiU_max = float(np.max(PhiU_abs)) if PhiU_abs.size > 0 else 0.0
-        singular_mask = PhiU_abs < eps_reg * PhiU_max
-
-        G = np.empty_like(PhiYU)
-        with np.errstate(divide="ignore", invalid="ignore"):
-            G[:] = PhiYU / PhiU
-        if np.any(singular_mask):
-            G[singular_mask] = np.nan + 1j * np.nan
-            warnings.warn(
-                "Input spectrum Phi_u is near-singular at some "
-                "frequencies. G set to NaN at those points.",
-                stacklevel=2,
-            )
-
-        # Phi_v(w) = Phi_y(w) - |Phi_yu(w)|^2 / Phi_u(w)  -- noise spectrum
-        with np.errstate(divide="ignore", invalid="ignore"):
-            PhiV = np.real(PhiY) - np.abs(PhiYU) ** 2 / np.real(PhiU)
-        if np.any(singular_mask):
-            PhiV[singular_mask] = np.real(PhiY[singular_mask])
-        PhiV = np.maximum(PhiV, 0.0)
-
-        # gamma^2(w) = |Phi_yu|^2 / (Phi_y * Phi_u)  -- squared coherence
-        with np.errstate(divide="ignore", invalid="ignore"):
-            Coh = np.abs(PhiYU) ** 2 / (np.real(PhiY) * np.real(PhiU))
-        if np.any(singular_mask):
-            Coh[singular_mask] = 0.0
-        Coh = np.clip(Coh, 0.0, 1.0)
-
     else:
-        # MIMO: G(w) = Phi_yu(w) * Phi_u(w)^{-1} per frequency (SPEC.md S2.6)
-        # Ensure spectral arrays are 3D even when one dimension is 1
-        # (sid_cov squeezes scalar signals to 1D)
-        if PhiY.ndim == 1:
-            PhiY = PhiY[:, np.newaxis, np.newaxis]
-        if PhiU.ndim == 1:
-            PhiU = PhiU[:, np.newaxis, np.newaxis]
-        if PhiYU.ndim == 1:
-            PhiYU = PhiYU[:, np.newaxis, np.newaxis]
-
-        G = np.zeros((nf, ny, nu), dtype=complex)
-        PhiV = np.zeros((nf, ny, ny))
-        eps_reg = 1e-10
-        warned_singular = False
-
-        for k in range(nf):
-            PhiU_k = PhiU[k, :, :].reshape(nu, nu)  # (nu, nu)
-            PhiYU_k = PhiYU[k, :, :].reshape(ny, nu)  # (ny, nu)
-            PhiY_k = PhiY[k, :, :].reshape(ny, ny)  # (ny, ny)
-
-            # Regularization: check condition of Phi_u (SPEC.md S2.6)
-            rc = 1.0 / np.linalg.cond(PhiU_k)
-            if rc < eps_reg:
-                G[k, :, :] = np.nan
-                PhiV[k, :, :] = np.real(PhiY_k)
-                if not warned_singular:
-                    warnings.warn(
-                        "Input spectrum Phi_u is near-singular at some "
-                        "frequencies. G set to NaN at those points.",
-                        stacklevel=2,
-                    )
-                    warned_singular = True
-            else:
-                # MATLAB: PhiYU_k / PhiU_k  == PhiYU_k * inv(PhiU_k)
-                # Python: solve(PhiU_k.T, PhiYU_k.T).T
-                G[k, :, :] = np.linalg.solve(PhiU_k.T, PhiYU_k.T).T
-
-                # Phi_v = Phi_y - Phi_yu * Phi_u^{-1} * Phi_yu'
-                Gk = G[k, :, :]
-                PhiV[k, :, :] = np.real(PhiY_k - Gk @ PhiYU_k.conj().T)
-
-        PhiV = np.real(PhiV)
-
-        # Clamp MIMO noise spectrum to PSD (SPEC.md S2.7):
-        # zero any negative eigenvalues at each frequency.
-        for k in range(nf):
-            Vk = PhiV[k, :, :].reshape(ny, ny)
-            Vk = (Vk + Vk.T) / 2  # enforce symmetry
-            eigvals, eigvecs = np.linalg.eigh(Vk)
-            if np.any(eigvals < 0):
-                eigvals = np.maximum(eigvals, 0.0)
-                Vk = eigvecs @ np.diag(eigvals) @ eigvecs.T
-                PhiV[k, :, :] = np.real(Vk)
-
-        Coh = None
+        # Whole-signal input-excitation check (SPEC.md §10.3): a constant or
+        # zero input identifies no dynamics, so every frequency is degenerate.
+        force_degenerate = input_excitation_degenerate(u)
+        # Shared per-frequency Phi_u guard, NaN substitution and PSD clamp
+        # (SPEC.md §2.6/§2.7), extracted so BT/BTFDR/ETFE/Welch cannot drift.
+        G, PhiV, Coh = regularize_response(PhiYU, PhiU, PhiY, force_degenerate=force_degenerate)
 
     # ---- Asymptotic uncertainty (SPEC.md S3) ----
     if is_time_series:
@@ -333,8 +251,10 @@ def freq_bt(
     elif ny == 1 and nu == 1:
         GStd, PhiVStd = sid_uncertainty(G, PhiV, Coh, N, W, n_traj)
     else:
-        # MIMO: pass PhiU for diagonal uncertainty approximation
-        GStd, PhiVStd = sid_uncertainty(G, PhiV, Coh, N, W, n_traj, PhiU)
+        # MIMO: pass PhiU (3-D) for the diagonal uncertainty approximation.
+        # sid_cov ravels a scalar-channel spectrum to 1-D, so re-expand.
+        PhiU_mimo = PhiU[:, np.newaxis, np.newaxis] if PhiU.ndim == 1 else PhiU
+        GStd, PhiVStd = sid_uncertainty(G, PhiV, Coh, N, W, n_traj, PhiU_mimo)
 
     # ---- Pack result ----
     return FreqResult(
