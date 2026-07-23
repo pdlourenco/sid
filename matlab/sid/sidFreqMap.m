@@ -495,15 +495,23 @@ function result = welchEstimate(y, u, isTimeSeries, ny, nu, Lsub, Psub, nfft, wi
     end
 
     % ---- Average and normalize ----
-    % Factor of 2 for one-sided spectrum (we exclude DC and use positive
-    % frequencies only). This cancels in G = Pyu/Puu and coherence, but is
-    % needed for correct PSD magnitude.
+    % One-sided factor of 2 on every bin EXCEPT those with no distinct negative-
+    % frequency mirror: DC (already excluded from the grid) and, for even nfft,
+    % the Nyquist bin omega = pi keep a factor of 1 -- matching scipy/cpsd and
+    % sidSpectrogram (SPEC.md 6.5/7.3). Doubling Nyquist made Phi exactly 2x too
+    % large there (issue #142). The factor cancels in G = Pyu/Puu and coherence.
     % Total number of periodogram segments: J sub-segments × nTrajW trajectories
     Jtotal = J * nTrajW;
-    PhiY = 2 * PhiY / (Jtotal * S1);
+    nb = size(PhiY, 1);
+    onesided = 2 * ones(nb, 1);
+    if mod(nfft, 2) == 0
+        onesided(end) = 1;  % Nyquist bin has no mirror
+    end
+    normVec = reshape(onesided / (Jtotal * S1), nb, 1, 1);
+    PhiY = PhiY .* normVec;
     if ~isTimeSeries
-        PhiU  = 2 * PhiU  / (Jtotal * S1);
-        PhiYU = 2 * PhiYU / (Jtotal * S1);
+        PhiU  = PhiU  .* normVec;
+        PhiYU = PhiYU .* normVec;
     end
 
     % ---- Degrees of freedom for uncertainty ----

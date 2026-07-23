@@ -309,6 +309,21 @@ class TestSpectrogram:
             "due to one-sided doubling"
         )
 
+        # Bit-exact against scipy across the whole one-sided axis, so DC AND the
+        # Nyquist bin (both un-doubled) are pinned, not just DC (issue #142).
+        from scipy.signal import periodogram
+
+        _, pxx = periodogram(
+            y,
+            fs=1.0,
+            window="boxcar",
+            nfft=N,
+            detrend=False,
+            scaling="density",
+            return_onesided=True,
+        )
+        np.testing.assert_allclose(result.power[:, 0], pxx, rtol=1e-10, atol=1e-12)
+
 
 class TestSpectrogramInputShapes:
     """Documented input shapes that previously crashed (issue #135)."""

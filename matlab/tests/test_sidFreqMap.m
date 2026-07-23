@@ -350,4 +350,25 @@ assert(~any(isnan(gs29(:))), 'Welch SISO low-coherence sigma should be Inf, neve
 runner__nPassed = runner__nPassed + 1;
 fprintf('  Test 29 passed: Welch SISO low-coherence sigma is Inf, not NaN (SPEC 3.3).\n');
 
+%% Test 30: Welch one-sided scaling -- Nyquist bin NOT doubled (#142, SPEC 6.5)
+% A single rect sub-segment over the whole signal makes Welch == the raw
+% one-sided periodogram, so the scaling (incl. the Nyquist bin) is checkable
+% in closed form without scipy. Before the fix the Nyquist bin was 2x too large.
+rng(30);
+Nn = 512;
+yn = randn(Nn, 1);
+rn = sidFreqMap(yn, [], 'Algorithm', 'welch', 'SegmentLength', Nn, ...
+    'SubSegmentLength', Nn, 'SubOverlap', 0, 'Window', 'rect', 'NFFT', Nn);
+phin = rn.NoiseSpectrum(:);              % (Nn/2 x 1), sid grid = fft bins 2..Nn/2+1
+Xn = fft(yn);
+Pfull = abs(Xn).^2 / Nn;                 % S1 = Nn for a rect window
+expected = 2 * Pfull(2:Nn/2+1);          % one-sided doubling
+expected(end) = Pfull(Nn/2+1);           % Nyquist has no mirror -> factor 1
+assert(max(abs(phin - expected)) < 1e-9 * max(abs(expected)), ...
+    'Welch PSD must match the one-sided periodogram, incl. the Nyquist bin');
+assert(abs(phin(end) / Pfull(Nn/2+1) - 1) < 1e-9, ...
+    'Nyquist bin must NOT be doubled (ratio 1, was 2 before #142)');
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 30 passed: Welch Nyquist bin un-doubled (#142).\n');
+
 fprintf('test_sidFreqMap: %d/%d passed\n', runner__nPassed, runner__nPassed);

@@ -590,20 +590,24 @@ Within each segment of length `L`, apply the Welch method (equivalent to `tfesti
    Φ̂_u(ω)  = (2 / (J_total × S₁)) Σ_{j,l} |U_{j,l}(ω)|²
    Φ̂_y(ω)  = (2 / (J_total × S₁)) Σ_{j,l} |Y_{j,l}(ω)|²
    ```
-   where `S₁ = Σ_n w(n)²` is the window power normalization, `J_total = J × L` is the total number of averaged periodograms, and the factor of 2 converts to one-sided spectra (positive frequencies only, excluding DC). This factor cancels in the transfer function ratio `Ĝ = Φ̂_yu / Φ̂_u` but is needed for correct spectral magnitudes.
+   where `S₁ = Σ_n w(n)²` is the window power normalization, `J_total = J × L` is the total number of averaged periodograms, and the factor of 2 converts to one-sided spectra. The factor of 2 applies to every bin **except those with no distinct negative-frequency mirror — DC and, for even `NFFT`, the Nyquist bin `ω = π`, which carry a factor of 1** (the frequency grid already excludes DC, so in practice only the Nyquist bin is un-doubled). This is the same one-sided convention as `sidSpectrogram` (§7.3) and as `scipy.signal`/`cpsd`; without the Nyquist exception the estimate is exactly 2× too large at `ω = π`. The factor cancels in the transfer function ratio `Ĝ = Φ̂_yu / Φ̂_u` and in the coherence, but is needed for correct spectral magnitudes.
+
+   **Relationship to BT.** The Welch spectra are **one-sided**, while the BT correlogram `Φ̂ = Σ_τ R(τ) W(τ) e^{−jωτ}` is a **two-sided** convention evaluated on `(0, π]`. Consequently, on the same data `Φ̂_v` (and `Φ̂_y`, `Φ̂_u`) from `'welch'` is **twice** that from `'bt'` at every non-DC, non-Nyquist bin. `Ĝ` and `γ̂²` are identical between the two (the factor cancels). Users comparing noise-spectrum magnitudes across algorithms must account for this 2× — it is a convention difference, not an error, and is stated here because §6.6 previously implied the two used an identical scale.
 
 4. Form `Ĝ(ω) = Φ̂_yu(ω) / Φ̂_u(ω)`.
 5. Form `Φ̂_v(ω)` and `γ̂²(ω)` as in the BT case.
 
 **Frequency resolution** is determined by the sub-segment length `L_sub` and the NFFT: `Δf = Fs / NFFT`. The sub-segment overlap `P_sub` controls variance reduction — more sub-segments (higher overlap) → lower variance but no change in resolution.
 
-**Uncertainty:** The variance of the Welch spectral estimate is approximately:
+**Uncertainty:** The averaged periodogram follows a scaled `χ²_ν` law, so the variance of the Welch spectral estimate is approximately:
 
 ```
-Var{Φ̂(ω)} ≈ Φ²(ω) / ν
+Var{Φ̂(ω)} ≈ 2 Φ²(ω) / ν
 ```
 
-where `ν` is the equivalent degrees of freedom. With no overlap, the `J` periodograms are independent and `ν = 2J`. With overlap, periodograms become correlated and `ν` decreases. For 50% overlap with a Hann window, `ν ≈ 1.8J` (Harris 1978). The exact formula involves the autocorrelation of the window function at the overlap lag and is not expressible in simple closed form; the implementation uses the empirical `1.8J` value directly.
+where `ν` is the equivalent degrees of freedom (the factor of 2 is the `χ²_ν` result and must not be dropped). With no overlap, the `J` periodograms are independent and `ν = 2J`. With overlap, periodograms become correlated and `ν` decreases. For 50% overlap with a Hann window, `ν ≈ 1.8J` (Harris 1978).
+
+**Limitation.** The exact `ν` depends on the window autocorrelation at the overlap lag and is not expressible in simple closed form. The implementation uses `ν = 2J` for zero overlap and the empirical `ν ≈ 1.8J` for **any** nonzero overlap. The `1.8J` value is calibrated for a Hann window at ~50% overlap; for other windows or much higher overlap it is an approximation that can **understate** the uncertainty (the reported `ResponseStd` / `NoiseSpectrumStd` are then optimistic). A window/overlap-aware `ν` is a documented future refinement.
 
 ### 6.6 Comparison of BT and Welch
 
@@ -613,7 +617,7 @@ where `ν` is the equivalent degrees of freedom. With no overlap, the `J` period
 | Variance control | `M` (smaller M → lower variance) | Number of sub-segments `J` (more → lower variance) |
 | Guaranteed non-negative spectrum | Yes (biased covariance estimator) | Yes (averaged periodograms) |
 | Custom frequency grid | Yes (direct DFT path) | No (FFT bins only) |
-| Normalization | System ID convention (no Ts factor) | System ID convention (no Ts factor) within `sidFreqMap`; standalone `tfestimate` includes Ts |
+| Normalization | Two-sided (correlogram), no Ts factor | One-sided periodogram (= **2× BT** on `Φ̂_y`/`Φ̂_u`/`Φ̂_v`; `Ĝ`, `γ̂²` identical), no Ts factor within `sidFreqMap`; standalone `tfestimate` includes Ts. See §6.5. |
 | Best for | Smooth spectra, custom frequencies | Standard analysis, `tfestimate` compatibility |
 
 **Default choice:** `'bt'` is the default because it matches the `sid` package's primary use case (system identification with `sidFreqBT`-compatible output) and supports custom frequency grids. Users coming from `tfestimate` should use `'welch'`.

@@ -681,3 +681,68 @@ class TestFreqMapWelchDegenerate:
         r = freq_map(y, u, algorithm="welch", segment_length=256)
         gstd = r.response_std[0] if isinstance(r.response_std, list) else r.response_std
         assert not np.any(np.isnan(gstd)), "low-coherence sigma should be Inf, never NaN"
+
+
+class TestFreqMapWelchScaling:
+    """Welch one-sided PSD scaling (issue #142, SPEC.md §6.5)."""
+
+    def test_welch_matches_scipy_including_nyquist(self) -> None:
+        """sid Welch Phi_y is bit-exact to scipy.signal.welch, Nyquist included.
+
+        The same window is handed to both so S1 (and thus the scaling) is
+        identical; the only thing under test is the one-sided factor, which must
+        double every bin except DC (excluded) and Nyquist. Before the fix the
+        Nyquist bin was exactly 2x too large.
+        """
+        from scipy.signal import welch as scipy_welch
+
+        rng = np.random.default_rng(0)
+        N, Lsub, Psub, nfft = 4096, 256, 128, 256
+        y = rng.standard_normal(N)
+        n = np.arange(Lsub)
+        w = 0.5 * (1.0 - np.cos(2.0 * np.pi * n / (Lsub - 1)))  # sid symmetric Hann
+
+        r = freq_map(
+            y,
+            algorithm="welch",
+            segment_length=N,
+            sub_segment_length=Lsub,
+            sub_overlap=Psub,
+            nfft=nfft,
+        )
+        phi = np.asarray(r.noise_spectrum).squeeze()
+
+        _, pxx = scipy_welch(
+            y,
+            fs=1.0,
+            window=w,
+            nperseg=Lsub,
+            noverlap=Psub,
+            nfft=nfft,
+            detrend=False,
+            scaling="density",
+            return_onesided=True,
+        )
+        pxx_nodc = pxx[1:]  # sid grid excludes DC
+
+        assert phi.shape == pxx_nodc.shape
+        np.testing.assert_allclose(phi, pxx_nodc, rtol=1e-10, atol=0.0)
+        # Nyquist bin specifically (the regressed one): ratio must be 1, not 2.
+        assert abs(phi[-1] / pxx_nodc[-1] - 1.0) < 1e-9
+
+    def test_welch_is_twice_bt_off_nyquist(self) -> None:
+        """SPEC.md §6.6: Welch (one-sided) noise spectrum is ~2x BT (two-sided).
+
+        Pins the documented convention relationship on white noise, away from
+        the Nyquist bin where Welch is un-doubled.
+        """
+        rng = np.random.default_rng(1)
+        N = 8000
+        y = rng.standard_normal(N)
+        r_bt = freq_map(y, algorithm="bt", segment_length=2000)
+        r_w = freq_map(y, algorithm="welch", segment_length=2000)
+        bt_mean = float(np.mean(np.asarray(r_bt.noise_spectrum)))
+        # Exclude the last (Nyquist) Welch bin, which is intentionally un-doubled.
+        w_mean = float(np.mean(np.asarray(r_w.noise_spectrum)[:-1]))
+        ratio = w_mean / bt_mean
+        assert 1.7 < ratio < 2.3, f"Welch/BT noise-spectrum ratio {ratio:.2f} should be ~2"
