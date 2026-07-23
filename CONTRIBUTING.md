@@ -107,6 +107,46 @@ When an ADR motivates a spec change, both land in the same PR (spec first, per
 (`% See ADR-NNNN`). Adding or revisiting a load-bearing decision is a "major
 decision" — see [`CLAUDE.md`](CLAUDE.md) §4.
 
+## Pre-push self-review (agent convention)
+
+Before pushing on a PR branch, review the local diff against the project's
+principles — not just lint — and act on findings before pushing. This catches
+the "I'd have caught that if I'd thought harder" class of bug before it burns CI
+minutes and reviewer attention. Note the outcome in the PR description
+(`pre-push review: no findings` or `pre-push review flagged X, fixed in <sha>`).
+
+Coding agents should launch a reviewer subagent on the diff, seeded with
+[`docs/REVIEW_CONTEXT.md`](docs/REVIEW_CONTEXT.md) (project principles, red
+flags, review modes) alongside [`spec/SPEC.md`](spec/SPEC.md) so it reviews
+against what the project cares about. The prompt:
+
+> Review the diff below against sid's principles in `docs/REVIEW_CONTEXT.md`,
+> citing the principle number or the affected `spec/SPEC.md` rule:
+>
+> 1. **Contract conformance** — does any change make a port match another port
+>    rather than the spec (principles 1, 2)? Is new/changed behaviour reflected
+>    in `spec/SPEC.md` *first* (principle 3)? Does a touched shared helper have
+>    every caller audited (principle 4)?
+> 2. **Verification** — does a new/changed spec rule name a `Verified by:`
+>    mechanism — or, until #113 lands, is it pinned by a test (principle 6)? Are
+>    tests written against spec requirements, not against the other language's
+>    current output (principle 5)? Are NaN/Inf substitutions, clamps, or warning
+>    identifiers changed without a spec update (principle 8)?
+> 3. **Scope & docs hygiene** — files or refactors outside the PR's stated
+>    purpose; user-facing docs (README, API reference, examples) carrying
+>    dev-tracking references (`ADR-NNNN` / `#issue`) or "recently changed"
+>    narration (principle 9).
+> 4. **Decisions deserving an ADR** — new thresholds, fallbacks, NaN policy,
+>    magic numbers (see `docs/decisions/`); and missing ADR links in the PR.
+> 5. **Catalogue / naming / auto-discovery** — new public functions follow the
+>    `sid + Domain + Method` convention and appear in `docs/roadmap.md`; new
+>    tests/examples match the discovery naming convention (principle 7).
+>
+> Report findings in under 200 words. Say "no findings" if the diff is clean.
+
+**Exceptions** — one-line typo fixes, formatting-only changes, and pure reverts
+don't warrant the ceremony.
+
 ## General Guidelines
 
 - The spec rules above apply to every implementation. The per-language
