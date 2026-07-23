@@ -1,0 +1,26 @@
+# Line-ending policy.
+#
+# The repository stores text as LF. Enforce it explicitly so line endings do
+# not vary per clone (core.autocrlf), which is the source of the recurring
+# "CRLF will be replaced by LF" churn, and so shell scripts and git hooks keep
+# a valid LF shebang under sh regardless of the checkout platform.
+#
+# `text=auto eol=lf` normalises every text file to LF both in the repository
+# and in the working tree. MATLAB/Octave and Python read LF correctly on all
+# platforms, so a forced-LF working tree is safe here and keeps Windows and
+# Linux (CI) byte-identical.
+* text=auto eol=lf
+
+# Files that MUST stay LF in the working tree to remain executable under sh.
+*.sh          text eol=lf
+.githooks/**  text eol=lf
+
+# Binary assets: never normalise or diff as text.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.pdf  binary
+*.mat  binary
+*.mex* binary
+*.ico  binary
