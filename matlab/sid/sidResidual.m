@@ -68,19 +68,30 @@ function result = sidResidual(model, y, u, varargin)
     % ---- Dispatch on model type ----
     if isfield(model, 'A') && isfield(model, 'B')
         % State-space model (sidLTVdisc)
-        [e, N_eff] = computeResidualSS(model, y, u);
+        [e, N] = computeResidualSS(model, y, u);
     elseif isfield(model, 'Response')
         % Frequency-domain model (sidFreqBT, sidFreqETFE, etc.)
         % Response may be empty for time-series models — that's valid
-        [e, N_eff] = computeResidualFreq(model, y, u);
+        [e, N] = computeResidualFreq(model, y, u);
     else
         error('sid:badModel', ...
             'Model struct must have Response field (freq-domain) or A,B fields (state-space).');
     end
 
+    % Trajectory count. Correlograms are computed on the per-trajectory
+    % residual (3-D) via sidCov's ensemble averaging; the whiteness /
+    % independence bound uses the pooled sample count N_eff = L*N, while the
+    % lag range is bounded by the per-trajectory length N (issue #140).
+    if ndims(e) == 3 %#ok<ISMAT>
+        Ltraj = size(e, 3);
+    else
+        Ltraj = 1;
+    end
+    N_eff = Ltraj * N;
+
     % ---- Default MaxLag ----
     if isempty(maxLag)
-        maxLag = min(25, floor(N_eff / 5));
+        maxLag = min(25, floor(N / 5));
     end
 
     % ---- Per-channel whiteness and independence tests ----
@@ -89,19 +100,16 @@ function result = sidResidual(model, y, u, varargin)
     ny = size(e, 2);
     confBound = 2.58 / sqrt(N_eff);
 
-    % Determine number of input channels for independence tests
+    % Keep the input per trajectory (3-D) so each trajectory's residual is
+    % cross-correlated against its own input, ensemble-averaged by sidCov.
     if ~isTimeSeries
-        if ndims(u) == 3 %#ok<ISMAT>
-            nu = size(u, 2);
-            u_2d = u(:, :, 1);  % use first trajectory
-        else
-            nu = size(u, 2);
-            u_2d = u;
+        if isvector(u)
+            u = u(:);
         end
-        Nu = min(size(e, 1), size(u_2d, 1));
+        nu = size(u, 2);
+        Nu = min(size(e, 1), size(u, 1));
     else
         nu = 0;
-        u_2d = [];
         Nu = size(e, 1);
     end
 
@@ -117,7 +125,13 @@ function result = sidResidual(model, y, u, varargin)
     end
 
     for ch = 1:ny
-        e_ch = e(1:Nu, ch);
+        % Keep the trajectory axis so sidCov ensemble-averages (Nu x 1 x L);
+        % single-trajectory residuals stay 2-D (Nu x 1).
+        if ndims(e) == 3 %#ok<ISMAT>
+            e_ch = e(1:Nu, ch, :);
+        else
+            e_ch = e(1:Nu, ch);
+        end
 
         % ---- Whiteness: normalised autocorrelation ----
         Ree = sidCov(e_ch, e_ch, maxLag);
@@ -131,12 +145,17 @@ function result = sidResidual(model, y, u, varargin)
         if ~isTimeSeries
             for iu = 1:nu
                 pairIdx = (ch - 1) * nu + iu;
-                u_ch = u_2d(1:Nu, iu);
+                if ndims(u) == 3 %#ok<ISMAT>
+                    u_ch = u(1:Nu, iu, :);
+                else
+                    u_ch = u(1:Nu, iu);
+                end
 
                 Reu_pos = sidCov(e_ch, u_ch, maxLag);
                 Rue_pos = sidCov(u_ch, e_ch, maxLag);
 
-                Ruu0 = u_ch' * u_ch / Nu;
+                Ruu = sidCov(u_ch, u_ch, 0);  % ensemble variance
+                Ruu0 = Ruu(1);
                 denom = sqrt(Ree0 * Ruu0);
                 if denom > 0
                     cc_pos = Reu_pos / denom;
@@ -202,16 +221,21 @@ function [e, N] = computeResidualSS(model, X, U)
     Nm = model.DataLength;  % number of time steps
     p = model.StateDim;
 
-    % Handle multi-trajectory
+    % Keep trajectories separate (NOT averaged): averaging shrinks the
+    % residual variance by L while the whiteness bound stays at 2.58/sqrt(N),
+    % making the test anticonservative, and it discards each trajectory's own
+    % input for the independence test. sidCov ensemble-averages the 3-D result
+    % with the correct 1/(L*N) normalization; the caller uses N_eff = L*N for
+    % the bound (issue #140).
     if ndims(X) == 3 %#ok<ISMAT>
         L = size(X, 3);
     else
         L = 1;
     end
 
-    e_all = zeros(Nm, p);
+    e = zeros(Nm, p, L);
     for l = 1:L
-        if L > 1
+        if ndims(X) == 3 %#ok<ISMAT>
             Xl = X(:, :, l);   % (N+1 x p)
             Ul = U(:, :, l);   % (N x q)
         else
@@ -221,10 +245,12 @@ function [e, N] = computeResidualSS(model, X, U)
 
         for k = 1:Nm
             x_pred = model.A(:, :, k) * Xl(k, :)' + model.B(:, :, k) * Ul(k, :)';
-            e_all(k, :) = e_all(k, :) + (Xl(k+1, :) - x_pred');
+            e(k, :, l) = Xl(k+1, :) - x_pred';
         end
     end
-    e = e_all / L;
+    if L == 1
+        e = e(:, :, 1);
+    end
     N = Nm;
 end
 

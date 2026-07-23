@@ -117,19 +117,29 @@ def compare(
         )
 
     # ------------------------------------------------------------------
-    # Compute NRMSE fit per channel
+    # Compute NRMSE fit per channel (SPEC §15.3)
     # ------------------------------------------------------------------
-    ny: int = y_meas.shape[1]
-    fit_vec = np.zeros(ny)
+    # y_meas / y_pred are (N, ny) for single-trajectory / frequency models, or
+    # (N, ny, L) for multi-trajectory state-space models. Normalise to 3-D so
+    # the fit is always computed per trajectory then averaged.
+    ym3 = y_meas[:, :, np.newaxis] if y_meas.ndim == 2 else y_meas
+    yp3 = y_pred[:, :, np.newaxis] if y_pred.ndim == 2 else y_pred
+    ny: int = ym3.shape[1]
+    L: int = ym3.shape[2]
 
+    fit_vec = np.zeros(ny)
     for ch in range(ny):
-        ym = y_meas[:, ch]
-        yp = y_pred[:, ch]
-        denom = np.linalg.norm(ym - np.mean(ym))
-        if denom > 0:
-            fit_vec[ch] = 100.0 * (1.0 - np.linalg.norm(ym - yp) / denom)
-        else:
-            fit_vec[ch] = np.nan
+        per_traj = np.full(L, np.nan)
+        for traj in range(L):
+            ym = ym3[:, ch, traj]
+            yp = yp3[:, ch, traj]
+            denom = np.linalg.norm(ym - np.mean(ym))
+            if denom > 0:
+                per_traj[traj] = 100.0 * (1.0 - np.linalg.norm(ym - yp) / denom)
+        # SPEC §15.3: average per-trajectory fits. A degenerate trajectory
+        # (constant measured signal) contributes NaN and is skipped; the fit
+        # is NaN only when every trajectory is degenerate.
+        fit_vec[ch] = np.nanmean(per_traj) if np.any(np.isfinite(per_traj)) else np.nan
 
     # ------------------------------------------------------------------
     # Determine method name
@@ -140,13 +150,14 @@ def compare(
         method_name = "unknown"
 
     # ------------------------------------------------------------------
-    # Plot (optional)
+    # Plot (optional). Overlay the first trajectory for multi-trajectory data.
     # ------------------------------------------------------------------
     if plot:
-        _plot_comparison(y_meas, y_pred, fit_vec, method_name)
+        _plot_comparison(ym3[:, :, 0], yp3[:, :, 0], fit_vec, method_name)
 
     # ------------------------------------------------------------------
-    # Pack result
+    # Pack result. predicted / measured / residual are per-trajectory:
+    # (N, ny) for single-trajectory data, (N, ny, L) for multi-trajectory.
     # ------------------------------------------------------------------
     return CompareResult(
         predicted=y_pred,
@@ -183,10 +194,10 @@ def _simulate_ss(
 
     Returns
     -------
-    y_pred : ndarray, shape ``(N, p)``
-        Predicted state (averaged over trajectories).
-    y_meas : ndarray, shape ``(N, p)``
-        Measured state (averaged over trajectories).
+    y_pred : ndarray, shape ``(N, p)`` or ``(N, p, L)``
+        Predicted state, per trajectory. 2-D for a single trajectory.
+    y_meas : ndarray, shape ``(N, p)`` or ``(N, p, L)``
+        Measured state, per trajectory. 2-D for a single trajectory.
     """
     X = np.asarray(X, dtype=np.float64)
     Nm: int = model.data_length
@@ -197,11 +208,15 @@ def _simulate_ss(
     else:
         L = 1
 
-    y_pred_sum = np.zeros((Nm, p), dtype=np.float64)
-    y_meas_sum = np.zeros((Nm, p), dtype=np.float64)
+    # Keep trajectories separate: SPEC §15.3 computes the fit per trajectory,
+    # so this must NOT ensemble-average the signals (which cancels independent
+    # per-trajectory errors and is optimistic — degenerate for mirror-image
+    # trajectories that sum to zero; issue #140).
+    y_pred = np.zeros((Nm, p, L), dtype=np.float64)
+    y_meas = np.zeros((Nm, p, L), dtype=np.float64)
 
     for traj in range(L):
-        if L > 1:
+        if X.ndim == 3:
             Xl = X[:, :, traj]
             Ul = U[:, :, traj] if U is not None else None
         else:
@@ -221,11 +236,11 @@ def _simulate_ss(
             xk = x_next
 
         # Measured: x[1:N+1], Predicted: x_hat[0:N]
-        y_meas_sum += Xl[1:, :]
-        y_pred_sum += x_hat
+        y_meas[:, :, traj] = Xl[1:, :]
+        y_pred[:, :, traj] = x_hat
 
-    y_meas = y_meas_sum / L
-    y_pred = y_pred_sum / L
+    if L == 1:
+        return y_pred[:, :, 0], y_meas[:, :, 0]
     return y_pred, y_meas
 
 

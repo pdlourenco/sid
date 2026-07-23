@@ -2063,6 +2063,8 @@ For COSMIC multi-trajectory data, fit is computed per trajectory and averaged.
 | `Residual` | `(N × n_y)` | `y(t) - ŷ(t)` |
 | `Method` | char | Method of the source model |
 
+**Multi-trajectory data.** For multi-trajectory state-space input (`L` trajectories), `Predicted`, `Measured`, and `Residual` are returned **per trajectory** with shape `(N × n_y × L)` — *not* the ensemble mean, which would cancel independent per-trajectory errors (and is degenerate for mirror-image trajectories). `Fit` stays `(1 × n_y)`: the per-channel NRMSE is computed for each trajectory and averaged across trajectories, per §15.3. A trajectory whose measured channel is constant contributes `NaN` to that channel's average and is skipped; the channel's `Fit` is `NaN` only when every trajectory is degenerate. Single-trajectory input returns the `(N × n_y)` shapes above.
+
 ### 15.6 Plotting
 
 When called with `'Plot', true` or with no output arguments, `sidCompare` produces a figure with measured and predicted outputs overlaid, and the fit percentage displayed in the title or legend.

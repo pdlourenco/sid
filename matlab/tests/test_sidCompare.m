@@ -27,10 +27,37 @@ comp = sidCompare(perfect_model, X, U);
 
 assert(all(comp.Fit > 99), ...
     'Perfect model should give >99%% fit, got [%.1f, %.1f]', comp.Fit(1), comp.Fit(2));
-assert(isequal(size(comp.Predicted), [N, p]), 'Predicted should be N x p');
-assert(isequal(size(comp.Residual), [N, p]), 'Residual should be N x p');
+% Multi-trajectory Predicted/Residual are per-trajectory (N x p x L), not the
+% ensemble mean — SPEC §15.3, issue #140.
+assert(isequal(size(comp.Predicted), [N, p, L]), 'Predicted should be N x p x L');
+assert(isequal(size(comp.Residual), [N, p, L]), 'Residual should be N x p x L');
 runner__nPassed = runner__nPassed + 1;
 fprintf('  Test 1 passed: perfect state-space model gives %.1f%% fit.\n', min(comp.Fit));
+
+%% Test 1b: mirror-image trajectories are perfectly identifiable, not NaN (#140)
+% X2 = [X, -X], U2 = [U, -U] sum to zero; the old signal-averaging path gave
+% measured == 0 and fit = NaN. The per-trajectory fit is ~100% for each.
+rng(7011);
+p = 2; q = 1; N = 60;
+A_true = [0.9 0.1; -0.05 0.8]; B_true = [0.5; 0.3];
+Xs = zeros(N+1, p); Us = randn(N, q); Xs(1, :) = randn(1, p);
+for k = 1:N
+    Xs(k+1, :) = (A_true * Xs(k, :)' + B_true * Us(k, :)')';
+end
+mirror_model.A = repmat(A_true, [1, 1, N]);
+mirror_model.B = repmat(B_true, [1, 1, N]);
+mirror_model.DataLength = N;
+mirror_model.StateDim = p;
+mirror_model.InputDim = q;
+mirror_model.Method = 'sidLTVdisc';
+Xmir = cat(3, Xs, -Xs); Umir = cat(3, Us, -Us);
+compMir = sidCompare(mirror_model, Xmir, Umir);
+assert(all(isfinite(compMir.Fit)) && all(compMir.Fit > 99), ...
+    'Mirror-image trajectories should give ~100%% fit, got [%.2f, %.2f]', ...
+    compMir.Fit(1), compMir.Fit(2));
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 1b passed: mirror-image trajectories fit %.1f%% (#140).\n', ...
+    min(compMir.Fit));
 
 %% Test 2: Frequency-domain model fit
 rng(7002);
