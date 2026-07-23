@@ -1777,6 +1777,7 @@ then the input carries no usable excitation: set `Ĝ(ω) = NaN` for all `ω`, `�
 | `y` is constant | Valid; `Φ̂_y ≈ 0` at all frequencies |
 | `u = y` (perfect coherence) | Valid; `γ̂² ≈ 1`, `Φ̂_v ≈ 0`, very small `σ_G` |
 | Collinear MIMO inputs (rank-deficient `u`) | Per-frequency `cond(Φ̂_u) > 1/ε` fires at every frequency: `Ĝ = NaN`, `σ_G = Inf`, warning (§2.6) |
+| One input channel constant while others are active (partial degeneracy) | The whole-signal check passes (a healthy channel dominates `max_ch`) and `cond(Φ̂_u)` may stay below `1/ε`, so the estimate proceeds; that channel's column of `Ĝ` is unidentifiable. A **per-channel warning** names the constant channel(s); the healthy channels are estimated normally (their columns are *not* NaN'd). |
 
 ---
 

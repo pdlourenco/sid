@@ -15,7 +15,11 @@ import numpy as np
 
 from sid._exceptions import SidError
 from sid._internal.cov import sid_cov
-from sid._internal.degenerate import input_excitation_degenerate, regularize_response
+from sid._internal.degenerate import (
+    dead_input_channels,
+    input_excitation_degenerate,
+    regularize_response,
+)
 from sid._internal.hann_win import hann_win
 from sid._internal.is_default_freqs import is_default_freqs
 from sid._internal.uncertainty import sid_uncertainty
@@ -240,6 +244,18 @@ def freq_bt(
         # Whole-signal input-excitation check (SPEC.md §10.3): a constant or
         # zero input identifies no dynamics, so every frequency is degenerate.
         force_degenerate = input_excitation_degenerate(u)
+        # Partial degeneracy (§10.3): a single dead channel among active ones
+        # does not fail the whole-signal check, but its response column is
+        # unreliable -- warn without NaNing the healthy channels.
+        if not force_degenerate:
+            dead = dead_input_channels(u)
+            if np.any(dead):
+                warnings.warn(
+                    f"Input channel(s) {list(np.nonzero(dead)[0])} are "
+                    "(near-)constant; their frequency-response columns are "
+                    "unreliable (SPEC.md §10.3).",
+                    stacklevel=2,
+                )
         # Shared per-frequency Phi_u guard, NaN substitution and PSD clamp
         # (SPEC.md §2.6/§2.7), extracted so BT/BTFDR/ETFE/Welch cannot drift.
         G, PhiV, Coh = regularize_response(PhiYU, PhiU, PhiY, force_degenerate=force_degenerate)

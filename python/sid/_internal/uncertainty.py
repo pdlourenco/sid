@@ -126,6 +126,12 @@ def sid_uncertainty(
                         g_std[k, ii, jj] = np.sqrt(CW / Neff * phiV_ii / phiU_jj)
                     else:
                         g_std[k, ii, jj] = np.inf
+
+        # SPEC §3.3 (the "equivalently" clause): MIMO has no coherence, so the
+        # Inf sentinel keys on the NaN mask of G -- a singular Phi_u (collinear
+        # inputs) NaNs the whole G(w) slice and its sigma_G must be Inf, not a
+        # finite value from a merely ill-conditioned diagonal (issue #143).
+        g_std = np.where(np.isnan(G), np.inf, g_std)
     else:
         # MIMO case without phi_u: cannot compute uncertainty
         g_std = np.full_like(G, np.nan, dtype=np.float64)

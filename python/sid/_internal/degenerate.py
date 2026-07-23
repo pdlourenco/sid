@@ -46,7 +46,7 @@ _CONSTANT_INPUT_MSG = (
 
 
 def input_excitation_degenerate(u: np.ndarray | None, eps: float = EPS_REG) -> bool:
-    """Return ``True`` when the input carries no usable excitation (§10.3).
+    """Return ``True`` when the input carries no usable excitation (SPEC.md §10.3).
 
     A constant input (zero variance about its own mean) or an identically-zero
     input cannot identify any dynamics on the ``(0, pi]`` grid. This is an
@@ -63,6 +63,25 @@ def input_excitation_degenerate(u: np.ndarray | None, eps: float = EPS_REG) -> b
     eps : float
         Relative tolerance; ``max_ch(var) <= eps * max_ch(mean_square)`` counts
         as constant. Default ``1e-10``.
+
+    Returns
+    -------
+    bool
+        ``True`` when the input is constant or identically zero.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> input_excitation_degenerate(np.ones(100))  # doctest: +SKIP
+    True
+
+    See Also
+    --------
+    regularize_response : Per-frequency degenerate handling this pairs with.
+
+    Changelog
+    ---------
+    2026-07-23 : First version by Pedro Lourenco.
     """
     if u is None:
         return False
@@ -78,13 +97,87 @@ def input_excitation_degenerate(u: np.ndarray | None, eps: float = EPS_REG) -> b
     return bool(np.max(var_ac) <= eps * max_ms or max_ms <= np.finfo(np.float64).tiny)
 
 
+def dead_input_channels(u: np.ndarray | None, eps: float = EPS_REG) -> np.ndarray:
+    """Flag individual (near-)constant input channels (SPEC.md §10.3).
+
+    A single constant channel among otherwise active channels does *not* make
+    the whole input degenerate (:func:`input_excitation_degenerate` stays
+    ``False`` because a healthy channel dominates), and it may not push
+    ``cond(Phi_u)`` past ``1/eps`` at every frequency -- yet that channel's
+    transfer-function column is unidentifiable. Callers use this to warn
+    without NaNing the healthy channels.
+
+    Parameters
+    ----------
+    u : ndarray or None
+        Input signal, shape ``(N,)``, ``(N, nu)``, or ``(N, nu, L)``.
+    eps : float
+        Relative tolerance, as in :func:`input_excitation_degenerate`.
+
+    Returns
+    -------
+    ndarray
+        Boolean array ``(nu,)``; ``True`` where the channel is (near-)constant.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> dead_input_channels(np.c_[np.ones(50), np.arange(50.0)])  # doctest: +SKIP
+    array([ True, False])
+
+    See Also
+    --------
+    input_excitation_degenerate : Whole-signal version.
+
+    Changelog
+    ---------
+    2026-07-23 : First version by Pedro Lourenco.
+    """
+    if u is None:
+        return np.zeros(0, dtype=bool)
+    u = np.asarray(u, dtype=np.float64)
+    if u.ndim == 1:
+        u = u[:, np.newaxis]
+    elif u.ndim == 3:
+        u = u.transpose(0, 2, 1).reshape(-1, u.shape[1])
+    var_ac = u.var(axis=0)
+    mean_sq = (u**2).mean(axis=0)
+    scale = float(np.max(mean_sq)) if mean_sq.size else 0.0
+    tiny = np.finfo(np.float64).tiny
+    return (var_ac <= eps * scale) | (mean_sq <= tiny)
+
+
 def clamp_psd_scalar(phi_v: np.ndarray) -> np.ndarray:
-    """Clamp a SISO/scalar noise spectrum to be non-negative (§2.7).
+    """Clamp a SISO/scalar noise spectrum to be non-negative (SPEC.md §2.7).
 
     Only *finite* negative values are clamped to 0; ``NaN`` entries (from a
     degenerate frequency) are preserved. ``np.maximum(NaN, 0)`` already returns
     ``NaN`` in NumPy, but this wrapper makes the intent explicit and mirrors
     the MATLAB port, where ``max(NaN, 0) == 0`` would otherwise erase the NaN.
+
+    Parameters
+    ----------
+    phi_v : ndarray
+        Scalar noise spectrum ``(nf,)``.
+
+    Returns
+    -------
+    ndarray
+        ``phi_v`` with finite negatives set to 0 and ``NaN`` preserved.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> clamp_psd_scalar(np.array([1.0, -1e-9, np.nan]))  # doctest: +SKIP
+    array([ 1.,  0., nan])
+
+    See Also
+    --------
+    clamp_psd_matrix : MIMO (matrix) counterpart.
+
+    Changelog
+    ---------
+    2026-07-23 : First version by Pedro Lourenco.
     """
     out = np.array(phi_v, dtype=np.float64, copy=True)
     neg = np.isfinite(out) & (out < 0.0)
@@ -95,12 +188,45 @@ def clamp_psd_scalar(phi_v: np.ndarray) -> np.ndarray:
 def clamp_psd_matrix(V: np.ndarray) -> np.ndarray:
     """Clamp a single ``(ny, ny)`` noise-spectrum matrix to PSD (§2.7).
 
-    Symmetrises, then zeroes any negative eigenvalues. A matrix containing
-    ``NaN`` (degenerate frequency) is returned unchanged so the NaN survives.
+    The **real part is taken first**, then the matrix is symmetrised and any
+    negative eigenvalues are zeroed. Taking the real part before ``eigh`` is
+    the pre-refactor convention for the MIMO noise spectrum ``Φ̂_v`` and avoids
+    handing a complex-symmetric (not Hermitian) matrix to ``eigh``, which would
+    silently reinterpret one triangle. A matrix containing ``NaN`` (degenerate
+    frequency) is returned unchanged so the NaN survives.
+
+    Parameters
+    ----------
+    V : ndarray
+        A single ``(ny, ny)`` noise-spectrum matrix (may be complex).
+
+    Returns
+    -------
+    ndarray
+        The real, symmetric, PSD-clamped ``(ny, ny)`` matrix (or the real part
+        unchanged when it contains ``NaN``).
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> clamp_psd_matrix(np.array([[1.0, 0.0], [0.0, -1e-9]]))  # doctest: +SKIP
+    array([[1., 0.], [0., 0.]])
+
+    Notes
+    -----
+    **Specification:** SPEC.md §2.7 -- Noise Spectrum Estimate (PSD clamp).
+
+    See Also
+    --------
+    clamp_psd_scalar : Scalar (SISO) counterpart.
+
+    Changelog
+    ---------
+    2026-07-23 : First version by Pedro Lourenco.
     """
-    V = np.asarray(V)
+    V = np.real(np.asarray(V))  # real part first (parity with the old path)
     if not np.all(np.isfinite(V)):
-        return np.real(V)
+        return V
     Vk = (V + V.T) / 2.0
     eigvals, eigvecs = np.linalg.eigh(Vk)
     if np.any(eigvals < 0):
@@ -119,6 +245,8 @@ def regularize_response(
     warn: bool = True,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
     """Form ``G``, ``Phi_v`` and coherence with the shared degenerate handling.
+
+    Implements SPEC.md §2.6 (regularization) and §2.7 (PSD clamp).
 
     Parameters
     ----------
@@ -142,6 +270,22 @@ def regularize_response(
         Noise spectrum, ``(nf,)`` (SISO) or ``(nf, ny, ny)``.
     coherence : ndarray or None
         Squared coherence ``(nf,)`` for SISO; ``None`` for MIMO.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> G, Phi_v, coh = regularize_response(  # doctest: +SKIP
+    ...     phi_yu, phi_u, phi_y
+    ... )
+
+    See Also
+    --------
+    input_excitation_degenerate : Whole-signal check that sets ``force_degenerate``.
+    sid._internal.uncertainty.sid_uncertainty : Applies the sigma_G = Inf sentinel.
+
+    Changelog
+    ---------
+    2026-07-23 : First version by Pedro Lourenco.
     """
     is_siso = phi_yu.ndim == 1
 
@@ -152,9 +296,15 @@ def regularize_response(
 
         PhiU_abs = np.abs(PhiU)
         PhiU_max = float(np.max(PhiU_abs)) if PhiU_abs.size > 0 else 0.0
-        singular_mask = PhiU_abs < eps_reg * PhiU_max
-        if force_degenerate:
+        # Defense-in-depth: an all-zero Phi_u makes the relative mask vacuous
+        # (0 < 0 is False), so treat it as fully degenerate even if a caller
+        # forgot the input-excitation check upstream -- otherwise the §143 bug
+        # shape (silent NaN, no warning) returns by omission.
+        if force_degenerate or PhiU_max <= np.finfo(np.float64).tiny:
             singular_mask = np.ones_like(PhiU_abs, dtype=bool)
+            force_degenerate = True
+        else:
+            singular_mask = PhiU_abs < eps_reg * PhiU_max
 
         G = np.empty_like(PhiYU)
         with np.errstate(divide="ignore", invalid="ignore"):
