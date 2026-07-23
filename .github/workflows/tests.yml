@@ -1,15 +1,19 @@
 name: MATLAB/Octave tests
 
+# Triggers are intentionally unfiltered by path. A `paths:` include filter
+# skips the whole job when it does not match, which (a) left edits to
+# testdata/generate_reference.m from triggering reference regeneration
+# (issue #145e) and (b) leaves a required status check pending forever on
+# an unrelated PR. Instead the job always starts — so the required check
+# always reports — and a per-job "Detect MATLAB-relevant change" step skips
+# the expensive engine steps when the PR touches nothing this suite exercises
+# (matlab/, testdata/, or this workflow). See docs/roadmap.md / issue #145e.
 on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths:
-      - 'matlab/**.m'
   pull_request:
     branches: [main]
-    paths:
-      - 'matlab/**.m'
 
 permissions:
   contents: write
@@ -24,16 +28,39 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Detect MATLAB-relevant change
+        id: changes
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          run=true
+          if [ "$EVENT" = "pull_request" ]; then
+            files=$(git diff --name-only "origin/$BASE_REF...HEAD")
+            echo "Changed files:"; printf '%s\n' "$files"
+            if [ -z "$files" ] || ! printf '%s\n' "$files" \
+                 | grep -qE '^(matlab/|testdata/|\.github/workflows/tests\.yml$)'; then
+              run=false
+            fi
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          echo "Run engine steps: $run"
 
       - name: Install GNU Octave and xvfb
+        if: steps.changes.outputs.run == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y octave xvfb
 
       - name: Run test suite
+        if: steps.changes.outputs.run == 'true'
         run: xvfb-run octave --no-gui --eval "run('matlab/tests/runAllTests.m')"
 
       - name: Run examples
+        if: steps.changes.outputs.run == 'true'
         run: xvfb-run octave --no-gui --eval "run('matlab/examples/runAllExamples.m')"
 
   matlab:
@@ -59,33 +86,59 @@ jobs:
         with:
           token: ${{ steps.app-token.outputs.token }}
           persist-credentials: true
+          fetch-depth: 0
+
+      - name: Detect MATLAB-relevant change
+        id: changes
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          run=true
+          if [ "$EVENT" = "pull_request" ]; then
+            files=$(git diff --name-only "origin/$BASE_REF...HEAD")
+            echo "Changed files:"; printf '%s\n' "$files"
+            if [ -z "$files" ] || ! printf '%s\n' "$files" \
+                 | grep -qE '^(matlab/|testdata/|\.github/workflows/tests\.yml$)'; then
+              run=false
+            fi
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          echo "Run engine steps: $run"
 
       # Note: matlab-actions v2 uses Node.js 20 (deprecated June 2026).
       # FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 runs them on Node 24 instead.
       # Upgrade to v3 when MathWorks releases it.
       - name: Set up MATLAB with toolboxes
+        if: steps.changes.outputs.run == 'true'
         uses: matlab-actions/setup-matlab@v2.7.0
         with:
           release: R2025a
           products: System_Identification_Toolbox Signal_Processing_Toolbox
+          cache: true
 
       - name: Run test suite
+        if: steps.changes.outputs.run == 'true'
         uses: matlab-actions/run-command@v2.4.1
         with:
           command: run('matlab/tests/runAllTests.m')
 
       - name: Run examples
+        if: steps.changes.outputs.run == 'true'
         uses: matlab-actions/run-command@v2.4.1
         with:
           command: run('matlab/examples/runAllExamples.m')
 
       - name: Generate cross-language reference data
+        if: steps.changes.outputs.run == 'true'
         uses: matlab-actions/run-command@v2.4.1
         with:
           command: run('testdata/generate_reference.m')
 
       - name: Commit reference data if changed
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: >-
+          steps.changes.outputs.run == 'true' &&
+          (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         env:
           APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
         run: |
