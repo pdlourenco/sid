@@ -14,6 +14,7 @@ import warnings
 import numpy as np
 
 from sid._exceptions import SidError
+from sid._internal.degenerate import input_excitation_degenerate
 from sid._internal.dft import sid_dft
 from sid._internal.is_default_freqs import is_default_freqs
 from sid._internal.validate_data import validate_data
@@ -52,6 +53,29 @@ def _boxcar_smooth(x: np.ndarray, S: int) -> np.ndarray:
         hi = min(nf, k + half + 1)
         out[k] = np.mean(x[lo:hi])
     return out
+
+
+def _warn_degenerate(any_singular: bool, force_degenerate: bool) -> None:
+    """Emit the shared degenerate-input warning for the ETFE (SPEC.md §10.2/§10.3).
+
+    ETFE does not share ``regularize_response`` (it forms ``G = Y/U`` directly
+    rather than from windowed covariances), so its NaN branches historically
+    warned only in the true-MIMO case. This restores parity: a whole-signal
+    constant/zero input (§10.3) and any per-frequency near-singular ``U(ω)``
+    (§10.2) now both warn, with the same wording as the other estimators.
+    """
+    if force_degenerate:
+        warnings.warn(
+            "Input u has negligible variation (constant or zero). The frequency "
+            "response is unidentifiable; G set to NaN and sigma_G to Inf everywhere.",
+            stacklevel=3,
+        )
+    elif any_singular:
+        warnings.warn(
+            "Input spectrum Phi_u is near-singular at some frequencies. "
+            "G set to NaN at those points.",
+            stacklevel=3,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -301,6 +325,8 @@ def freq_etfe(
     elif ny == 1 and nu == 1:
         # ---- SISO: G(w) = Y(w) / U(w) ----
         eps_reg = 1e-10
+        force_degenerate = input_excitation_degenerate(u)  # §10.3 whole-signal
+        any_singular = False
 
         if n_traj == 1:
             assert Ydft is not None and Udft is not None
@@ -314,6 +340,7 @@ def freq_etfe(
             for kk in range(nf):
                 if Uabs[kk] < eps_reg * Umax:
                     G_arr[kk] = np.nan + 1j * np.nan
+                    any_singular = True
                 else:
                     G_arr[kk] = Y1[kk] / U1[kk]
             G = G_arr
@@ -335,9 +362,18 @@ def freq_etfe(
             for kk in range(nf):
                 if PhiU[kk] < eps_reg * Umax:
                     G_arr[kk] = np.nan + 1j * np.nan
+                    any_singular = True
                 else:
                     G_arr[kk] = PhiYU[kk] / PhiU[kk]
             G = G_arr
+
+        # §10.3: a constant/zero input is unidentifiable at every frequency.
+        # The relative per-frequency floor cannot see it (a constant signal's
+        # DFT is a nonzero Dirichlet kernel off DC), so force the whole
+        # response to NaN here, keyed on the time-domain excitation check.
+        if force_degenerate:
+            G[:] = np.nan + 1j * np.nan
+        _warn_degenerate(any_singular, force_degenerate)
 
         # Optional smoothing
         if S > 1:
@@ -391,8 +427,9 @@ def freq_etfe(
             PhiYU /= n_traj
             PhiU /= n_traj
 
+        force_degenerate = input_excitation_degenerate(u)  # §10.3 whole-signal
         G_mimo = np.zeros((nf, ny, nu), dtype=np.complex128)
-        warned_singular = False
+        any_singular = False
         for kk in range(nf):
             PhiU_k = PhiU[kk, :, :].reshape(nu, nu)
             PhiYU_k = PhiYU[kk, :, :].reshape(ny, nu)
@@ -401,6 +438,7 @@ def freq_etfe(
                 # Scalar input spectrum
                 if np.abs(PhiU_k[0, 0]) < eps_reg * np.max(np.abs(PhiU)):
                     G_mimo[kk, :, :] = np.nan
+                    any_singular = True
                 else:
                     G_mimo[kk, :, :] = PhiYU_k / PhiU_k[0, 0]
             else:
@@ -411,18 +449,15 @@ def freq_etfe(
                     rc = 0.0
                 if rc < eps_reg:
                     G_mimo[kk, :, :] = np.nan
-                    if not warned_singular:
-                        warnings.warn(
-                            "Input spectrum Phi_u is near-singular at some "
-                            "frequencies. G set to NaN at those points.",
-                            stacklevel=2,
-                        )
-                        warned_singular = True
+                    any_singular = True
                 else:
                     # MATLAB: PhiYU_k / PhiU_k  == PhiYU_k * inv(PhiU_k)
                     # Python: solve(PhiU_k.T, PhiYU_k.T).T
                     G_mimo[kk, :, :] = np.linalg.solve(PhiU_k.T, PhiYU_k.T).T
 
+        if force_degenerate:  # §10.3, see the SISO branch note
+            G_mimo[:] = np.nan
+        _warn_degenerate(any_singular, force_degenerate)
         G = G_mimo
 
         # Optional smoothing (element-wise)

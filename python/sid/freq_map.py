@@ -14,6 +14,7 @@ import math
 import numpy as np
 
 from sid._exceptions import SidError
+from sid._internal.degenerate import input_excitation_degenerate, regularize_response
 from sid._internal.validate_data import validate_data
 from sid._results import FreqMapResult, FreqResult
 from sid.freq_bt import freq_bt
@@ -156,7 +157,6 @@ def _welch_estimate(
         nu_dof = max(2.0, 1.8 * J * n_traj_w)
 
     # ---- Form transfer function, noise spectrum, coherence ----
-    nf = n_bins
     if is_time_series:
         G: np.ndarray | None = None
         GStd: np.ndarray | None = None
@@ -167,34 +167,31 @@ def _welch_estimate(
         Coh: np.ndarray | None = None
 
     elif ny == 1 and nu == 1:
-        # SISO
-        PhiY_s = PhiY.ravel()
-        PhiU_s = PhiU.ravel()
-        PhiYU_s = PhiYU.ravel()
-        G = PhiYU_s / PhiU_s
-        PhiV = np.real(PhiY_s) - np.abs(PhiYU_s) ** 2 / np.real(PhiU_s)
-        PhiV = np.maximum(PhiV, 0.0)
-        Coh = np.abs(PhiYU_s) ** 2 / (np.real(PhiY_s) * np.real(PhiU_s))
-        Coh = np.clip(Coh, 0.0, 1.0)
-        GStd = np.abs(G) * np.sqrt((1.0 - Coh) / (Coh * nu_dof))
-        GStd = np.where(Coh < 1e-10, np.nan, GStd)
+        # SISO -- shared degenerate handling (SPEC.md §2.6/§2.7/§10.3), so the
+        # Welch path applies the same Phi_u guard and PSD clamp as freq_bt.
+        force_degenerate = input_excitation_degenerate(u)
+        G, PhiV, Coh = regularize_response(
+            PhiYU.ravel(),
+            PhiU.ravel(),
+            PhiY.ravel(),
+            force_degenerate=force_degenerate,
+        )
+        with np.errstate(divide="ignore", invalid="ignore"):
+            GStd = np.abs(G) * np.sqrt((1.0 - Coh) / (Coh * nu_dof))
+        # §3.3: sigma_G = Inf (not NaN) where the input carries no information.
+        GStd = np.where(np.asarray(Coh) < 1e-10, np.inf, GStd)
         PhiVStd = PhiV * math.sqrt(2.0 / nu_dof)
 
     else:
-        # MIMO
-        G = np.zeros((nf, ny, nu), dtype=complex)
-        PhiV = np.zeros((nf, ny, ny))
-        for k in range(nf):
-            PhiU_k = PhiU[k, :, :].reshape(nu, nu)
-            PhiYU_k = PhiYU[k, :, :].reshape(ny, nu)
-            PhiY_k = PhiY[k, :, :].reshape(ny, ny)
-            # G(k) = Phi_yu(k) * Phi_u(k)^{-1}
-            G[k, :, :] = np.linalg.solve(PhiU_k.T, PhiYU_k.T).T
-            # Phi_v = Phi_y - Phi_yu * Phi_u^{-1} * Phi_yu'
-            Gk = G[k, :, :]
-            PhiV[k, :, :] = np.real(PhiY_k - Gk @ PhiYU_k.conj().T)
-        PhiV = np.real(PhiV)
+        # MIMO -- the shared helper adds the rcond guard + PSD clamp that the
+        # raw solve lacked, so collinear inputs yield NaN, not a LinAlgError
+        # (issue #141).
+        force_degenerate = input_excitation_degenerate(u)
+        G, PhiV, _ = regularize_response(PhiYU, PhiU, PhiY, force_degenerate=force_degenerate)
+        # Welch MIMO has no closed-form G uncertainty (kept NaN), but honour the
+        # §3.3 Inf sentinel where a singular Phi_u NaN'd the response slice.
         GStd = np.full_like(G, np.nan, dtype=float)
+        GStd = np.where(np.isnan(G), np.inf, GStd)
         PhiVStd = np.abs(PhiV) * math.sqrt(2.0 / nu_dof)
         Coh = None
 
