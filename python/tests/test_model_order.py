@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-
 from scipy.signal import lfilter
 
 from sid._exceptions import SidError

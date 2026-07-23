@@ -14,9 +14,9 @@ import warnings
 import numpy as np
 
 from sid._exceptions import SidError
+from sid.freq_map import freq_map
 from sid.ltv_disc import ltv_disc
 from sid.ltv_disc_frozen import ltv_disc_frozen
-from sid.freq_map import freq_map
 
 
 def ltv_disc_tune(

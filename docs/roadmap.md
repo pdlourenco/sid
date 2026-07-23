@@ -422,7 +422,7 @@ Architecture is decomposed into reusable layers:
 - No `tiledlayout`/`nexttile` — use `subplot`
 - No `exportgraphics` — use `print`
 - No `dictionary` — use `struct` or `containers.Map`
-- Test in CI with Octave 8+
+- Test in CI with Octave 11+
 
 ---
 

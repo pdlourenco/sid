@@ -19,7 +19,6 @@ from sid._internal.validate_data import validate_data
 from sid._results import FreqMapResult, FreqResult
 from sid.freq_bt import freq_bt
 
-
 # ---- Welch inner estimator (private) ----------------------------------------
 
 

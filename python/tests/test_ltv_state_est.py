@@ -18,6 +18,7 @@ import numpy as np
 # It is made importable here by python/tests/conftest.py, which prepends
 # the examples directory to sys.path.
 from util_msd import util_msd as _test_msd  # noqa: E402
+
 from sid.ltv_state_est import ltv_state_est
 
 

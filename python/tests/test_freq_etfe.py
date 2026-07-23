@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 from scipy.signal import lfilter
 
-from sid import freq_etfe, SidError
+from sid import SidError, freq_etfe
 
 
 class TestFreqETFE:

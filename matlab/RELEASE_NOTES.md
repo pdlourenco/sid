@@ -18,7 +18,7 @@ system identification (Carvalho et al., 2022). Both paths support SISO, MIMO, ti
 series, and multi-trajectory data through a unified API.
 
 No toolboxes are required. The entire codebase uses only core MATLAB/Octave
-functions and runs on MATLAB R2016b+ and GNU Octave 8.0+, including MATLAB
+functions and runs on MATLAB R2024a+ and GNU Octave 11+, including MATLAB
 Online.
 
 ## Release Contents
@@ -229,8 +229,8 @@ Every estimation function returns a struct with documented fields. Run
 
 | Platform | Version | Status |
 |---|---|---|
-| MATLAB | R2016b or later | Tested in CI |
-| GNU Octave | 8.0 or later | Tested in CI |
+| MATLAB | R2024a or later | Tested in CI (R2025a) and locally (R2024a) |
+| GNU Octave | 11 or later | Tested in CI (11.x via snap) |
 
 ## Out of Scope for this version
 

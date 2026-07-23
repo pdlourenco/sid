@@ -18,7 +18,6 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-
 import numpy as np
 import pytest
 from scipy.signal import lfilter
@@ -30,7 +29,6 @@ from sid.map_plot import map_plot
 from sid.spectrogram import spectrogram as sid_spectrogram
 from sid.spectrogram_plot import spectrogram_plot
 from sid.spectrum_plot import spectrum_plot
-
 
 # ======================================================================
 #  Bode plot

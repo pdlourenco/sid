@@ -30,7 +30,7 @@ consistency.
 
 | Language | Status | Directory | README | Requirements |
 |----------|--------|-----------|--------|--------------|
-| MATLAB/Octave | Stable | [`matlab/`](matlab/) | [README](matlab/README.md) | MATLAB R2016b+ or GNU Octave 8.0+ |
+| MATLAB/Octave | Stable | [`matlab/`](matlab/) | [README](matlab/README.md) | MATLAB R2024a+ or GNU Octave 11+ |
 | Python | Stable | [`python/`](python/) | [README](python/README.md) | Python 3.10+, NumPy 1.22+, SciPy 1.8+ |
 | Julia | Planned | [`julia/`](julia/) | [README](julia/README.md) | TBD |
 

@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 from scipy.signal import lfilter
 
-from sid import freq_btfdr, SidError
+from sid import SidError, freq_btfdr
 
 
 class TestFreqBTFDR:

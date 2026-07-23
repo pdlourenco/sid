@@ -255,7 +255,7 @@ k = k + 1;
 
 - All tests: `matlab/tests/runAllTests.m`
 - All examples: `matlab/examples/runAllExamples.m`
-- Both must pass on **MATLAB R2016b+** and **GNU Octave 8.0+**
+- Both must pass on **MATLAB R2024a+** and **GNU Octave 11+**
 - CI runs lint (`miss_hit`) and tests on both platforms automatically
 
 ### Auto-discovery

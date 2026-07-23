@@ -20,7 +20,6 @@ from sid._internal.is_default_freqs import is_default_freqs
 from sid._internal.validate_data import validate_data
 from sid._results import FreqResult
 
-
 # ---------------------------------------------------------------------------
 # Private helper
 # ---------------------------------------------------------------------------
