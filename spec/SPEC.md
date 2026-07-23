@@ -1537,7 +1537,7 @@ When the state dimension `n` is unknown, it can be determined prior to calling `
 **Algorithm:**
 
 1. Take a frequency response estimate `Ĝ(ω)` from any `sidFreq*` function.
-2. Compute impulse response coefficients `g(k)` via IFFT of `Ĝ(ω)`.
+2. Compute impulse response coefficients `g(k)` via IFFT of `Ĝ(ω)`. The one-sided grid `(0, π]` carries no DC sample, so the DC bin of the conjugate-symmetric spectrum is linearly extrapolated from the first two grid points, `G(0) ≈ Re(2Ĝ(ω₁) − Ĝ(ω₂))` (the same convention `sidLTIfreqIO` uses). The Hankel is built from the **lag-1 onward** Markov parameters `g(k) = H A^{k-1} B`, `k ≥ 1`; the lag-0 IFFT sample (direct feedthrough, zero for a strictly proper plant) is discarded. Retaining it would build the Hankel of `z⁻¹Ĝ(z)`, whose McMillan degree is `n+1` for a strictly proper plant with a nonzero finite zero.
 3. Build the block Hankel matrix:
    ```
    H_hankel = [ g(1)   g(2)   ... g(r)   ]

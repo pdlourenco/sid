@@ -143,9 +143,16 @@ function [n, sv] = sidModelOrder(result, varargin)
         for iu = 1:nu
             Gvec = squeeze(G(:, iy, iu));  % (nf x 1) complex
 
-            % Build full-circle: DC, positive freqs, mirror of negative freqs
+            % Build full-circle: DC, positive freqs, mirror of negative freqs.
+            % DC bin: linearly extrapolate from the first two grid points
+            % (real), matching sidLTIfreqIO so both IFFT consumers share one
+            % DC convention (issue #139; SPEC §8.12.12).
             Gfull = zeros(Nfft, 1);
-            Gfull(1) = real(Gvec(1));                    % DC approximation
+            if nf >= 2
+                Gfull(1) = real(2 * Gvec(1) - Gvec(2));
+            else
+                Gfull(1) = real(Gvec(1));
+            end
             Gfull(2:nf) = Gvec(1:nf-1);                  % w1 to w_{nf-1}
             Gfull(nf+1) = real(Gvec(nf));                 % Nyquist (real)
             Gfull(nf+2:Nfft) = conj(Gvec(nf-1:-1:1));    % mirror
@@ -154,9 +161,13 @@ function [n, sv] = sidModelOrder(result, varargin)
         end
     end
 
-    % Use causal part (first half) as impulse response coefficients
-    N_imp = nf;
-    g = g_all(1:N_imp, :, :);
+    % Markov parameters g(k) = H A^{k-1} B start at lag 1. g_all(1) is the
+    % direct feedthrough (lag 0), ~0 for the library's strictly proper model
+    % class. Drop it (aligning with sidLTIfreqIO): keeping lag 0 builds the
+    % Hankel of z^{-1}G(z), whose McMillan degree is n+1 for a strictly proper
+    % plant with a nonzero finite zero — overestimating the order (issue #139).
+    N_imp = nf - 1;
+    g = g_all(2:nf, :, :);
 
     % ---- Determine horizon ----
     if isempty(horizon)
@@ -223,6 +234,12 @@ function [n, sv] = sidModelOrder(result, varargin)
             % Only consider ratios among singular values above a noise
             % floor to avoid spurious gaps in the numerical tail.
             % The floor scales with sigma_1 and the matrix dimension.
+            % NOTE: the gap search is capped at floor(nSigma/2) (SPEC §8.12.12
+            % nominally allows k = 1..r-1). Lifting the cap requires a data-
+            % aware noise floor first: the machine-eps floor below keeps the
+            % entire noisy tail of an estimated (non-exact) G "resolvable", so
+            % an unguarded search locks onto spurious tail gaps (AR(1) -> n=40).
+            % Data-aware-floor follow-up: issue #160.
             noiseFloor = sigmas(1) * sqrt(nSigma) * eps;
             lastSig = find(sigmas > noiseFloor, 1, 'last');
             maxK = min(lastSig, floor(nSigma / 2));

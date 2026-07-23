@@ -174,3 +174,70 @@ class TestModelOrder:
         with pytest.raises(SidError) as exc_info:
             model_order(42)
         assert exc_info.value.code == "bad_input"
+
+
+class TestModelOrderStrictlyProper:
+    """Regression for the lag-0 Hankel bug (issue #139).
+
+    Uses exact analytic frequency responses on the (0, pi] grid so the order
+    is unambiguous. The pre-fix code kept the lag-0 IFFT sample and built the
+    Hankel of z^{-1}G(z), overestimating the order by one for a strictly
+    proper plant with a nonzero finite zero.
+    """
+
+    @staticmethod
+    def _result(G: np.ndarray, nf: int):
+        from types import SimpleNamespace
+
+        w = np.arange(1, nf + 1) * np.pi / nf
+        return SimpleNamespace(frequency=w, response=G)
+
+    def test_finite_zero_second_order(self) -> None:
+        """G(z) = (z + 0.5) / (z^2 - 1.2728 z + 0.81), true n = 2.
+
+        The lag-0 fix is verified directly on the Hankel singular values:
+        pre-fix the third value was a structural ~0.4/6.1 (order 3); post-fix
+        it collapses to numerical noise (~1e-4). Order is read with the
+        threshold method, which is deterministic and cross-language-consistent
+        (the gap method's noise-floor handling is a separate follow-up; see
+        the module note in model_order).
+        """
+        nf = 128
+        w = np.arange(1, nf + 1) * np.pi / nf
+        z = np.exp(1j * w)
+        G = ((z + 0.5) / (z**2 - 1.2728 * z + 0.81)).reshape(nf, 1, 1)
+        n, sv = model_order(self._result(G, nf), threshold=1e-2)
+        assert n == 2, f"finite-zero strictly proper plant: expected n=2, got {n}"
+        # The third singular value must be numerical noise, not structural.
+        s = sv["singular_values"]
+        assert s[2] / s[0] < 1e-3, f"spurious structural SV: {s[2] / s[0]:.2e}"
+
+    def test_zero_at_origin_unchanged(self) -> None:
+        """Masked family (numerator z) still returns n = 2."""
+        nf = 128
+        w = np.arange(1, nf + 1) * np.pi / nf
+        z = np.exp(1j * w)
+        G = (z / (z**2 - 1.2728 * z + 0.81)).reshape(nf, 1, 1)
+        n, _ = model_order(self._result(G, nf), threshold=1e-2)
+        assert n == 2
+
+    def test_mimo_block_hankel(self) -> None:
+        """2x2 MIMO map with four distinct first-order channels -> n = 4.
+
+        Uses the threshold method: the four modes span two orders of
+        magnitude in Hankel singular value, so the largest-gap heuristic
+        latches onto the first (largest) gap; the threshold counts all four
+        structural values. Exercises the MIMO block-Hankel assembly.
+        """
+        nf = 256
+        w = np.arange(1, nf + 1) * np.pi / nf
+        z = np.exp(1j * w)
+        G = np.zeros((nf, 2, 2), dtype=complex)
+        G[:, 0, 0] = 1.0 / (z - 0.7)
+        G[:, 0, 1] = 0.3 / (z - 0.4)
+        G[:, 1, 0] = 0.2 / (z - 0.6)
+        G[:, 1, 1] = 1.0 / (z - 0.5)
+        n, sv = model_order(self._result(G, nf), horizon=8, threshold=1e-3)
+        assert n == 4, f"MIMO 4-pole plant: expected n=4, got {n}"
+        # Block-Hankel is (r*ny) x (r*nu) = 16 x 16.
+        assert len(sv["singular_values"]) == 16
