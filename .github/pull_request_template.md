@@ -25,5 +25,6 @@
 - [ ] Shared helpers touched? Audited every caller against the relevant spec section
 - [ ] New defaults / bounds / thresholds are covered by `spec/SPEC.md`
 - [ ] Fixing a known bug? Its tracking issue is closed and any visible-debt marker removed in **this same PR**
+- [ ] Major / architectural decision made? Recorded as an ADR in `docs/decisions/` and linked, per CLAUDE.md §4
 - **Pre-push review:** <!-- "no findings" or "flagged X, fixed in <sha>" — see CLAUDE.md §2 -->
 - **Local CI:** <!-- "green" or "<job> failed, fixed in <sha>" -->
