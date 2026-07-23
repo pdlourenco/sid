@@ -253,8 +253,9 @@ class TestLTVStateEst:
         (Nl < N) must have its terminal block replaced by H'R^-1H + Q^-1.
         Before the fix the sliced interior block leaked an A(Nl)'Q^-1A(Nl)
         term, imposing a phantom x(Nl+1)=0 constraint that biased the
-        estimate (~2.4 max-abs error on this setup); the full-length
-        trajectory was unaffected, so looser accuracy tests could not see it.
+        estimate (~2.4 max-abs error in the issue's repro; ~0.24 on this
+        test's setup); the full-length trajectory was unaffected, so looser
+        accuracy tests could not see it.
         """
         rng = np.random.default_rng(134)
         n, q, py = 2, 1, 2

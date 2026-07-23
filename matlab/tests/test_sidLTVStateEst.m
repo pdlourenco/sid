@@ -369,8 +369,9 @@ fprintf('  Test 11 passed: default params match explicit.\n');
 % N, so a short trajectory (Nl < N) must use the terminal block
 % H'R^{-1}H + Q^{-1} at its endpoint, not the interior block. Before the
 % fix the sliced interior block leaked A(Nl)'Q^{-1}A(Nl), imposing a
-% phantom x(Nl+1)=0 constraint (~2.4 max-abs error here); the full-length
-% trajectory was unaffected, which is why loose checks (Test 9) miss it.
+% phantom x(Nl+1)=0 constraint (~2.4 max-abs error in the issue's repro;
+% ~0.37 on this test's setup); the full-length trajectory was unaffected,
+% which is why loose checks (Test 9) miss it.
 rng(134);
 n = 2; q = 1; py = 2; N = 8;
 A12 = zeros(n, n, N); B12 = zeros(n, q, N);
