@@ -528,31 +528,22 @@ function result = welchEstimate(y, u, isTimeSeries, ny, nu, Lsub, Psub, nfft, wi
         PhiVStd = PhiV * sqrt(2 / nuDof);
         Coh = [];
     elseif ny == 1 && nu == 1
-        % SISO
-        PhiY_s  = PhiY(:);
-        PhiU_s  = PhiU(:);
-        PhiYU_s = PhiYU(:);
-        G = PhiYU_s ./ PhiU_s;
-        PhiV = real(PhiY_s) - abs(PhiYU_s).^2 ./ real(PhiU_s);
-        PhiV = max(PhiV, 0);
-        Coh = abs(PhiYU_s).^2 ./ (real(PhiY_s) .* real(PhiU_s));
-        Coh = min(max(Coh, 0), 1);
+        % SISO -- shared degenerate handling (SPEC.md §2.6/§2.7/§10.3) so the
+        % Welch path applies the same Phi_u guard and PSD clamp as sidFreqBT.
+        forceDegenerate = sidInputExcitationDegenerate(u);
+        [G, PhiV, Coh] = sidRegularizeResponse(PhiYU(:), PhiU(:), PhiY(:), 1, 1, forceDegenerate);
         GStd = abs(G) .* sqrt((1 - Coh) ./ (Coh * nuDof));
-        GStd(Coh < 1e-10) = NaN;
+        % §3.3: sigma_G = Inf (not NaN) where the input carries no information.
+        GStd(Coh < 1e-10) = Inf;
         PhiVStd = PhiV * sqrt(2 / nuDof);
     else
-        % MIMO
-        G = zeros(nf, ny, nu);
-        PhiV = zeros(nf, ny, ny);
-        for k = 1:nf
-            PhiU_k  = reshape(PhiU(k, :, :), nu, nu);
-            PhiYU_k = reshape(PhiYU(k, :, :), ny, nu);
-            PhiY_k  = reshape(PhiY(k, :, :), ny, ny);
-            G(k, :, :) = PhiYU_k / PhiU_k;
-            PhiV(k, :, :) = PhiY_k - PhiYU_k / PhiU_k * PhiYU_k';
-        end
-        PhiV = real(PhiV);
-        GStd = NaN(size(G));  % MIMO uncertainty not supported for Welch
+        % MIMO -- the shared helper adds the rcond guard + PSD clamp the raw
+        % mrdivide lacked, so a singular Phi_u yields NaN (issue #141) instead
+        % of "matrix singular to working precision" Inf garbage.
+        forceDegenerate = sidInputExcitationDegenerate(u);
+        [G, PhiV, ~] = sidRegularizeResponse(PhiYU, PhiU, PhiY, ny, nu, forceDegenerate);
+        GStd = NaN(size(G));  % Welch MIMO uncertainty not supported (kept NaN)
+        GStd(isnan(G)) = Inf;  % §3.3 sentinel where a singular Phi_u NaN'd G
         PhiVStd = abs(PhiV) * sqrt(2 / nuDof);
         Coh = [];
     end

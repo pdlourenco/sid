@@ -317,4 +317,37 @@ end
 runner__nPassed = runner__nPassed + 1;
 fprintf('  Test 27 passed: multi-output time-series map (#135).\n');
 
+%% Test 28: Welch MIMO collinear inputs -> NaN, no "singular to precision" crash (#141)
+rng(28);
+N28 = 1024;
+u0 = randn(N28, 1);
+u28 = [u0, 2 * u0];                     % rank-deficient Phi_u
+y28 = [u0 + 0.1 * randn(N28, 1), u0 + 0.1 * randn(N28, 1)];
+ws = warning('off', 'all');
+r28 = sidFreqMap(y28, u28, 'Algorithm', 'welch', 'SegmentLength', 256);
+warning(ws);
+resp28 = r28.Response;
+if iscell(resp28)
+    resp28 = resp28{1};
+end
+assert(any(isnan(resp28(:))), 'Welch MIMO collinear -> some Response NaN (not Inf garbage)');
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 28 passed: Welch MIMO collinear -> NaN, no crash (#141).\n');
+
+%% Test 29: Welch SISO low-coherence sigma uses the Inf sentinel, never NaN
+rng(29);
+N29 = 1024;
+u29 = randn(N29, 1);
+y29 = randn(N29, 1);                    % pure noise -> low coherence bins
+ws = warning('off', 'all');
+r29 = sidFreqMap(y29, u29, 'Algorithm', 'welch', 'SegmentLength', 256);
+warning(ws);
+gs29 = r29.ResponseStd;
+if iscell(gs29)
+    gs29 = gs29{1};
+end
+assert(~any(isnan(gs29(:))), 'Welch SISO low-coherence sigma should be Inf, never NaN');
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 29 passed: Welch SISO low-coherence sigma is Inf, not NaN (SPEC 3.3).\n');
+
 fprintf('test_sidFreqMap: %d/%d passed\n', runner__nPassed, runner__nPassed);
