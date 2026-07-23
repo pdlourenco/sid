@@ -69,6 +69,33 @@ later. An ADR without it is a decision-log entry, not an ADR.
 - If an ADR supersedes another, the new one references the old one in its Status
   section, and the old one's Status flips to "Superseded by ADR-NNNN".
 
+### Assigning a number under parallel tracks
+
+sid is developed by several implementer sessions at once, so "next free number"
+is not simply "highest merged + 1" — an unmerged sibling PR may already claim it.
+Before you finalize a number:
+
+1. **Scan in-flight PRs for already-claimed numbers.** GitHub *code* search does
+   not index pull-request diffs, so the `in:files` form (e.g.
+   `gh search code "ADR-00" --repo pdlourenco/sid ... in:files`) is a silent
+   no-op — it returns nothing and hides the collision. Enumerate open PRs and
+   inspect their changed files instead:
+
+   ```
+   gh pr list --state open --json files \
+     --jq '.[].files[].path | select(startswith("docs/decisions/ADR-"))'
+   ```
+
+   Caveat: `--json files` returns at most ~100 files per PR, so a very large PR
+   could truncate the list — widen the check (e.g. per-PR `gh pr view`) if that
+   ever bites.
+2. **Reserve a band for a multi-ADR track.** When one effort will land several
+   ADRs, reserve a contiguous block up front (e.g. ADR-0010–0014) and record the
+   reservation in the tracking issue, so parallel tracks pick disjoint bands.
+3. **Rebase before finalizing.** Numbers fix only at merge. Rebase onto the
+   latest `main` immediately before merging, and renumber if a sibling landed in
+   your band first.
+
 ## Linking to ADRs
 
 - From PR descriptions: `Implements X per ADR-NNNN.`

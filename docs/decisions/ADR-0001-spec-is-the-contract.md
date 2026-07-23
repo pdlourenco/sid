@@ -50,7 +50,8 @@ conformance, never a goal pursued by copying one port into another. The
   audited caller-by-caller against the spec when touched, because a helper bug
   drifts every caller identically.
 - A standing follow-on: rules the spec does not yet name are tracked as
-  verification gaps (see #113) rather than left implicit.
+  verification gaps (see #113, held for re-derivation after the remediation's
+  Phase 3) rather than left implicit.
 
 ## Alternatives considered
 
