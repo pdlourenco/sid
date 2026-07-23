@@ -2,8 +2,8 @@
 
 ![Tests](https://github.com/pdlourenco/sid/actions/workflows/tests.yml/badge.svg)
 ![Lint](https://github.com/pdlourenco/sid/actions/workflows/lint.yml/badge.svg)
-![MATLAB R2016b+](https://img.shields.io/badge/MATLAB-R2016b%2B-orange.svg)
-![GNU Octave 8+](https://img.shields.io/badge/GNU_Octave-8%2B-blue.svg)
+![MATLAB R2024a+](https://img.shields.io/badge/MATLAB-R2024a%2B-orange.svg)
+![GNU Octave 11+](https://img.shields.io/badge/GNU_Octave-11%2B-blue.svg)
 
 [![Open in MATLAB Online](https://www.mathworks.com/images/responsive/global/open-in-matlab-online.svg)](https://matlab.mathworks.com/open/github/v1?repo=pdlourenco/sid&file=matlab/examples/exampleSISO.m)
 
@@ -154,8 +154,13 @@ such as `.SampleTime`, `.DataLength`, and `.NumTrajectories`.
 
 | Platform | Version | Status |
 |---|---|---|
-| **MATLAB** | R2016b or later | Tested in CI |
-| **GNU Octave** | 8.0 or later | Tested in CI |
+| **MATLAB** | R2024a or later | Tested in CI (R2025a) and locally (R2024a) |
+| **GNU Octave** | 11 or later | Tested in CI (11.x via snap) |
+
+> **Octave install note:** the version in a distribution's package manager may
+> lag well behind (Ubuntu 24.04's `apt` ships the 8.x line, below the supported
+> floor). Install a current release via `snap install octave`, Flatpak, or the
+> binaries at [octave.org](https://octave.org/download).
 
 No toolboxes are required. The entire codebase uses only core MATLAB/Octave
 functions (`fft`, `filter`, `conv`, etc.), so it runs anywhere the base

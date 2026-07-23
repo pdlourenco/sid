@@ -53,12 +53,12 @@ from sid.freq_btfdr import freq_btfdr
 from sid.freq_etfe import freq_etfe
 from sid.freq_map import freq_map
 from sid.lti_freq_io import lti_freq_io
-from sid.map_plot import map_plot
 from sid.ltv_disc import ltv_disc
 from sid.ltv_disc_frozen import ltv_disc_frozen
 from sid.ltv_disc_io import ltv_disc_io
 from sid.ltv_disc_tune import ltv_disc_tune
 from sid.ltv_state_est import ltv_state_est
+from sid.map_plot import map_plot
 from sid.model_order import model_order
 from sid.residual import residual
 from sid.spectrogram import spectrogram

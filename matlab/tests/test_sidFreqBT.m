@@ -246,9 +246,9 @@ fprintf('  Test 17 passed: large WindowSize (FFT-path regression).\n');
 rng(18);
 N18 = 400;
 y18 = filter(1, [1 -0.8], randn(N18, 1));
-% Warnings stay ENABLED so lastwarn captures the id on CI's Octave 8.4, where a
-% disabled warning never reaches lastwarn (the extra runner output is tolerated,
-% matching test_sidLTVdiscTune.m).
+% Warnings stay ENABLED so lastwarn captures the id: on older Octave releases a
+% disabled warning never reaches lastwarn, so this portable idiom is version-proof
+% (the extra runner output is tolerated, matching test_sidLTVdiscTune.m).
 lastwarn('');
 r18 = sidFreqBT(y18, ones(N18, 1));
 [~, id18] = lastwarn();

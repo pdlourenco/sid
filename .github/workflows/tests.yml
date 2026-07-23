@@ -49,11 +49,17 @@ jobs:
           echo "run=$run" >> "$GITHUB_OUTPUT"
           echo "Run engine steps: $run"
 
-      - name: Install GNU Octave and xvfb
+      - name: Install GNU Octave 11.x and xvfb
         if: steps.changes.outputs.run == 'true'
         run: |
+          # Ubuntu apt ships Octave 8.4, below the supported floor (#163). The
+          # snap channel is 11.x and snapd is preinstalled on ubuntu runners;
+          # /snap/bin is already on PATH. xvfb is still needed for the plotting
+          # examples.
+          sudo snap install octave
           sudo apt-get update
-          sudo apt-get install -y octave xvfb
+          sudo apt-get install -y xvfb
+          octave --version | head -1
 
       - name: Run test suite
         if: steps.changes.outputs.run == 'true'

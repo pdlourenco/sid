@@ -58,10 +58,12 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v5
 
-      - name: Install GNU Octave
+      - name: Install GNU Octave 11.x
         run: |
-          sudo apt-get update
-          sudo apt-get install -y octave
+          # Octave 11.x via snap (apt ships 8.4, below the supported floor, #163).
+          # snapd is preinstalled on ubuntu runners; /snap/bin is on PATH.
+          sudo snap install octave
+          octave --version | head -1
 
       - name: Run cross-language validation
         run: octave --no-gui --eval "run('testdata/validate_reference.m')"

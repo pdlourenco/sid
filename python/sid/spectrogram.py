@@ -16,7 +16,6 @@ import numpy as np
 from sid._exceptions import SidError
 from sid._results import SpectrogramResult
 
-
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------

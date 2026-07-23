@@ -182,7 +182,7 @@ fprintf('  Test 15 passed: multi-trajectory ETFE (L=%d).\n', L15);
 rng(16);
 N16 = 300;
 y16 = filter(1, [1 -0.8], randn(N16, 1));
-% Warnings ENABLED so lastwarn captures the id on CI's Octave 8.4.
+% Warnings ENABLED so lastwarn captures the id (portable across Octave releases).
 lastwarn('');
 r16 = sidFreqETFE(y16, ones(N16, 1));
 [~, id16] = lastwarn();

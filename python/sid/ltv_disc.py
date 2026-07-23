@@ -14,6 +14,8 @@ import warnings
 import numpy as np
 
 from sid._exceptions import SidError
+from sid._internal.estimate_noise_cov import estimate_noise_cov
+from sid._internal.extract_std import extract_std
 from sid._internal.ltv_build_block_terms import build_block_terms
 from sid._internal.ltv_build_data_matrices import (
     build_data_matrices,
@@ -22,8 +24,6 @@ from sid._internal.ltv_build_data_matrices import (
 from sid._internal.ltv_cosmic_solve import cosmic_solve
 from sid._internal.ltv_evaluate_cost import evaluate_cost
 from sid._internal.ltv_uncertainty_backward_pass import uncertainty_backward_pass
-from sid._internal.estimate_noise_cov import estimate_noise_cov
-from sid._internal.extract_std import extract_std
 from sid._results import LTVResult
 
 

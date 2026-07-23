@@ -27,11 +27,12 @@ jobs:
           python-version: '3.12'
 
       - name: Install ruff
-        # Pinned: an unpinned linter is a gate whose pass/fail changes with no
-        # repo change. ruff 0.16 newly flags I001 import-sorting across files
-        # unrelated to any given PR; pin to the 0.15 line the repo is clean
-        # against. Adopting 0.16's sorting is a separate, deliberate PR.
-        run: pip install "ruff==0.15.*"
+        # Pinned (version + rule set): an unpinned linter is a gate whose
+        # pass/fail changes with no repo change. Adopt ruff 0.16 (the version
+        # CI resolves) per #163; the enforced rules are pinned explicitly in
+        # pyproject's [tool.ruff.lint] select, so 0.16's expanded implicit
+        # default does not silently widen the gate.
+        run: pip install "ruff==0.16.*"
 
       - name: Lint check (ruff check)
         run: ruff check python/sid/
