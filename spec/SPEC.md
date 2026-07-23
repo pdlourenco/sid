@@ -216,10 +216,11 @@ For **cross-covariance**, `R̂_xz(-τ) = conj(R̂_zx(τ))` (scalar case) or `R̂
 
 where `Φ̂_yu(ω)` is `n_y × n_u` and `Φ̂_u(ω)` is `n_u × n_u`. The matrix inverse is computed independently at each frequency.
 
-**Regularization:** If `Φ̂_u(ω)` is singular or nearly singular at some frequency `ω_k`:
+**Regularization.** If `Φ̂_u(ω)` is singular or nearly singular at some frequency `ω_k`:
 - SISO: if `|Φ̂_u(ω_k)| < ε × max(|Φ̂_u|)` where `ε = 1e-10`, set `Ĝ(ω_k) = NaN + j×NaN`.
-- MIMO: if `cond(Φ̂_u(ω_k)) > 1/ε`, set the corresponding row of `Ĝ(ω_k)` to `NaN`.
+- MIMO: if `cond(Φ̂_u(ω_k)) > 1/ε`, the shared input spectrum cannot be inverted, so the estimate at that frequency is invalid for **every** output — set the entire slice `Ĝ(ω_k)` (all `n_y` rows) to `NaN`. (This whole-slice behaviour supersedes the earlier "affected row" wording: a singular `Φ̂_u` degrades all outputs jointly, not one row.)
 - Issue a warning when this occurs.
+- This degenerate-input handling — the `Φ̂_u` guard, the `NaN` substitution, the `Φ̂_v` clamp (§2.7), the `σ_G = Inf` sentinel (§3.3), and the warning — is shared verbatim by `sidFreqBT`, `sidFreqBTFDR`, `sidFreqETFE`, and the Welch path of `sidFreqMap`, so the estimators cannot drift apart. A whole-signal constant/zero input is caught earlier by the input-excitation check of §10.3.
 
 ### 2.7 Noise Spectrum Estimate
 
@@ -244,6 +245,8 @@ where `'` denotes conjugate transpose.
 ```
 
 For MIMO, ensure the matrix is positive semi-definite by zeroing any negative eigenvalues.
+
+The clamp acts only on **finite** negative values. A `NaN` entry of `Φ̂_v(ω)` — produced at a degenerate frequency (§2.6) or when the input-excitation check fires (§10.3) — must be **preserved as `NaN`**, not turned into `0`. This is a cross-platform hazard: `max(NaN, 0)` returns `0` in MATLAB but `NaN` in NumPy, so implementations must guard the clamp (e.g. clamp only where the value is finite and `< 0`) to keep degenerate frequencies `NaN` in both languages. The same rule applies to the MIMO eigenvalue clamp.
 
 **Time series mode:** No noise spectrum is computed separately. The output spectrum `Φ̂_y(ω)` is returned in the `NoiseSpectrum` field.
 
@@ -309,7 +312,7 @@ The standard deviation returned in the result struct is:
 σ_G(ω) = sqrt(Var{Ĝ(ω)})
 ```
 
-**Regularization:** If `γ̂²(ω_k) < ε` (where `ε = 1e-10`), set `σ_G(ω_k) = Inf`. This corresponds to frequencies where the input has negligible power and the estimate is unreliable.
+**Regularization (single convention for all estimators).** If `γ̂²(ω_k) < ε` (where `ε = 1e-10`) — equivalently, at any frequency where `Ĝ(ω_k)` was set to `NaN` because `Φ̂_u(ω_k)` is degenerate (§2.6), or at every frequency when the input-excitation check fires (§10.3) — set `σ_G(ω_k) = Inf`. Implementations must **not** floor the coherence to a small positive value to keep `σ_G` finite, and must **not** substitute `NaN`: a coherence below `ε` means the input carries no usable information at that frequency, so the response is unidentifiable and `Inf` is the honest report. Every estimator that returns `σ_G` — `sidFreqBT`, `sidFreqBTFDR`, `sidFreqETFE`, and the Welch path of `sidFreqMap` — uses this same `Inf` sentinel.
 
 **Note:** This formula gives the variance of the complex-valued `Ĝ`, defined as `E[|Ĝ - G|²]`. The real and imaginary parts of the estimation error have equal variance `σ_G²/2` each (by isotropy of the asymptotic distribution). Confidence bands for magnitude use the total complex standard deviation `σ_G`, corresponding to a circular region of radius `p × σ_G` in the complex plane (Ljung 1999, §6.4):
 
@@ -454,6 +457,8 @@ where `R_k = R(ω_k)` is the desired resolution at that frequency. Here "resolut
 
 If `R` is a scalar, it applies uniformly. If `R` is a vector of the same length as the frequency grid, each entry specifies the local resolution.
 
+Each `M_k` obeys the same bounds as the fixed window of §10.1: it is capped at `⌊N/2⌋` (a resolution finer than the data supports), and `M_k < 2` is invalid. Reaching either bound is reported the same way as for `sidFreqBT` — a warning (`sid:windowReduced`) when any `M_k` is reduced to `⌊N/2⌋`, and an error when the requested resolution implies `M_k < 2` — rather than being silently clamped.
+
 ### 5.3 Algorithm
 
 For each frequency `ω_k`:
@@ -470,10 +475,11 @@ For each frequency `ω_k`:
 If no resolution is specified:
 
 ```
-R = 2π / min(floor(N/10), 30)
+M_default = clip(floor(N/10), 2, 30)
+R = 2π / M_default
 ```
 
-This matches the default behavior of `sidFreqBT`.
+The lower clip at 2 matters for short data: for `N ∈ [10, 19]`, `floor(N/10) = 1` would imply `M_default = 1 < 2` (invalid); flooring at 2 keeps the default window legal and matches the short-data default of `sidFreqBT`.
 
 ---
 
@@ -1748,17 +1754,29 @@ All `sidFreq*` functions return a struct with these fields:
 | Condition | Action |
 |-----------|--------|
 | `Φ̂_u(ω_k) ≈ 0` | Set `Ĝ(ω_k) = NaN`, `σ_G(ω_k) = Inf`, issue warning |
-| `Φ̂_v(ω_k) < 0` | Clamp to 0 |
+| `Φ̂_v(ω_k) < 0` (finite) | Clamp to 0 (preserve `NaN`, §2.7) |
 | `γ̂²(ω_k) > 1` (numerical error) | Clamp to 1 |
 | `γ̂²(ω_k) < 0` (numerical error) | Clamp to 0 |
 
+The `Φ̂_u(ω_k) ≈ 0` test is the **per-frequency** relative floor of §2.6 (`|Φ̂_u(ω_k)| < ε·max|Φ̂_u|` for SISO; `cond(Φ̂_u(ω_k)) > 1/ε` for MIMO). It catches individual dead frequencies but, being relative to the input's own spectral maximum, it **cannot** catch a whole-signal constant input — that case is handled by the input-excitation check of §10.3.
+
 ### 10.3 Degenerate Inputs
+
+**Input-excitation check (applied before estimation).** Under the biased-covariance convention (no mean removal), a constant input `u = c` has `R̂_u(τ) = c²(N−|τ|)/N ≠ 0`, so `Φ̂_u(ω)` is nonzero at every frequency and the *relative* per-frequency floor of §10.2 never fires — yet a constant input excites no dynamics on the `(0, π]` grid, so `Ĝ` is unidentifiable everywhere. Estimators therefore apply an **absolute input-excitation check** to `u` before estimating. Let `s²_u` be the per-channel sample variance of `u` about its own mean and `p_u` the per-channel mean square. If
+
+```
+max_ch(s²_u) ≤ ε · max_ch(p_u)      (u is constant to relative tolerance ε = 1e-10),
+   or  max_ch(p_u) ≤ realmin        (u is identically zero),
+```
+
+then the input carries no usable excitation: set `Ĝ(ω) = NaN` for all `ω`, `σ_G(ω) = Inf` for all `ω`, and issue a warning. This makes the constant-input contract enforceable independently of the (nonzero) per-frequency `Φ̂_u` values.
 
 | Condition | Action |
 |-----------|--------|
-| `u` is constant (zero variance) | Same as `Φ̂_u ≈ 0` at all frequencies; `Ĝ = NaN` everywhere, with warning |
+| `u` constant (zero AC variance) or identically zero | Input-excitation check fires: `Ĝ = NaN` everywhere, `σ_G = Inf`, warning |
 | `y` is constant | Valid; `Φ̂_y ≈ 0` at all frequencies |
 | `u = y` (perfect coherence) | Valid; `γ̂² ≈ 1`, `Φ̂_v ≈ 0`, very small `σ_G` |
+| Collinear MIMO inputs (rank-deficient `u`) | Per-frequency `cond(Φ̂_u) > 1/ε` fires at every frequency: `Ĝ = NaN`, `σ_G = Inf`, warning (§2.6) |
 
 ---
 
