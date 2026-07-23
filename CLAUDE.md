@@ -82,6 +82,9 @@ A "major decision" is anything that:
 
 - changes a contract in `spec/SPEC.md` or `spec/EXAMPLES.md`, or the public
   function catalogue / naming convention in [`docs/roadmap.md`](docs/roadmap.md);
+- changes a load-bearing governance document the whole workflow leans on — this
+  file, [`CONTRIBUTING.md`](CONTRIBUTING.md), or the reviewer-context document
+  (`docs/REVIEW_CONTEXT.md`, landing in #115);
 - introduces a new external dependency, a new public function, or a new on-disk
   artifact (e.g. a new reference-vector format);
 - locks in a trade-off a future PR could reasonably want to revisit
@@ -91,9 +94,13 @@ A "major decision" is anything that:
 
 For any of the above:
 
-1. **Pause and surface the decision** — describe the choice, the alternatives,
-   and the trade-off in the conversation. Wait for an explicit go-ahead before
-   implementing.
+1. **Pause and surface the decision — recommend, don't decide.** Lay out the
+   choice, the alternatives, and the trade-off in the conversation, and mark the
+   option you'd choose with a one-line *why*; then let the maintainer choose.
+   Wait for an explicit go-ahead before implementing. This
+   recommend-don't-decide posture is the default for *every* maintainer-facing
+   question, not only the major decisions enumerated above: surface the options
+   and your recommendation rather than picking silently.
 2. **If the decision is accepted and non-obvious, record it.** An ADR convention
    for `docs/decisions/` is being added (tracked in #114); once it lands, write
    the ADR there and link it from the PR. Until then, capture the rationale in
@@ -101,3 +108,24 @@ For any of the above:
 3. **Tactical and mechanical choices do not need this** — formatter settings,
    import ordering, internal naming, obvious refactors. When in doubt, ask; the
    cost of a question is lower than the cost of an unwanted commit.
+
+## 5. Opening PRs, and the two-session authoring/review split
+
+You may **open** a PR for work that is already planned or pre-approved — a filed
+issue, an epic sub-task, an agreed refactor — without asking first. Opening a PR
+is how work is proposed for review, not how it is committed to `main`.
+**Merging always requires explicit maintainer approval:** never merge your own
+PR, and never weaken or skip a required check to get one green (§3).
+
+Authoring and review belong in **different sessions**. The session that writes a
+change runs the pre-push self-review (§2) on its own diff, but a reviewer that
+shares the author's context also shares its blind spots — so a *separate*
+reviewer session (or a subagent with fresh context) reviews the pushed PR
+against the same principles §2 lists, seeded by `docs/REVIEW_CONTEXT.md` once it
+lands (#115). Keep the two roles apart: don't approve, in substance, a diff your
+own session authored.
+
+Session-level direction from the maintainer overrides this file. If, in a
+session, the maintainer tells you to do something this document defers or
+forbids, the in-session instruction wins for that task — this file is the
+default, not a veto over the person you're working with.
