@@ -72,6 +72,15 @@ def sid_cov(x: np.ndarray, z: np.ndarray, max_lag: int) -> np.ndarray:
     else:
         L = 1
 
+    # A 3-D array with a singleton trajectory axis (N, p, 1) — e.g. from
+    # programmatic slicing arr[..., :1] — is a single trajectory. Squeeze
+    # that axis so the L == 1 path below does plain 2-D matrix algebra
+    # instead of failing on 3-D operands (issue #135).
+    if L == 1 and x.ndim == 3:
+        x = x[:, :, 0]
+    if z.ndim == 3 and z.shape[2] == 1:
+        z = z[:, :, 0]
+
     R = np.zeros((max_lag + 1, p, q), dtype=np.float64)
 
     if L == 1:

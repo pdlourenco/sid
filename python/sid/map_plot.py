@@ -135,7 +135,10 @@ def map_plot(
                 "PlotType 'magnitude' requires input-output data (not time series).",
             )
         resp = np.asarray(result.response)
-        if resp.ndim > 2:
+        # MIMO response is 4-D (nf, K, ny, nu); reduce every channel axis to
+        # the (1,1) element so the color map is 2-D (nf, K). A single
+        # [:, :, 0] leaves a 4-D array 3-D and pcolormesh rejects it (#135).
+        while resp.ndim > 2:
             resp = resp[:, :, 0]
         Z = 20.0 * np.log10(np.maximum(np.abs(resp), _EPS))
         color_label = "Magnitude (dB)"
@@ -148,7 +151,7 @@ def map_plot(
                 "PlotType 'phase' requires input-output data (not time series).",
             )
         resp = np.asarray(result.response)
-        if resp.ndim > 2:
+        while resp.ndim > 2:
             resp = resp[:, :, 0]
         Z = np.angle(resp) * 180.0 / np.pi
         color_label = "Phase (deg)"
@@ -156,7 +159,8 @@ def map_plot(
 
     elif pt == "noise":
         ns = np.asarray(result.noise_spectrum)
-        if ns.ndim > 2:
+        # MIMO noise spectrum is 4-D (nf, K, ny, ny); reduce to (nf, K).
+        while ns.ndim > 2:
             ns = ns[:, :, 0]
         Z = 10.0 * np.log10(np.maximum(ns, _EPS))
         color_label = "Noise PSD (dB)"
@@ -174,7 +178,7 @@ def map_plot(
 
     elif pt == "spectrum":
         ns = np.asarray(result.noise_spectrum)
-        if ns.ndim > 2:
+        while ns.ndim > 2:
             ns = ns[:, :, 0]
         Z = 10.0 * np.log10(np.maximum(ns, _EPS))
         color_label = "PSD (dB)"

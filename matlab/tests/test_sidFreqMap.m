@@ -302,4 +302,19 @@ assert(length(res_eq.Frequency) == 256, ...
 runner__nPassed = runner__nPassed + 1;
 fprintf('  Test 26 passed: Welch NFFT < SubSegmentLength rejected.\n');
 
+%% Test 27: Multi-output time-series (SPEC 6.1, both algorithms) (#135)
+% Previously the storage branch "ny == 1 || isTimeSeries" ravelled an
+% (nf x ny x ny) per-segment noise spectrum into an incompatible slice.
+rng(27);
+y_mots = randn(2000, 2);
+for alg = {'bt', 'welch'}
+    r_mots = sidFreqMap(y_mots, [], 'SegmentLength', 256, 'Algorithm', alg{1});
+    assert(ndims(r_mots.NoiseSpectrum) == 4, ...
+        'Multi-output TS (%s): NoiseSpectrum should be 4-D (nf x K x ny x ny)', alg{1});
+    assert(all(isfinite(r_mots.NoiseSpectrum(:))), ...
+        'Multi-output TS (%s): NoiseSpectrum has non-finite entries', alg{1});
+end
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 27 passed: multi-output time-series map (#135).\n');
+
 fprintf('test_sidFreqMap: %d/%d passed\n', runner__nPassed, runner__nPassed);

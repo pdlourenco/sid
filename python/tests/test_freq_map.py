@@ -590,3 +590,67 @@ class TestFreqMapVariableLength:
             rtol=1e-10,
             atol=1e-12,
         )
+
+
+class TestFreqMapInputShapes:
+    """Documented input shapes that previously crashed (issue #135)."""
+
+    def test_multi_output_time_series_bt(self) -> None:
+        """Multi-output time-series (SPEC §6.1): ny>1, u=None, BT path.
+
+        Previously the storage branch ``if ny == 1 or is_time_series`` ravelled
+        an (nf, ny, ny) per-segment spectrum into an incompatible slice.
+        """
+        rng = np.random.default_rng(0)
+        y = rng.standard_normal((1000, 2))
+        result = freq_map(y, None, segment_length=256, algorithm="bt")
+        nf = len(result.frequency)
+        assert result.noise_spectrum.shape[0] == nf
+        assert result.noise_spectrum.shape[2:] == (2, 2)
+        assert np.all(np.isfinite(result.noise_spectrum))
+
+    def test_multi_output_time_series_welch(self) -> None:
+        """Same, Welch path."""
+        rng = np.random.default_rng(1)
+        y = rng.standard_normal((1200, 2))
+        result = freq_map(y, None, segment_length=256, algorithm="welch")
+        assert result.noise_spectrum.shape[2:] == (2, 2)
+        assert np.all(np.isfinite(result.noise_spectrum))
+
+    def test_mimo_freq_map(self) -> None:
+        """2x2 MIMO map produces 4-D response/noise without crashing."""
+        rng = np.random.default_rng(2)
+        N = 2000
+        u = rng.standard_normal((N, 2))
+        y = np.column_stack(
+            [
+                lfilter([1], [1, -0.8], u[:, 0]) + 0.1 * rng.standard_normal(N),
+                lfilter([0.5], [1, -0.7], u[:, 1]) + 0.1 * rng.standard_normal(N),
+            ]
+        )
+        result = freq_map(y, u, segment_length=400, algorithm="bt")
+        assert result.response.ndim == 4 and result.response.shape[2:] == (2, 2)
+        assert result.noise_spectrum.shape[2:] == (2, 2)
+
+    def test_single_trajectory_3d(self) -> None:
+        """3-D single-trajectory input (N, ch, 1) — e.g. arr[..., :1] —
+        is treated as one trajectory, not rejected by the L==1 cov path."""
+        rng = np.random.default_rng(3)
+        u = rng.standard_normal((800, 1, 1))
+        y = rng.standard_normal((800, 1, 1))
+        result = freq_map(y, u, segment_length=256, algorithm="bt")
+        assert np.all(np.isfinite(result.response))
+
+    def test_tiny_welch_segment_raises_cleanly(self) -> None:
+        """A segment too short to sub-divide raises SidError, not a raw
+        math-domain error from log2(Lsub) (issue #135)."""
+        from sid._exceptions import SidError
+
+        rng = np.random.default_rng(4)
+        with pytest.raises(SidError):
+            freq_map(
+                rng.standard_normal(1000),
+                rng.standard_normal(1000),
+                segment_length=8,
+                algorithm="welch",
+            )

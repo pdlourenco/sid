@@ -376,7 +376,7 @@ function result = sidFreqMap(y, u, varargin)
                 Coh(:, idx) = rk.Coherence;
             end
         end
-        if ny == 1 || isTimeSeries
+        if ny == 1
             NS(:, idx) = rk.NoiseSpectrum(:);
             NSStd(:, idx) = rk.NoiseSpectrumStd(:);
         else

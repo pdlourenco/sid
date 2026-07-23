@@ -70,6 +70,15 @@ def _welch_estimate(
             )
 
     S1 = float(np.sum(w**2))  # window power normalisation
+    # A degenerate sub-window (e.g. a symmetric Hann of length 2, whose samples
+    # are both zero) has zero energy; the 1/(J*S1) normalisation below would
+    # divide by zero and return silent all-NaN. Fail loudly instead (#135).
+    if S1 <= 0.0:
+        raise SidError(
+            "degenerate_window",
+            "Sub-segment window has zero energy; increase SubSegmentLength or "
+            "choose a different window.",
+        )
 
     # ---- Sub-segmentation ----
     sub_step = Lsub - Psub
@@ -440,10 +449,10 @@ def freq_map(
         Lsub = (
             int(sub_segment_length) if sub_segment_length is not None else int(math.floor(L / 4.5))
         )
-        Psub = int(sub_overlap) if sub_overlap is not None else Lsub // 2
-        nfft_val = int(nfft) if nfft is not None else max(256, 1 << math.ceil(math.log2(Lsub)))
-        win_type = window
-
+        # Validate Lsub BEFORE deriving the NFFT default: the default uses
+        # math.log2(Lsub), which raises a raw "math domain error" for
+        # Lsub <= 0 (reachable for tiny segments, L < 9). Fail with the
+        # friendly SidError instead (issue #135).
         if Lsub < 2:
             raise SidError(
                 "invalid_sub_segment_length",
@@ -454,6 +463,9 @@ def freq_map(
                 "sub_segment_too_long",
                 f"SubSegmentLength ({Lsub}) exceeds SegmentLength ({L}).",
             )
+        Psub = int(sub_overlap) if sub_overlap is not None else Lsub // 2
+        nfft_val = int(nfft) if nfft is not None else max(256, 1 << math.ceil(math.log2(Lsub)))
+        win_type = window
         if Psub < 0 or Psub >= Lsub:
             raise SidError(
                 "invalid_sub_overlap",
@@ -585,7 +597,7 @@ def freq_map(
             if Coh_all is not None:
                 Coh_all[:, idx] = rk.coherence
 
-        if ny == 1 or is_time_series:
+        if ny == 1:
             NS_all[:, idx] = rk.noise_spectrum.ravel()
             NSStd_all[:, idx] = rk.noise_spectrum_std.ravel()
         else:
