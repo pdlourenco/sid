@@ -24,5 +24,6 @@
 - [ ] Tests written against spec requirements, not against the other language's current output
 - [ ] Shared helpers touched? Audited every caller against the relevant spec section
 - [ ] New defaults / bounds / thresholds are covered by `spec/SPEC.md`
+- [ ] Fixing a known bug? Its tracking issue is closed and any visible-debt marker removed in **this same PR**
 - **Pre-push review:** <!-- "no findings" or "flagged X, fixed in <sha>" — see CLAUDE.md §2 -->
 - **Local CI:** <!-- "green" or "<job> failed, fixed in <sha>" -->
