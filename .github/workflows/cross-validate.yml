@@ -65,8 +65,12 @@ jobs:
           sudo snap install octave
           octave --version | head -1
 
+      # Qt offscreen (not xvfb): the snap Octave binary deadlocks under
+      # xvfb-run at startup; offscreen needs no X server. No plotting here.
       - name: Run cross-language validation
-        run: octave --no-gui --eval "run('testdata/validate_reference.m')"
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: timeout 600 octave --no-gui --eval "run('testdata/validate_reference.m')" < /dev/null
 
   validate-python:
     name: Validate Python port

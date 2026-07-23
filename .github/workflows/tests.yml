@@ -49,25 +49,31 @@ jobs:
           echo "run=$run" >> "$GITHUB_OUTPUT"
           echo "Run engine steps: $run"
 
-      - name: Install GNU Octave 11.x and xvfb
+      - name: Install GNU Octave 11.x
         if: steps.changes.outputs.run == 'true'
         run: |
           # Ubuntu apt ships Octave 8.4, below the supported floor (#163). The
           # snap channel is 11.x and snapd is preinstalled on ubuntu runners;
-          # /snap/bin is already on PATH. xvfb is still needed for the plotting
-          # examples.
+          # /snap/bin is already on PATH.
           sudo snap install octave
-          sudo apt-get update
-          sudo apt-get install -y xvfb
           octave --version | head -1
 
+      # Run headless via Qt's offscreen platform rather than xvfb: the snap
+      # Octave binary links Qt and, under xvfb-run, deadlocks at startup. Qt
+      # offscreen needs no X server. Figures are made invisible so the plotting
+      # examples never touch a display. stdin is closed and a timeout guards
+      # against any residual hang (vs GitHub's 6-hour default).
       - name: Run test suite
         if: steps.changes.outputs.run == 'true'
-        run: xvfb-run octave --no-gui --eval "run('matlab/tests/runAllTests.m')"
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: timeout 900 octave --no-gui --eval "run('matlab/tests/runAllTests.m')" < /dev/null
 
       - name: Run examples
         if: steps.changes.outputs.run == 'true'
-        run: xvfb-run octave --no-gui --eval "run('matlab/examples/runAllExamples.m')"
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: timeout 900 octave --no-gui --eval "set(0, 'defaultfigurevisible', 'off'); run('matlab/examples/runAllExamples.m')" < /dev/null
 
   matlab:
     name: MATLAB tests & examples
