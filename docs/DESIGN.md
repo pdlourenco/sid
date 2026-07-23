@@ -103,7 +103,8 @@ unrelated tools.
 - **Numerical conventions are contract.** Normalization (System Identification
   Toolbox convention — no `Ts`, no `1/2π`), NaN/Inf substitutions, clamps, and
   warning identifiers are specified, not incidental — see `spec/SPEC.md` §2.8,
-  §10, and the `Verified by:` annotations.
+  §10, and the per-rule `Verified by:` annotations (re-derived
+  post-remediation-Phase-3, landing with #113).
 
 ## Module map
 
