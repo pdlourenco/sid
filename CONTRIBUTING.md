@@ -212,3 +212,17 @@ CI workflows run per-language:
 - **Cross-Language Validation** — reference test vector consistency
 
 All checks must pass before merging.
+
+**Run them locally first.** [`scripts/local-ci`](scripts/local-ci) mirrors these
+legs so the whole suite is one command before you push, instead of tribal
+knowledge:
+
+```
+scripts/local-ci            # every leg whose toolchain is installed
+scripts/local-ci python     # just the Python legs
+scripts/local-ci lint       # just the lint legs
+```
+
+A leg whose toolchain isn't installed is **skipped** (with a hint), not failed,
+so it's useful in a partial dev environment; the run exits non-zero only if a leg
+that actually ran fails. Keep the script in sync with `.github/workflows/*.yml`.

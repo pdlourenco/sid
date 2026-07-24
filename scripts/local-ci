@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+#
+# local-ci — run sid's CI legs locally before pushing.
+#
+# Mirrors the GitHub Actions workflows so "run CI locally" is one command
+# instead of tribal knowledge. Each leg runs the same command CI runs; a leg
+# whose toolchain isn't installed is SKIPPED (with a hint), not failed, so this
+# is useful even in a partial dev environment.
+#
+#   scripts/local-ci               # run every leg whose tools are present
+#   scripts/local-ci python        # only the Python legs (lint, tests, cross-val)
+#   scripts/local-ci matlab        # only the MATLAB/Octave legs (tests, lint, cross-val)
+#   scripts/local-ci lint          # only the lint legs (mh_* + ruff + header checks)
+#   scripts/local-ci --list        # list leg names and exit
+#
+# Exit status is non-zero if any leg that actually ran FAILED. Skipped legs do
+# not fail the run. Run from anywhere — the script cd's to the repo root.
+#
+# Legs and the workflow each mirrors:
+#   matlab-tests   tests.yml         octave run of matlab/tests + matlab/examples
+#   matlab-lint    lint.yml          mh_lint / mh_style / mh_metric + check_headers.py
+#   python-lint    python-lint.yml   ruff check / ruff format --check + header check
+#   python-tests   python-tests.yml  pytest unit tests + example notebooks
+#   cross-val      cross-validate.yml validate_reference.m (Octave) + python cross-val
+#
+# Keep this in sync with .github/workflows/*.yml — if a workflow leg's command
+# changes, change it here too (see CONTRIBUTING.md §CI).
+
+set -uo pipefail
+
+# ---- repo root ----------------------------------------------------------------
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+
+# ---- output helpers -----------------------------------------------------------
+if [ -t 1 ]; then
+  C_RESET=$'\033[0m'; C_RED=$'\033[31m'; C_GRN=$'\033[32m'
+  C_YEL=$'\033[33m'; C_BLU=$'\033[34m'; C_BOLD=$'\033[1m'
+else
+  C_RESET=; C_RED=; C_GRN=; C_YEL=; C_BLU=; C_BOLD=
+fi
+
+PASS=(); FAIL=(); SKIP=()
+
+hdr()  { printf '\n%s==== %s ====%s\n' "$C_BOLD$C_BLU" "$1" "$C_RESET"; }
+pass() { printf '%sPASS%s %s\n' "$C_GRN" "$C_RESET" "$1"; PASS+=("$1"); }
+fail() { printf '%sFAIL%s %s\n' "$C_RED" "$C_RESET" "$1"; FAIL+=("$1"); }
+skip() { printf '%sSKIP%s %s (%s)\n' "$C_YEL" "$C_RESET" "$1" "$2"; SKIP+=("$1"); }
+
+# have <cmd> : is a command available?
+have() { command -v "$1" >/dev/null 2>&1; }
+
+# run_step <label> <cmd...> : run a command, record pass/fail. Returns cmd status.
+run_step() {
+  local label="$1"; shift
+  printf '%s$ %s%s\n' "$C_BOLD" "$*" "$C_RESET"
+  if "$@"; then pass "$label"; return 0; else fail "$label"; return 1; fi
+}
+
+# ---- legs ---------------------------------------------------------------------
+
+leg_matlab_tests() {
+  hdr "matlab-tests (tests.yml)"
+  local oct=""
+  if have octave; then oct=octave
+  elif have matlab; then oct=matlab; fi
+  if [ -z "$oct" ]; then
+    skip "matlab-tests" "no octave/matlab on PATH"; return
+  fi
+  if [ "$oct" = "octave" ]; then
+    run_step "matlab-tests: unit tests" \
+      octave --no-gui --eval "run('matlab/tests/runAllTests.m')" </dev/null
+    run_step "matlab-tests: examples" \
+      octave --no-gui --eval "set(0,'defaultfigurevisible','off'); run('matlab/examples/runAllExamples.m')" </dev/null
+  else
+    run_step "matlab-tests: unit tests" \
+      matlab -batch "run('matlab/tests/runAllTests.m')"
+    run_step "matlab-tests: examples" \
+      matlab -batch "set(0,'defaultfigurevisible','off'); run('matlab/examples/runAllExamples.m')"
+  fi
+}
+
+leg_matlab_lint() {
+  hdr "matlab-lint (lint.yml)"
+  if have mh_lint; then run_step "matlab-lint: mh_lint"   mh_lint matlab/;        else skip "matlab-lint: mh_lint"   "MISS_HIT not installed (pip install miss-hit)"; fi
+  if have mh_style; then run_step "matlab-lint: mh_style" mh_style matlab/;       else skip "matlab-lint: mh_style"  "MISS_HIT not installed (pip install miss-hit)"; fi
+  if have mh_metric; then run_step "matlab-lint: mh_metric" mh_metric --ci matlab/; else skip "matlab-lint: mh_metric" "MISS_HIT not installed (pip install miss-hit)"; fi
+  if have python3; then run_step "matlab-lint: headers" python3 .github/scripts/check_headers.py; else skip "matlab-lint: headers" "no python3"; fi
+}
+
+leg_python_lint() {
+  hdr "python-lint (python-lint.yml)"
+  if have ruff; then
+    run_step "python-lint: ruff check"  ruff check python/sid/ python/tests/
+    run_step "python-lint: ruff format" ruff format --check python/sid/ python/tests/
+  else
+    skip "python-lint: ruff" "ruff not installed (pip install 'ruff==0.16.*')"
+  fi
+  if have python3; then run_step "python-lint: docstrings" python3 .github/scripts/check_python_headers.py; else skip "python-lint: docstrings" "no python3"; fi
+}
+
+leg_python_tests() {
+  hdr "python-tests (python-tests.yml)"
+  if ! have python3; then skip "python-tests" "no python3"; return; fi
+  if ! python3 -c "import pytest" >/dev/null 2>&1; then
+    skip "python-tests" "pytest not installed (pip install -e './python[dev]')"; return
+  fi
+  run_step "python-tests: unit" \
+    python3 -m pytest python/tests/ -v --tb=short -k "not cross_validation"
+  if python3 -c "import nbmake" >/dev/null 2>&1; then
+    run_step "python-tests: notebooks" \
+      python3 -m pytest --nbmake python/examples/ -v --tb=short
+  else
+    skip "python-tests: notebooks" "nbmake not installed (pip install -e './python[dev]')"
+  fi
+}
+
+leg_cross_val() {
+  hdr "cross-val (cross-validate.yml)"
+  if have octave; then
+    run_step "cross-val: octave" \
+      octave --no-gui --eval "run('testdata/validate_reference.m')" </dev/null
+  else
+    skip "cross-val: octave" "no octave on PATH"
+  fi
+  if have python3 && python3 -c "import pytest" >/dev/null 2>&1; then
+    run_step "cross-val: python" \
+      python3 -m pytest python/tests/test_cross_validation.py -v --tb=short
+  else
+    skip "cross-val: python" "pytest not installed (pip install -e './python[dev]')"
+  fi
+}
+
+# ---- leg selection ------------------------------------------------------------
+usage() {
+  sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+}
+
+run_group() {
+  case "$1" in
+    all)     leg_matlab_tests; leg_matlab_lint; leg_python_lint; leg_python_tests; leg_cross_val ;;
+    matlab)  leg_matlab_tests; leg_matlab_lint; leg_cross_val ;;
+    python)  leg_python_lint;  leg_python_tests; leg_cross_val ;;
+    lint)    leg_matlab_lint;  leg_python_lint ;;
+    tests)   leg_matlab_tests; leg_python_tests ;;
+    cross-val) leg_cross_val ;;
+    *) printf '%sunknown group: %s%s\n' "$C_RED" "$1" "$C_RESET"; usage; exit 2 ;;
+  esac
+}
+
+case "${1:-all}" in
+  -h|--help) usage; exit 0 ;;
+  --list) printf 'groups: all matlab python lint tests cross-val\n'; exit 0 ;;
+  *) run_group "${1:-all}" ;;
+esac
+
+# ---- summary ------------------------------------------------------------------
+hdr "summary"
+printf '%spassed:%s %d   %sfailed:%s %d   %sskipped:%s %d\n' \
+  "$C_GRN" "$C_RESET" "${#PASS[@]}" \
+  "$C_RED" "$C_RESET" "${#FAIL[@]}" \
+  "$C_YEL" "$C_RESET" "${#SKIP[@]}"
+
+if [ "${#SKIP[@]}" -gt 0 ]; then
+  printf '%sskipped legs did not run — install their toolchain to cover them locally%s\n' "$C_YEL" "$C_RESET"
+fi
+
+if [ "${#FAIL[@]}" -gt 0 ]; then
+  printf '%sFAILED:%s %s\n' "$C_RED" "$C_RESET" "${FAIL[*]}"
+  exit 1
+fi
+printf '%sall run legs passed%s\n' "$C_GRN" "$C_RESET"
