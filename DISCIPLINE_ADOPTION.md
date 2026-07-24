@@ -31,7 +31,7 @@ layout (contracts in `spec/`, `CONTRIBUTING.md` at root), not copied verbatim.
 | `analyses/` doc-type convention | ADR-0010 | [`docs/analyses/README.md`](docs/analyses/README.md) | Adopted | #154 (#169) |
 | Local-CI runner | ADR-0004 | [`scripts/local-ci`](scripts/local-ci) | Adapted | #155 (#170) |
 | Adoption marker | ADR-0013 | this file | Adopted | #151 (#171) |
-| Branch-protection-as-code + drift workflow | seed BP-as-code | [`.github/rulesets/main.json`](.github/rulesets/main.json) + [`branch-protection.yml`](.github/workflows/branch-protection.yml) + [ADR-0005](docs/decisions/ADR-0005-required-ci-checks.md) | Adopted | — (#180) |
+| Branch-protection-as-code + drift workflow | seed BP-as-code | [`.github/rulesets/main.json`](.github/rulesets/main.json) + [`branch-protection.yml`](.github/workflows/branch-protection.yml) + [ADR-0005](docs/decisions/ADR-0005-required-ci-checks.md) | Adopted | — (#181) |
 | Randomized-exploration / PBT (seeded MC: fixed-seed gate smoke + `SID_MC_CAMPAIGN`-gated sweep) | ADR-0014 | [`python/tests/test_ltv_uncertainty_calibration.py`](python/tests/test_ltv_uncertainty_calibration.py) | Adopted | #137 (#175) |
 
 ## Held
