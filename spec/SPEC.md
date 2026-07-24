@@ -1558,11 +1558,22 @@ When the state dimension `n` is unknown, it can be determined prior to calling `
    ```
    where `r` is the prediction horizon (default: `min(floor(N_imp/3), 50)` where `N_imp` is the number of impulse response coefficients). For MIMO systems with `n_y` outputs and `n_u` inputs, each entry `g(k)` is an `n_y × n_u` block.
 4. Compute the SVD: `H_hankel = U Σ V'`.
-5. Detect model order `n` as the index of the largest normalised singular value gap:
-   ```
-   n = argmax_k  σ_k / σ_{k+1}       for k = 1, ..., r-1
-   ```
-   Alternatively, when a threshold `τ` is specified, `n` is the number of singular values satisfying `σ_k / σ_1 > τ`.
+5. Detect model order `n` from the singular-value gaps. Let `σ_1 ≥ σ_2 ≥ … ≥ σ_m` be the singular values (`m = r·min(n_y, n_u)`).
+
+   a. **Noise floor.** A singular value is *resolvable* iff `σ_k > σ_1·√m·ε` (`ε` = machine epsilon); values at or below this floor are numerical zeros. Let `L` be the number of resolvable singular values.
+   b. **Search range.** `K = min(L − 1, floor(m/2))`, with `K ≥ 1`.
+      - The `L − 1` bound **excludes** the resolvable→floor cliff ratio `σ_L / σ_{L+1}` (dividing a resolvable value by a numerical zero), so the gap search ranges only over resolvable modes.
+      - The `floor(m/2)` cap bounds `n` when the singular values decay without a clear cliff (noise-dominated data, e.g. no underlying system).
+   c. **Order.**
+      ```
+      n = argmax_k  σ_k / σ_{k+1}       for k = 1, ..., K
+      ```
+
+   `L` and `K` are defined on singular-value **magnitudes**, not array indices, so the MATLAB and Python implementations return identical `n` for identical `Σ`.
+
+   Alternatively, when a threshold `τ` is specified, `n` is the number of singular values satisfying `σ_k / σ_1 > τ` (rank-count semantics, independent of the gap search above).
+
+   **Rationale for the floor, cliff exclusion, and cap:** the gap method uses a *machine-epsilon* floor rather than a larger data-aware floor because the lag-1 impulse-response reconstruction (step 2) already suppresses finite-grid/DC artifacts to near-`ε` magnitudes; a larger relative floor would instead cut genuine weak modes and collapse exact low-order plants (users needing an explicit magnitude cutoff use `'Threshold'`). The search **excludes** the resolvable→floor cliff so the gap method stays a gap detector rather than a rank counter (which `'Threshold'` already provides); including it made the two ports disagree on low-order plants. The `floor(m/2)` cap is retained — not lifted — because the floor cannot bound the *no-cliff* regime (noise-dominated data has a slowly decaying tail with no resolvable/floor boundary, and an uncapped search drifts to `n ≈ m`). See [ADR-0004](../docs/decisions/ADR-0004-model-order-gap-convention.md).
 
 **Inputs:**
 
