@@ -137,14 +137,21 @@ def _welch_estimate(
                         PhiYU[:, a, b] += Yj[:, a] * np.conj(Uj[:, b])
 
     # ---- Average and normalise ----
-    # Factor of 2 for one-sided spectrum (positive frequencies only,
-    # excluding DC).  Cancels in G = Pyu/Puu and coherence but is needed
-    # for correct PSD magnitude.
+    # One-sided factor of 2 (positive frequencies only).  It applies to every
+    # bin EXCEPT those with no distinct negative-frequency mirror: DC (already
+    # excluded from the grid) and, for even nfft, the Nyquist bin omega = pi,
+    # which keep a factor of 1 -- matching scipy/cpsd and sidSpectrogram
+    # (SPEC.md 6.5/7.3).  Doubling Nyquist made Phi exactly 2x too large there
+    # (issue #142).  The factor cancels in G = Pyu/Puu and coherence.
     J_total = J * n_traj_w
-    PhiY = 2.0 * PhiY / (J_total * S1)
+    onesided = np.full(n_bins, 2.0)
+    if nfft % 2 == 0:
+        onesided[-1] = 1.0  # Nyquist bin has no mirror
+    norm = (onesided / (J_total * S1)).reshape(n_bins, 1, 1)
+    PhiY = PhiY * norm
     if not is_time_series:
-        PhiU = 2.0 * PhiU / (J_total * S1)
-        PhiYU = 2.0 * PhiYU / (J_total * S1)
+        PhiU = PhiU * norm
+        PhiYU = PhiYU * norm
 
     # ---- Degrees of freedom for uncertainty ----
     # For Hann window at 50% overlap: nu_dof ~ 1.8 * J per trajectory.
