@@ -26,6 +26,13 @@ on:
       - 'python/**'
       - 'julia/**'
 
+# Least-privilege token: these jobs only check out and run validators, so
+# contents: read is all actions/checkout needs. Declaring the block explicitly
+# also avoids the private-fork checkout 404 that bites any workflow which later
+# adds a write scope (e.g. issues: write) without re-listing contents.
+permissions:
+  contents: read
+
 jobs:
   changes:
     name: Detect changed paths

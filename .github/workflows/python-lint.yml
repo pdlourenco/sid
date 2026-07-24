@@ -16,6 +16,13 @@ on:
       - 'python/pyproject.toml'
       - '.github/scripts/check_python_headers.py'
 
+# Least-privilege token: this job only checks out and lints, so contents: read
+# is all actions/checkout needs. Declaring the block explicitly also avoids the
+# private-fork checkout 404 that bites any workflow which later adds a write
+# scope (e.g. issues: write) without re-listing contents.
+permissions:
+  contents: read
+
 jobs:
   ruff:
     name: Style & lint check
