@@ -31,6 +31,7 @@ layout (contracts in `spec/`, `CONTRIBUTING.md` at root), not copied verbatim.
 | `analyses/` doc-type convention | ADR-0010 | [`docs/analyses/README.md`](docs/analyses/README.md) | Adopted | #154 (#169) |
 | Local-CI runner | ADR-0004 | [`scripts/local-ci`](scripts/local-ci) | Adapted | #155 (#170) |
 | Adoption marker | ADR-0013 | this file | Adopted | #151 (#171) |
+| Branch-protection-as-code + drift workflow | seed BP-as-code | [`.github/rulesets/main.json`](.github/rulesets/main.json) + [`branch-protection.yml`](.github/workflows/branch-protection.yml) + [ADR-0005](docs/decisions/ADR-0005-required-ci-checks.md) | Adopted | — (#180) |
 | Randomized-exploration / PBT (seeded MC: fixed-seed gate smoke + `SID_MC_CAMPAIGN`-gated sweep) | ADR-0014 | [`python/tests/test_ltv_uncertainty_calibration.py`](python/tests/test_ltv_uncertainty_calibration.py) | Adopted | #137 (#175) |
 
 ## Held
@@ -45,7 +46,6 @@ Real seed features parked with explicit triggers rather than dropped, same
 discipline the seed applies to its own deferred items:
 
 - **Label-as-code + issue templates** — *trigger:* issue volume past ~one screen, or a second regular contributor.
-- **Branch-protection-as-code + drift workflow** — *trigger:* required-check set changes often, or a drift incident.
 - **Release-as-code CHANGELOG gate** (ADR-0015) — *trigger:* next release-process change.
 - **Project-level `CHANGELOG.md`** — *trigger:* per-language `RELEASE_NOTES.md` diverge, or a unified cadence emerges.
 - **Traceability matrix** (seed SPEC option) — *trigger:* a formal V&V / ECSS process requirement.
@@ -74,3 +74,10 @@ take/skip each entry with a one-line reason, and bump the pin above.
   uses the two-tier shape — deterministic fixed-seed gate smoke + a
   `SID_MC_CAMPAIGN`-gated 500-trial λ-sweep out of the gate (#137, #175). With
   Phase 3 complete, `Verified by:` (#127) is now unblocked.
+- **2026-07-24 — branch-protection-as-code adopted** (ADR-0005), moved deferred →
+  adopted. The deferred trigger ("a drift incident") fired twice — #174 and #178
+  both admin-merged while the MATLAB/Octave Lint check was red, undetected until
+  #155's local-ci runner surfaced it (#179). The two cheap lint workflows now run
+  on every PR with distinct contexts, and `.github/rulesets/main.json` +
+  `branch-protection.yml` require them as code (admin bypass retained). Activation
+  is a one-time maintainer step (add `RULESET_TOKEN`, run the workflow).

@@ -1,0 +1,77 @@
+name: Branch protection (as code)
+
+# Keeps the `main` branch ruleset in version control: the required-status-checks
+# policy lives in .github/rulesets/main.json instead of only in repo settings,
+# where two admin-merges have already outrun a non-required check (#174, #178).
+# See ADR-0005.
+#
+#   - workflow_dispatch : apply main.json to the live ruleset (create or update)
+#   - pull_request      : drift-check only — fail if the live ruleset diverges
+#                         from main.json (never mutates on a PR)
+#
+# The default GITHUB_TOKEN cannot edit rulesets, so this needs a repo-admin token
+# in the RULESET_TOKEN secret. If the secret is absent the job no-ops with a
+# clear message rather than failing red.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/rulesets/**'
+      - '.github/workflows/branch-protection.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ruleset:
+    name: Apply / check branch ruleset
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Validate ruleset JSON
+        run: |
+          jq empty .github/rulesets/main.json
+          echo "ruleset JSON is valid"
+
+      - name: Apply (dispatch) or drift-check (pull_request)
+        env:
+          GH_TOKEN: ${{ secrets.RULESET_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::warning::RULESET_TOKEN not set — skipping. Add a repo-admin token secret to enforce the ruleset as code."
+            exit 0
+          fi
+          name=$(jq -r .name .github/rulesets/main.json)
+          id=$(gh api "repos/$GH_REPO/rulesets" --jq ".[] | select(.name==\"$name\") | .id" | head -n1 || true)
+
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            if [ -n "${id:-}" ]; then
+              echo "Updating ruleset #$id ($name)"
+              gh api -X PUT "repos/$GH_REPO/rulesets/$id" --input .github/rulesets/main.json >/dev/null
+            else
+              echo "Creating ruleset ($name)"
+              gh api -X POST "repos/$GH_REPO/rulesets" --input .github/rulesets/main.json >/dev/null
+            fi
+            echo "Ruleset applied."
+          else
+            # PR: drift check — compare the fields we manage, never mutate.
+            if [ -z "${id:-}" ]; then
+              echo "::warning::Ruleset '$name' is not applied yet — run this workflow via workflow_dispatch to create it."
+              exit 0
+            fi
+            gh api "repos/$GH_REPO/rulesets/$id" > live.json
+            desired=$(jq -S '{enforcement, conditions, rules}' .github/rulesets/main.json)
+            live=$(jq -S '{enforcement, conditions, rules}' live.json)
+            if [ "$desired" != "$live" ]; then
+              echo "::error::Live ruleset has drifted from .github/rulesets/main.json"
+              diff <(printf '%s\n' "$live") <(printf '%s\n' "$desired") || true
+              exit 1
+            fi
+            echo "No drift — live ruleset matches main.json."
+          fi
