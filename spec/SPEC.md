@@ -24,7 +24,7 @@ Every binding rule in this document should name the mechanism that gates it — 
 
 A `cross-vector` check proves the two ports *agree*, not that either satisfies the spec; the strongest rules pair it with a `unit` test written against the spec requirement (see `CONTRIBUTING.md` §"Cross-language reference vectors are a check, not a proof" and `CLAUDE.md` §3).
 
-**Rollout (issue #113).** Annotation is landing section-by-section rather than as one monster diff, and each block is re-derived against the *current* test suite (post-remediation), not the June recon — the earlier draft over-claimed. **This revision annotates §1–§8** (frequency-domain §1–§7 and the `sidLTVdisc`/COSMIC section §8). The `**Verified by:**` blocks for §9–§15 follow in subsequent PRs; until then those sections carry no block (their absence is the honest "not yet audited", not a claim of zero coverage).
+**Rollout (issue #113).** Annotation is landing section-by-section rather than as one monster diff, and each block is re-derived against the *current* test suite (post-remediation), not the June recon — the earlier draft over-claimed. **All function sections §1–§15 now carry a `**Verified by:**` block** (the rollout completed §1–§7, then §8, then §9–§15). Each was re-derived against the current suite; the uncovered rules are tagged `none` rather than left silent.
 
 ---
 
@@ -1838,6 +1838,8 @@ All `sidFreq*` functions return a struct with these fields:
 
 **Time series mode:** `Response` and `ResponseStd` are empty (`[]`). `Coherence` is empty. `NoiseSpectrum` contains `Φ̂_y(ω)`.
 
+**Verified by:** the output-struct schema (field names, shapes, time-series-mode empties) is exercised field-by-field by the frequency-domain `unit(M)`/`unit(Py)` tests of §2–§7 (which assert on each field) and pinned across ports by their `cross-vector`s. The `.Method` string and metadata fields are `manual`.
+
 ---
 
 ## 10. Edge Cases and Validation
@@ -1885,6 +1887,11 @@ then the input carries no usable excitation: set `Ĝ(ω) = NaN` for all `ω`, `�
 | Collinear MIMO inputs (rank-deficient `u`) | Per-frequency `cond(Φ̂_u) > 1/ε` fires at every frequency: `Ĝ = NaN`, `σ_G = Inf`, warning (§2.6) |
 | One input channel constant while others are active (partial degeneracy) | The whole-signal check passes (a healthy channel dominates `max_ch`) and `cond(Φ̂_u)` may stay below `1/ε`, so the estimate proceeds; that channel's column of `Ĝ` is unidentifiable. A **per-channel warning** names the constant channel(s); the healthy channels are estimated normally (their columns are *not* NaN'd). |
 
+**Verified by:**
+
+- Input validation — NaN/Inf, complex data, too-short, shape errors (§10.1) — `unit(M)` `test_sidValidate.m`, `unit(Py)` `test_validate.py`.
+- Degenerate excitation §10.2–10.3 (near-singular `Φ̂_u`, whole-signal constant/zero, partial degeneracy) — verified by the degenerate test classes cited under §2/§4/§5/§6 (`TestFreqBTDegenerate` etc. and their MATLAB counterparts). **`none` for `cross-vector`** — degenerate inputs are not stored.
+
 ---
 
 ## 11. Plotting
@@ -1920,6 +1927,8 @@ Both plotting functions accept name-value options:
 | `'LineWidth'` | `1.5` | Line width |
 | `'Axes'` | `[]` | Axes handle (creates new figure if empty) |
 
+**Verified by:** plotting functions (`sidBodePlot`, `sidSpectrumPlot`, `sidMapPlot`, `sidSpectrogramPlot`, …) — `unit(M)` `test_sidPlotting.m` / `test_sidMapPlot.m` / `test_sidSpectrogramPlot.m`, `unit(Py)` `test_plotting.py` (smoke / structure: figures build, handles returned, no error). Visual appearance is `manual`.
+
 ---
 
 ## 12. References
@@ -1954,6 +1963,8 @@ Both plotting functions accept name-value options:
 12. Harris, F.J. "On the use of windows for harmonic analysis with the discrete Fourier transform." Proc. IEEE, 66(1):51–83, 1978. (Effective DOF for Welch estimator with overlap.)
 
 13. Priestley, M.B. *Spectral Analysis and Time Series*. Academic Press, 1981. (Ch. 14: Non-stationary processes and time-dependent spectral analysis.)
+
+**Verified by:** `manual` — bibliographic references; no automated verifier applies.
 
 ---
 
@@ -2018,6 +2029,8 @@ y_ds = sidDetrend(y, 'SegmentLength', 1000);
 [u_dt] = sidDetrend(u);
 result = sidFreqBT(y_dt, u_dt);
 ```
+
+**Verified by:** `cross-vector` (`reference_detrend`), `unit(M)` `test_sidDetrend.m`, `unit(Py)` `test_detrend.py`.
 
 ---
 
@@ -2130,6 +2143,8 @@ resid = sidResidual(ltv, X, U);
 sidResidual(result, y, u, 'Plot', true);
 ```
 
+**Verified by:** `cross-vector` (`reference_residual`), `unit(M)` `test_sidResidual.m`, `unit(Py)` `test_residual.py`.
+
 ---
 
 ## 15. `sidCompare` — Model Output Comparison
@@ -2211,3 +2226,5 @@ comp = sidCompare(ltv, X_val, U_val);
 % Plot comparison
 sidCompare(result, y, u, 'Plot', true);
 ```
+
+**Verified by:** `cross-vector` (`reference_compare`), `unit(M)` `test_sidCompare.m`, `unit(Py)` `test_compare.py`. Multi-trajectory output shapes (§15.5) — the `unit(M)`/`unit(Py)` multi-trajectory cases added with issues #140/#158.
