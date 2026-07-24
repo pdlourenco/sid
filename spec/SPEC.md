@@ -1509,24 +1509,25 @@ This eliminates the state as a free variable. A single COSMIC step (§8.3.4) on 
 
 #### 8.12.4 Trust-Region Interpolation (Optional)
 
-When the transition from `A = I` (initialisation) to the first COSMIC estimate of `A(k)` is too abrupt — for instance with high noise, long trajectories, or poorly conditioned data — the state step can use interpolated dynamics:
+The Case-2 alternating loop is initialised from the LTI realisation `(A₀, B₀)` of §8.12.3 step 1 (**not** from `A = I`). When the jump from that initialisation to the first free COSMIC estimate of `A(k)` is too abrupt — high noise, long trajectories, or ill-conditioned data — the **state step** can use dynamics interpolated toward the initialisation:
 
 ```
-Ã(k) = (1 - μ) A(k) + μ I
+Ã(k) = (1 - μ) A(k) + μ A₀
 ```
 
-where `μ ∈ [0, 1]` is the trust-region parameter. The COSMIC step is unaffected (it always solves for `A(k)` and `B(k)` freely).
+where `μ ∈ [0, 1]` is the trust-region parameter and `A₀` is the (constant) LTI-initialisation dynamics. At `μ = 1` the state step trusts the initialisation entirely; at `μ = 0` it trusts the current free estimate `A(k)`. The COSMIC step is unaffected — it always solves for `A(k)`, `B(k)` freely. (Earlier drafts interpolated toward `μ·I`; that predates the LTI initialisation of §8.12.3 and is superseded here — `A₀` is the actual initialisation *and* a stable, data-informed trust anchor. Issue #138.)
 
-**Adaptive schedule.** The outer loop manages `μ`:
+**Two-level schedule.** Trust-region is an **outer** loop over `μ` that wraps the **inner** alternating loop of §8.12.3; the two are distinct, and the inner loop runs to its own stopping point *before* `μ` changes:
 
-1. Initialise `μ = 1` (first state step uses `A = I`, i.e., the initialisation).
-2. Run the alternating state–COSMIC loop to convergence for the current `μ`, yielding `J*(μ)`.
-3. Reduce `μ`: set `μ ← μ / 2`.
-4. Run the alternating loop to convergence with the new `μ`, yielding `J*(μ/2)`.
-5. **Accept/reject:** If `J*(μ/2) ≤ J*(μ)`, accept and continue from step 3. If `J*(μ/2) > J*(μ)`, revert to `μ` and terminate.
-6. Terminate when `μ < ε_μ` and set `μ = 0` for a final pass.
+1. `μ ← 1`.
+2. *Inner loop:* iterate the alternating state–COSMIC step at the fixed current `μ` until the relative change in the cost falls below `ε_J` (or an inner iteration cap is reached), giving the converged iterate `(X*, C*)_μ` and cost `J*(μ)`. For `μ > 0` the state step uses `Ã(k)`, so the inner iteration is a homotopy fixed-point, **not** the plain monotone descent of §8.12.3; monotonicity across `μ` is enforced by the outer accept/reject below, not within the inner loop.
+3. Propose `μ' = μ / 2`; run the inner loop at `μ'`, giving `J*(μ')`.
+4. *Accept/reject:* if `J*(μ') ≤ J*(μ)`, **accept** (`μ ← μ'`; keep `(X*, C*)_{μ'}`) and repeat from step 3; otherwise **reject** — restore `(X*, C*)_μ` and **terminate the outer loop** (do *not* keep alternating).
+5. Also terminate once `μ < ε_μ`; then run one final inner loop at `μ = 0` and return that iterate.
 
-When disabled (`μ = 0` from iteration 2 onward), the trust-region adds no computational overhead. This is expected to be sufficient for most practical cases.
+When disabled (`μ = 0`, the **default**), the outer loop is skipped and the algorithm reduces exactly to the plain alternating loop of §8.12.3 (Proposition 1 monotonicity applies), with no overhead. Trust-region is expected to be unnecessary for most cases; it exists for the abrupt-initialisation regime above.
+
+> **Correction (issue #138).** The previous implementation (a) **fused** the outer `μ` schedule into a single `max_iter` alternating loop, halving `μ` only when the inner relative-change test happened to fire — so at `μ = 1` it never settled and `μ` could remain at `1` for the whole budget; (b) interpolated toward `A₀` while the spec text said `μ·I` (this revision adopts `A₀`); and (c) on reject set `μ = 0` and **kept alternating** instead of terminating, which can move away from the restored best iterate. Net effect: `TrustRegion = 1` left the cost ~two orders of magnitude worse than off. This section specifies the corrected two-level algorithm; §8.12.4's `Verified by:` debt (`none`, #138) clears once the rewrite lands with tests.
 
 #### 8.12.5 Convergence
 

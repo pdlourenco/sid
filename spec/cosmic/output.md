@@ -108,12 +108,12 @@ For multi-trajectory: the data matrices $D(k) = \begin{bmatrix} X(k) \\ U(k) \en
 
 ### 4.3 Trust-Region Interpolation (Optional)
 
-In cases where the transition from the initialisation ($A = I$) to the first COSMIC estimate of $A(k)$ is too abrupt — for instance with high noise, long trajectories, or poorly conditioned data — a trust-region mechanism can be employed.
+In cases where the transition from the initialisation $(A_0, B_0)$ of Section 4.1 to the first COSMIC estimate of $A(k)$ is too abrupt — for instance with high noise, long trajectories, or poorly conditioned data — a trust-region mechanism can be employed.
 
-Define the interpolated dynamics matrix:
+Define the interpolated dynamics matrix, interpolating toward the **LTI initialisation** $A_0$ (not $I$; the $\mu I$ of earlier drafts predates the LTI initialisation — see SPEC §8.12.4 and issue #138):
 
 $$
-\tilde{A}(k) = (1 - \mu)\,A(k) + \mu\,I
+\tilde{A}(k) = (1 - \mu)\,A(k) + \mu\,A_0
 $$
 
 where $\mu \in [0, 1]$ is the trust-region parameter. The state step uses $\tilde{A}(k)$ in place of $A(k)$:
@@ -126,16 +126,17 @@ The COSMIC step is unaffected (it always solves for $A(k)$ and $B(k)$ freely).
 
 **Adaptive schedule.** The trust-region parameter $\mu$ is managed by an outer loop wrapping the alternating minimisation:
 
-1. Initialise $\mu = 1$ (which reduces the first state step to the $A = I$ initialisation).
-2. Run the alternating state–COSMIC loop to convergence for the current $\mu$, yielding $J^*(\mu)$.
-3. Reduce $\mu$: set $\mu \leftarrow \mu / 2$.
-4. Run the alternating loop to convergence with the new $\mu$, yielding $J^*(\mu/2)$.
-5. **Accept/reject:** If $J^*(\mu/2) \leq J^*(\mu)$, accept the reduction and continue from step 3. If $J^*(\mu/2) > J^*(\mu)$, increase $\mu$ back (set $\mu \leftarrow \min(2\mu, 1)$) and terminate.
-6. Terminate when $\mu < \varepsilon$ (e.g., $\varepsilon = 10^{-6}$) and set $\mu = 0$ for a final pass.
+This is an **outer** loop over $\mu$ that wraps the **inner** alternating loop of Section 4.2; the inner loop runs to its own stopping point before $\mu$ changes:
 
-At each value of $\mu$, the inner alternating loop minimises a well-defined objective (with $\tilde{A}(k)$ fixed for the duration of that inner loop), so the monotone decrease guarantee holds within each inner loop. The outer loop provides a monotone homotopy from the robust random-walk model ($\mu = 1$) to the fully dynamics-informed model ($\mu = 0$).
+1. Initialise $\mu = 1$ (the first state step uses the $A_0$ initialisation).
+2. *Inner loop:* run the alternating state–COSMIC loop at the fixed current $\mu$ to convergence, yielding the converged iterate $(X^*, C^*)_\mu$ and cost $J^*(\mu)$.
+3. Propose $\mu' = \mu / 2$; run the inner loop at $\mu'$, yielding $J^*(\mu')$.
+4. **Accept/reject:** if $J^*(\mu') \leq J^*(\mu)$, **accept** ($\mu \leftarrow \mu'$, keep $(X^*, C^*)_{\mu'}$) and repeat from step 3. If $J^*(\mu') > J^*(\mu)$, **reject** — restore $(X^*, C^*)_\mu$ and **terminate the outer loop** (do *not* keep alternating).
+5. Also terminate once $\mu < \varepsilon$ (e.g. $\varepsilon = 10^{-6}$); then run one final inner loop at $\mu = 0$ and return that iterate.
 
-**When $\mu = 0$ throughout:** the trust-region mechanism is inactive and the algorithm reduces to the base two-block alternation described in Section 4.2, with a single initialisation step at $A = I$. This is expected to be sufficient for most practical cases.
+At each $\mu > 0$ the inner loop **recomputes** $\tilde{A}(k) = (1-\mu)A(k) + \mu A_0$ from the latest COSMIC estimate $A(k)$ and iterates to a self-consistent fixed point. Because the state step's model $\tilde{A}$ then differs from the COSMIC step's free $A$, this inner iteration is a homotopy fixed-point and is **not** guaranteed monotone within a fixed $\mu$ (unlike the $\mu = 0$ loop of Section 4.2, Proposition 1). Monotonicity is instead enforced *across* $\mu$ by the outer accept/reject in step 4 — each accepted reduction lowers $J^*$. The outer loop is thus a monotone homotopy from the trusted LTI initialisation ($\mu = 1$) to the fully dynamics-informed model ($\mu = 0$).
+
+**When $\mu = 0$ throughout (the default):** the trust-region mechanism is inactive, the outer loop is skipped, and the algorithm reduces to the base two-block alternation of Section 4.2, initialised from $(A_0, B_0)$. This is expected to be sufficient for most practical cases.
 
 ## 5. Convergence Analysis
 
