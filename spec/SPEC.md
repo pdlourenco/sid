@@ -1520,10 +1520,12 @@ where `μ ∈ [0, 1]` is the trust-region parameter and `A₀` is the (constant)
 **Two-level schedule.** Trust-region is an **outer** loop over `μ` that wraps the **inner** alternating loop of §8.12.3; the two are distinct, and the inner loop runs to its own stopping point *before* `μ` changes:
 
 1. `μ ← 1`.
-2. *Inner loop:* iterate the alternating state–COSMIC step at the fixed current `μ` until the relative change in the cost falls below `ε_J` (or an inner iteration cap is reached), giving the converged iterate `(X*, C*)_μ` and cost `J*(μ)`. For `μ > 0` the state step uses `Ã(k)`, so the inner iteration is a homotopy fixed-point, **not** the plain monotone descent of §8.12.3; monotonicity across `μ` is enforced by the outer accept/reject below, not within the inner loop.
+2. *Inner loop:* iterate the alternating state–COSMIC step at the fixed current `μ` until the relative change in the cost falls below `ε_J`, or the per-stage inner cap `MaxIter` is reached. Report `J*(μ)` and `(X*, C*)_μ` as the **best (lowest-cost) iterate observed during the stage** — not necessarily the last: for `μ > 0` the state step uses `Ã(k)`, so the inner iteration is a homotopy fixed-point, **not** the plain monotone descent of §8.12.3, and a capped non-converged stage could otherwise report a worse `J*` than it visited and distort the accept/reject. Monotonicity across `μ` is enforced by the outer accept/reject below, not within the inner loop.
 3. Propose `μ' = μ / 2`; run the inner loop at `μ'`, giving `J*(μ')`.
-4. *Accept/reject:* if `J*(μ') ≤ J*(μ)`, **accept** (`μ ← μ'`; keep `(X*, C*)_{μ'}`) and repeat from step 3; otherwise **reject** — restore `(X*, C*)_μ` and **terminate the outer loop** (do *not* keep alternating).
-5. Also terminate once `μ < ε_μ`; then run one final inner loop at `μ = 0` and return that iterate.
+4. *Accept/reject:* if `J*(μ') ≤ J*(μ)`, **accept** (`μ ← μ'`; keep `(X*, C*)_{μ'}`) and repeat from step 3; otherwise **reject** — restore `(X*, C*)_μ` and stop reducing `μ`.
+5. *Final `μ = 0` refinement (both exits).* On leaving the outer loop — whether by **reject** (step 4) or by `μ < ε_μ` — run one inner loop at `μ = 0` from the current best iterate and **keep its result only if it lowers `J*`** (a guarded pass). Return that iterate. This guarantees the returned iterate is a fixed point of the reported (`μ = 0`, true-objective) alternation, closing the "returned iterate was smoothed under `Ã ≠ A`, never refined at `μ = 0`" gap a bare reject would leave.
+
+**Budget and defaults (normative).** `MaxIter` is the **per-stage** inner-loop iteration cap (not a global budget); the worst-case total inner-iteration count is `MaxIter × (⌈log₂(1/ε_μ)⌉ + 2)` — the `μ` stages plus the final `μ = 0` pass. Defaults: `ε_μ = 10⁻⁶`, and `μ = 0` (trust-region **off**), for which the outer loop is skipped entirely.
 
 When disabled (`μ = 0`, the **default**), the outer loop is skipped and the algorithm reduces exactly to the plain alternating loop of §8.12.3 (Proposition 1 monotonicity applies), with no overhead. Trust-region is expected to be unnecessary for most cases; it exists for the abrupt-initialisation regime above.
 
@@ -1560,7 +1562,7 @@ For any invertible `T ∈ ℝⁿˣⁿ`, the transformation `(T x(k), T A(k) T⁻
 | Regularisation | `λ` | scalar or `(N-1 × 1)` vector | required |
 | Noise covariance | `R` | `(p_y × p_y)` SPD matrix | `eye(p_y)` |
 | Convergence tol. | `ε_J` | positive scalar | `1e-6` |
-| Max iterations | | positive integer | `50` |
+| Max iterations (per-stage inner cap, §8.12.4) | `MaxIter` | positive integer | `50` |
 | Trust region | `μ_0` | scalar in `[0, 1]` or `'off'` | `'off'` |
 | Trust region tol. | `ε_μ` | positive scalar | `1e-6` |
 
