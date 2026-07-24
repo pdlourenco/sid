@@ -196,10 +196,10 @@ class TestModelOrderStrictlyProper:
 
         The lag-0 fix is verified directly on the Hankel singular values:
         pre-fix the third value was a structural ~0.4/6.1 (order 3); post-fix
-        it collapses to numerical noise (~1e-4). Order is read with the
-        threshold method, which is deterministic and cross-language-consistent
-        (the gap method's noise-floor handling is a separate follow-up; see
-        the module note in model_order).
+        it collapses to numerical noise (~1e-4). Both the threshold and the
+        (default) gap method return n=2. Pre-ADR-0004 the MATLAB gap method
+        included the resolvable->floor cliff and returned n=3 here while Python
+        returned n=2; the count-based rule makes both agree. See ADR-0004.
         """
         nf = 128
         w = np.arange(1, nf + 1) * np.pi / nf
@@ -210,6 +210,9 @@ class TestModelOrderStrictlyProper:
         # The third singular value must be numerical noise, not structural.
         s = sv["singular_values"]
         assert s[2] / s[0] < 1e-3, f"spurious structural SV: {s[2] / s[0]:.2e}"
+        # Gap method (default) now also returns n=2 (count-based, cliff excluded).
+        n_gap, _ = model_order(self._result(G, nf))
+        assert n_gap == 2, f"finite-zero gap method: expected n=2, got {n_gap}"
 
     def test_zero_at_origin_unchanged(self) -> None:
         """Masked family (numerator z) still returns n = 2."""

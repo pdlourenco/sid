@@ -289,18 +289,23 @@ zc = exp(1j * w);
 Gz = (zc + 0.5) ./ (zc.^2 - 1.2728 * zc + 0.81);
 resFZ = struct('Frequency', w, 'Response', reshape(Gz, nf, 1, 1), ...
     'Method', 'sidFreqBT');
-% Order via the threshold method: deterministic and cross-language-consistent
-% (the gap method's noise-floor handling is a separate follow-up; see the
-% note in sidModelOrder). The lag-0 fix is verified directly on the third
-% singular value, which pre-fix was structural (~0.4/6.1) and post-fix
-% collapses to numerical noise (~1e-4).
+% Threshold method: a deterministic magnitude cutoff. The lag-0 fix is
+% verified directly on the third singular value, which pre-fix was structural
+% (~0.4/6.1) and post-fix collapses to numerical noise (~1e-4).
 [nFZ, svFZ] = sidModelOrder(resFZ, 'Threshold', 1e-2);
 assert(nFZ == 2, ...
     'finite-zero strictly proper plant: expected n=2, got %d', nFZ);
 sFZ = svFZ.SingularValues;
 assert(sFZ(3) / sFZ(1) < 1e-3, ...
     'spurious structural singular value: %.2e', sFZ(3) / sFZ(1));
+% Gap method (default): now also n=2. The count-based search excludes the
+% resolvable->floor cliff, so it no longer counts the ~1e-4 reconstruction
+% artifact as structure. Pre-ADR-0004 MATLAB included the cliff and returned
+% n=3 here while Python returned n=2; both now agree. See ADR-0004 / SPEC §8.12.12.
+[nFZgap, ~] = sidModelOrder(resFZ);
+assert(nFZgap == 2, ...
+    'finite-zero gap method: expected n=2, got %d', nFZgap);
 runner__nPassed = runner__nPassed + 1;
-fprintf('  Test 15 passed: strictly-proper finite-zero plant n=2 (#139).\n');
+fprintf('  Test 15 passed: strictly-proper finite-zero plant n=2, gap+threshold (#139, ADR-0004).\n');
 
 fprintf('test_sidModelOrder: %d/%d passed\n', runner__nPassed, runner__nPassed);

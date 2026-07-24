@@ -231,23 +231,22 @@ function [n, sv] = sidModelOrder(result, varargin)
                     'All singular values near zero. Returning n = 1.');
             end
         else
-            % Only consider ratios among singular values above a noise
-            % floor to avoid spurious gaps in the numerical tail.
-            % The floor scales with sigma_1 and the matrix dimension.
-            % NOTE: the gap search is capped at floor(nSigma/2) (SPEC §8.12.12
-            % nominally allows k = 1..r-1). Lifting the cap requires a data-
-            % aware noise floor first: the machine-eps floor below keeps the
-            % entire noisy tail of an estimated (non-exact) G "resolvable", so
-            % an unguarded search locks onto spurious tail gaps (AR(1) -> n=40).
-            % Data-aware-floor follow-up: issue #160.
+            % Search the singular-value gaps over resolvable modes only.
+            % L = number of singular values above the machine-eps floor; the
+            % ratio search runs k = 1..min(L-1, floor(nSigma/2)). The L-1 bound
+            % EXCLUDES the resolvable->floor cliff sigma_L/sigma_{L+1} (a value
+            % over a numerical zero); the floor(nSigma/2) cap bounds n when the
+            % spectrum decays without a clear cliff (noise-dominated data).
+            % Defined on the count L (not a 1-based index) so MATLAB and Python
+            % agree. See ADR-0004 and SPEC §8.12.12.
             noiseFloor = sigmas(1) * sqrt(nSigma) * eps;
-            lastSig = find(sigmas > noiseFloor, 1, 'last');
-            maxK = min(lastSig, floor(nSigma / 2));
+            L = sum(sigmas > noiseFloor);
+            maxK = min(L - 1, floor(nSigma / 2));
             maxK = max(maxK, 1);
 
             ratios = sigmas(1:maxK) ./ sigmas(2:maxK+1);
 
-            % Find largest gap
+            % Largest gap
             [~, n] = max(ratios);
         end
     end

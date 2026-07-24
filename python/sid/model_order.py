@@ -273,18 +273,17 @@ def model_order(
                     stacklevel=2,
                 )
         else:
-            # Only consider ratios among singular values above a noise
-            # floor to avoid spurious gaps in the numerical tail.
+            # Search the singular-value gaps over resolvable modes only.
+            # L = number of singular values above the machine-eps floor; the
+            # ratio search runs k = 1..min(L-1, n_sigma // 2). The L-1 bound
+            # EXCLUDES the resolvable->floor cliff sigma_L / sigma_{L+1} (a value
+            # over a numerical zero); the n_sigma // 2 cap bounds n when the
+            # spectrum decays without a clear cliff (noise-dominated data).
+            # Defined on the count L (not a 0-based index) so Python and MATLAB
+            # agree. See ADR-0004 and SPEC §8.12.12.
             noise_floor = sigmas[0] * np.sqrt(n_sigma) * np.finfo(float).eps
-            last_sig = np.where(sigmas > noise_floor)[0]
-            last_sig = last_sig[-1] if len(last_sig) > 0 else 0
-            # NOTE: the gap search is capped at n_sigma // 2 (SPEC §8.12.12
-            # nominally allows k = 1..r-1). Lifting the cap requires a data-
-            # aware noise floor first: the machine-eps floor above keeps the
-            # entire noisy tail of an estimated (non-exact) G "resolvable", so
-            # an unguarded search locks onto spurious tail gaps (AR(1) -> n=40).
-            # Data-aware-floor follow-up: issue #160.
-            max_k = min(last_sig, n_sigma // 2)
+            n_resolvable = int(np.sum(sigmas > noise_floor))  # L
+            max_k = min(n_resolvable - 1, n_sigma // 2)
             max_k = max(max_k, 1)
 
             ratios = sigmas[:max_k] / sigmas[1 : max_k + 1]
