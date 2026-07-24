@@ -109,11 +109,15 @@ after the #145 cross-validation remediation (see
    validator in every language that has the port. A reference file no test reads
    is worse than none — it reads as coverage while providing zero. The consumer
    lands in the same PR as the vector.
-4. **Regeneration is the only sanctioned edit.** Vectors change only by
-   re-running `testdata/generate_reference.m` from a `matlab/**` change; never
-   hand-edit a committed JSON. A reference-data change with no `matlab/**` diff
-   to justify it is a red flag. (Recording generator provenance *inside* each
-   JSON — generator + source commit — is a tracked follow-up, not yet in place.)
+4. **Payloads change only by regeneration.** A vector's *payload* (the `input` /
+   `output` numbers) changes only by re-running `testdata/generate_reference.m`;
+   never hand-edit a committed payload, and a payload change with no `matlab/**`
+   diff to justify it is a red flag. The `tolerance` block *may* be edited
+   directly (rule 2), but the generator's matching tolerance entries change in
+   the **same PR**, so a fresh regeneration reproduces the committed file
+   byte-for-byte — itself a checkable invariant (rule 5). (Recording generator
+   provenance *inside* each JSON — generator + source commit — is a tracked
+   follow-up: #172.)
 5. **Structural gates over outcome tests.** Prefer a gate that checks the
    *mechanism* — every stored field is read and compared, every tolerance
    honored — over one that asserts only a specific numeric outcome. Outcome

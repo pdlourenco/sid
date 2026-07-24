@@ -34,9 +34,12 @@ Contract artifacts — today the `testdata/` vectors — are held to five standi
 rules, stated in [`CONTRIBUTING.md`](../../CONTRIBUTING.md) §"Contract artifacts
 and drift hardening": absolute tolerance floors; stored tolerances authoritative
 (no per-language hardcoding); no orphan artifacts (every vector wired into every
-port's validator, in the same PR); regeneration is the only sanctioned edit; and
-structural gates over outcome tests. Recording generator provenance *inside* each
-artifact is adopted as a **target**, tracked separately — not yet a gate.
+port's validator, in the same PR); payloads change only by regeneration (a
+`tolerance` block may be edited directly, but with the generator's matching
+entries changed in the same PR, so a fresh regeneration reproduces the committed
+file); and structural gates over outcome tests. Recording generator provenance
+*inside* each artifact is adopted as a **target**, tracked in #172 — not yet a
+gate.
 
 ## Consequences
 
@@ -49,7 +52,7 @@ artifact is adopted as a **target**, tracked separately — not yet a gate.
   consumer, in every port, lands in the same PR, and a near-zero field needs an
   `atol` chosen deliberately rather than defaulted.
 - **Cost / visible debt:** the generator-provenance target is stated but unmet,
-  so it remains debt until a follow-up lands the metadata and a check for it.
+  so it remains debt until #172 lands the metadata and a check for it.
 
 ## Alternatives considered
 
