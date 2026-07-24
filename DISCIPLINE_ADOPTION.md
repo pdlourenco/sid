@@ -31,6 +31,7 @@ layout (contracts in `spec/`, `CONTRIBUTING.md` at root), not copied verbatim.
 | `analyses/` doc-type convention | ADR-0010 | [`docs/analyses/README.md`](docs/analyses/README.md) | Adopted | #154 (#169) |
 | Local-CI runner | ADR-0004 | [`scripts/local-ci`](scripts/local-ci) | Adapted | #155 (#170) |
 | Adoption marker | ADR-0013 | this file | Adopted | #151 (#171) |
+| Randomized-exploration / PBT (seeded MC: fixed-seed gate smoke + `SID_MC_CAMPAIGN`-gated sweep) | ADR-0014 | [`python/tests/test_ltv_uncertainty_calibration.py`](python/tests/test_ltv_uncertainty_calibration.py) | Adopted | #137 (#175) |
 
 ## Held
 
@@ -45,7 +46,6 @@ discipline the seed applies to its own deferred items:
 
 - **Label-as-code + issue templates** — *trigger:* issue volume past ~one screen, or a second regular contributor.
 - **Branch-protection-as-code + drift workflow** — *trigger:* required-check set changes often, or a drift incident.
-- **Randomized-exploration / PBT convention** (ADR-0014) — *trigger:* Phase 3 lands; #137's calibration-test tightening is the natural vehicle.
 - **Release-as-code CHANGELOG gate** (ADR-0015) — *trigger:* next release-process change.
 - **Project-level `CHANGELOG.md`** — *trigger:* per-language `RELEASE_NOTES.md` diverge, or a unified cadence emerges.
 - **Traceability matrix** (seed SPEC option) — *trigger:* a formal V&V / ECSS process requirement.
@@ -68,3 +68,9 @@ take/skip each entry with a one-line reason, and bump the pin above.
   contract-gate doctrine (#152), known-bug lifecycle (#153), analyses convention
   (#154), local-ci (#155), this marker (#151). `Verified by:` (#127) held for
   post-Phase-3 re-derivation. Pin set to `v0.4.1` (`49860ad`).
+- **2026-07-24 — PBT convention adopted** (ADR-0014), moved deferred → adopted.
+  Its named trigger (Phase 3 landing; #137's calibration-test tightening as the
+  vehicle) fired and was swept in the same PR: `test_ltv_uncertainty_calibration.py`
+  uses the two-tier shape — deterministic fixed-seed gate smoke + a
+  `SID_MC_CAMPAIGN`-gated 500-trial λ-sweep out of the gate (#137, #175). With
+  Phase 3 complete, `Verified by:` (#127) is now unblocked.
