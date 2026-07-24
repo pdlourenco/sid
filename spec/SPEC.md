@@ -24,7 +24,7 @@ Every binding rule in this document should name the mechanism that gates it — 
 
 A `cross-vector` check proves the two ports *agree*, not that either satisfies the spec; the strongest rules pair it with a `unit` test written against the spec requirement (see `CONTRIBUTING.md` §"Cross-language reference vectors are a check, not a proof" and `CLAUDE.md` §3).
 
-**Rollout (issue #113).** Annotation is landing section-by-section rather than as one monster diff, and each block is re-derived against the *current* test suite (post-remediation), not the June recon — the earlier draft over-claimed. **This revision annotates §1–§7 (frequency-domain).** The `**Verified by:**` blocks for §8–§15 follow in subsequent PRs; until then those sections carry no block (their absence is the honest "not yet audited", not a claim of zero coverage).
+**Rollout (issue #113).** Annotation is landing section-by-section rather than as one monster diff, and each block is re-derived against the *current* test suite (post-remediation), not the June recon — the earlier draft over-claimed. **This revision annotates §1–§8** (frequency-domain §1–§7 and the `sidLTVdisc`/COSMIC section §8). The `**Verified by:**` blocks for §9–§15 follow in subsequent PRs; until then those sections carry no block (their absence is the honest "not yet audited", not a claim of zero coverage).
 
 ---
 
@@ -1795,6 +1795,19 @@ The following are out of scope for v1.0:
 - **GCV lambda selection.**
 - **Parametric identification:** ARX, ARMAX, state-space subspace methods (`sidTfARX`, `sidSsN4SID`, etc.).
 - **LPV identification:** Structured parameter-varying models via direct least-squares or post-hoc regression on COSMIC output.
+
+**Verified by:**
+
+- Core COSMIC — data matrices, cost, closed-form solve, `1/√N` scaling, variable-length (§8.1–8.8) — `cross-vector` (`reference_ltv_cosmic`, `reference_cosmic_internals`, `reference_test_msd`), `unit(M)` `test_sidLTVdisc.m` / `test_sidLTVdiscVarLen.m` / `test_util_msd_ltv.m`, `unit(Py)` `test_ltv_disc.py`.
+- §8.9 Bayesian uncertainty — posterior `P(k) = P_scaled/N`, DoF hat-trace, `Σ̂` (issue #137) — `cross-vector` (`reference_cosmic_internals`, `P` field), `unit(M)` `test_sidLTVdiscUncertainty.m` (Test 15 exact-Hessian oracle), `unit(Py)` `test_ltv_uncertainty_calibration.py` (exact-Hessian + `P=P_scaled/N` oracles + fixed-seed mid-`λ` Monte-Carlo calibration).
+- §8.10 online/recursive COSMIC — `deferred` (v2, per the implementation-status banner).
+- §8.11 lambda tuning + frozen transfer function (`sidLTVdiscFrozen`) — `cross-vector` (`reference_ltv_frozen`), `unit(M)` `test_sidLTVdiscTune.m` / `test_sidLTVdiscFrozen.m`, `unit(Py)` `test_ltv_disc_tune.py` / `test_ltv_disc_frozen.py`.
+- §8.12 Output-COSMIC (`sidLTVdiscIO`) — RTS state step, COSMIC step, `N·λ` reported cost (issue #137) — `cross-vector` (`reference_ltv_io`, `A`/`B`/`Cost`), `unit(M)` `test_sidLTVdiscIO.m`, `unit(Py)` `test_ltv_disc_io.py`.
+- §8.12.4 trust-region interpolation — **`none`**: `TrustRegion` is invoked in `test_sidLTVdiscIO.m` (Test 11) but the assertions are vacuous (`isfield(…,'A')`, `Iterations ≥ 1`) — no test verifies the μ-schedule, monotonicity, or benefit. Known-broken visible debt, issue #138.
+- §8.12.12 model-order selection (`sidModelOrder`) — `cross-vector` (`reference_model_order`), `unit(M)` `test_sidModelOrder.m`, `unit(Py)` `test_model_order.py`.
+- §8.12.13 batch LTV state estimation (`sidLTVStateEst`) — `cross-vector` (`reference_ltv_state_est`), `unit(M)` `test_sidLTVStateEst.m`, `unit(Py)` `test_ltv_state_est.py`.
+- §8.13 LTI realization from I/O frequency response (`sidLTIfreqIO`) — `cross-vector` (`reference_lti_freq_io`), `unit(M)` `test_sidLTIfreqIO.m`, `unit(Py)` `test_lti_freq_io.py`.
+- §8.14 deferred extensions — `deferred`.
 
 ---
 
