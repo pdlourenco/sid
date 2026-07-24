@@ -1,6 +1,6 @@
 # ADR-0004: Model-order gap search — machine-eps floor, cliff exclusion, retained cap
 
-- **Status:** Proposed — _2026-07-24_
+- **Status:** Accepted — _2026-07-24_
 - **Deciders:** Pedro Lourenço (maintainer), implementer session
 - **Related:** issue #160 (tracks this cluster), #139 / PR #157 (lag-0 Hankel fix that precedes it), [SPEC §8.12.12](../../spec/SPEC.md), [ADR-0001](ADR-0001-spec-is-the-contract.md)
 
@@ -53,10 +53,14 @@ they return identical `n` for identical `Σ`.
 ## Consequences
 
 - **MATLAB output changes** on low-order plants: the finite-zero reference goes
-  `3 → 2`, matching Python and the true order. This is a deliberate, recorded
-  behavior change, pinned by a cross-language reference vector on a strictly-proper
-  finite-zero plant (the plant #160 recommends over the current biproper
-  test-case 7).
+  `3 → 2`, matching Python and the true order. This deliberate behavior change is
+  pinned two ways: (1) independent per-port spec-conformance tests — both suites
+  assert the default gap method returns `n = 2` on `G(z)=(z+0.5)/(z²−1.2728z+0.81)`,
+  each checked against the spec's answer (ADR-0001) — and (2) a stored cross-language
+  reference vector: the `reference_model_order` case is swapped from the biproper
+  BT estimate to this analytic response, pinning the full singular-value vector
+  cross-language to `1e-8` rel + `1e-9` abs floor (ADR-0002). The swap also retires
+  the biproper test-case-7 exemplar flagged in #157.
 - **Python is essentially unchanged** — its 0-based `last_sig` already equals
   `L-1`; only the comment/framing updates. The behavioral fix is a one-line MATLAB
   correction (`lastSig → lastSig-1`, i.e. count-based `L-1`).

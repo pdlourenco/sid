@@ -99,22 +99,29 @@ return `n=2`; a noisy 4th-order Butterworth returns `n=3` under all three (a BT
 identifiability limit at the tested SNR/window, floor-independent). The floor only
 ever *differs* on near-exact data, and there the larger floors regress (§2.2).
 
-## 4. Cross-language reference vector
+## 4. Cross-language pin
 
-To pin the agreement, a strictly-proper finite-zero plant (the exemplar #160
-recommends over the current biproper `generate_reference.m` test-case 7):
+Agreement is pinned two ways on the strictly-proper finite-zero plant (the exemplar
+#160 recommends over the biproper `generate_reference.m` test-case 7):
 
 ```
 G(z) = (z + 0.5) / (z² − 1.2728 z + 0.81)
-ω = linspace(π/64, π, 64),  horizon = 21
-σ = [6.047747334326, 4.577697211291, 2.755498562572e-3, 9.805e-16, …]
+ω = (1..nf)·π/nf,  nf = 128,  horizon = 42
+σ = [6.1157, 4.6383, 6.954e-4, O(ε), …]   (σ₃/σ₁ = 1.1e-4)
 expected n = 2   (both languages, after the MATLAB cliff fix)
 ```
 
-Under the current code Python returns 2 and MATLAB returns 3; after aligning
-MATLAB to the count-based rule both return 2. The exact stored vector/grid is
-finalized when `testdata` references are regenerated (ties into the #145d/e
-test-case-7 swap).
+1. **Per-port spec-conformance tests** — both suites independently assert the
+   default gap method returns `n = 2`, each checked against the spec's answer
+   (ADR-0001), not against the other port.
+2. **Stored cross-language reference vector** — `reference_model_order` is swapped
+   from the biproper BT estimate to this analytic response, pinning the full
+   singular-value vector cross-language to `1e-8` rel + `1e-9` abs floor (ADR-0002;
+   the tail is `O(ε)` numerical noise, so the absolute floor is load-bearing). This
+   retires the biproper test-case-7 exemplar (#157).
+
+Under the current code Python returns 2 and MATLAB returns 3; after aligning MATLAB
+to the count-based rule both return 2, and the stored vector agrees end-to-end.
 
 ## 5. What lands
 
@@ -126,7 +133,10 @@ Per ADR-0004 and CONTRIBUTING (spec first, ADR + spec in one PR):
   `lastSig`; remove the `issue #160` NOTE (ADR-0003).
 - **Python** — already excludes the cliff (`last_sig == L-1`); reframe the comment,
   remove the NOTE.
-- **Reference vector** — add the finite-zero plant above to both suites; assert
-  identical `n=2`.
+- **Cross-language pin** — assert the default gap method returns `n=2` on the
+  finite-zero plant in both suites (per-port spec-conformance, per ADR-0001), and
+  swap the `reference_model_order` case to this analytic plant, pinning the full SV
+  vector cross-language (rel + abs floor, ADR-0002) and retiring the biproper
+  test-case 7 (#157).
 - **issue #160** — close as resolved, noting the "lift the cap" direction is
   superseded (ADR-0004 alternatives).

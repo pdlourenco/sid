@@ -137,9 +137,19 @@ function result = callSidFunction(funcName, input, params)
             [x_det, trend] = sidDetrend(input.x, args{:});
             result = struct('x_detrended', x_det, 'trend', trend);
         case 'sidModelOrder'
-            r_bt = sidFreqBT(input.y, input.u, ...
-                             'WindowSize', params.bt_WindowSize);
-            [n, sv] = sidModelOrder(r_bt, 'Horizon', params.Horizon);
+            if isfield(input, 'Response_real')
+                % Analytic frequency-response input: order via the default
+                % gap method (see ADR-0004).
+                nf = numel(input.Frequency);
+                resp = input.Response_real + 1i * input.Response_imag;
+                res_mo = struct('Frequency', input.Frequency(:), ...
+                    'Response', reshape(resp, nf, 1, 1), 'Method', 'analytic');
+                [n, sv] = sidModelOrder(res_mo);
+            else
+                r_bt = sidFreqBT(input.y, input.u, ...
+                                 'WindowSize', params.bt_WindowSize);
+                [n, sv] = sidModelOrder(r_bt, 'Horizon', params.Horizon);
+            end
             result = struct('n', n, 'SingularValues', sv.SingularValues);
         case 'sidCompare'
             r_ltv = sidLTVdisc(input.X, input.U, args{:});

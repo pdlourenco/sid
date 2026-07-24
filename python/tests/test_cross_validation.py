@@ -814,19 +814,35 @@ class TestCrossValidationModelOrder:
 
     def test_model_order(self):
         ref = _load("reference_model_order.json")
-        y = _to_array(ref["input"], "y")
-        u = _to_array(ref["input"], "u")
-        if u.ndim == 1:
-            u = u[:, np.newaxis]
-        horizon = int(ref["params"]["Horizon"])
-        bt_ws = int(ref["params"]["bt_WindowSize"])
+        inp = ref["input"]
 
-        from sid.freq_bt import freq_bt
         from sid.model_order import model_order
 
-        r = freq_bt(y, u, window_size=bt_ws)
-        n_est, sv = model_order(r, horizon=horizon)
+        if "Response_real" in inp:
+            # Analytic frequency-response input: default gap method (ADR-0004).
+            from types import SimpleNamespace
 
+            resp = _to_complex(inp, "Response").ravel()
+            nf = resp.size
+            r = SimpleNamespace(
+                frequency=_to_array(inp, "Frequency").ravel(),
+                response=resp.reshape(nf, 1, 1),
+            )
+            n_est, sv = model_order(r)
+        else:
+            from sid.freq_bt import freq_bt
+
+            y = _to_array(inp, "y")
+            u = _to_array(inp, "u")
+            if u.ndim == 1:
+                u = u[:, np.newaxis]
+            r = freq_bt(y, u, window_size=int(ref["params"]["bt_WindowSize"]))
+            n_est, sv = model_order(r, horizon=int(ref["params"]["Horizon"]))
+
+        assert n_est == int(ref["output"]["n"]), (
+            f"model order n mismatch vs MATLAB: got {n_est}, "
+            f"expected {int(ref['output']['n'])}"
+        )
         expected_sv = _to_array(ref["output"], "SingularValues").ravel()
         np.testing.assert_allclose(
             sv["singular_values"][: len(expected_sv)],
