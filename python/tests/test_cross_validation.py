@@ -840,8 +840,7 @@ class TestCrossValidationModelOrder:
             n_est, sv = model_order(r, horizon=int(ref["params"]["Horizon"]))
 
         assert n_est == int(ref["output"]["n"]), (
-            f"model order n mismatch vs MATLAB: got {n_est}, "
-            f"expected {int(ref['output']['n'])}"
+            f"model order n mismatch vs MATLAB: got {n_est}, expected {int(ref['output']['n'])}"
         )
         expected_sv = _to_array(ref["output"], "SingularValues").ravel()
         np.testing.assert_allclose(
