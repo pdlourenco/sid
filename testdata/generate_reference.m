@@ -8,6 +8,13 @@ function generate_reference()
 %
 %   Usage:
 %     run('testdata/generate_reference.m')
+%
+%   Canonical environment: the committed reference_*.json are regenerated and
+%   committed ONLY by CI (the tests.yml MATLAB job, pinned to MATLAB R2025a).
+%   Regenerating under another MATLAB version or Octave produces sub-tolerance
+%   output drift (~1 ULP, surfaced as whole-file text churn by jsonencode's
+%   shortest-round-trip formatting) and must not be committed. See
+%   testdata/README.md.
 
 fprintf('=== Generating cross-language reference data ===\n\n');
 
