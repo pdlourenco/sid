@@ -242,6 +242,7 @@ function [n, sv] = sidModelOrder(result, varargin)
             noiseFloor = sigmas(1) * sqrt(nSigma) * eps;
             L = sum(sigmas > noiseFloor);
             maxK = min(L - 1, floor(nSigma / 2));
+            % L <= 1: single candidate k = 1 -> n = 1 (SPEC §8.12.12 step 5b).
             maxK = max(maxK, 1);
 
             ratios = sigmas(1:maxK) ./ sigmas(2:maxK+1);

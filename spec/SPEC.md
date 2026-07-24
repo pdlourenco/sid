@@ -1564,6 +1564,7 @@ When the state dimension `n` is unknown, it can be determined prior to calling `
    b. **Search range.** `K = min(L − 1, floor(m/2))`, with `K ≥ 1`.
       - The `L − 1` bound **excludes** the resolvable→floor cliff ratio `σ_L / σ_{L+1}` (dividing a resolvable value by a numerical zero), so the gap search ranges only over resolvable modes.
       - The `floor(m/2)` cap bounds `n` when the singular values decay without a clear cliff (noise-dominated data, e.g. no underlying system).
+      - For `L ≤ 1` (a rank-≤1 system, `σ_1` resolvable at most) the `K ≥ 1` clamp leaves a single candidate `k = 1` and `n = 1` by construction. This is the sole case where the clamp admits the cliff ratio; it is not license to include the cliff when `L ≥ 2`.
    c. **Order.**
       ```
       n = argmax_k  σ_k / σ_{k+1}       for k = 1, ..., K

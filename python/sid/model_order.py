@@ -284,6 +284,7 @@ def model_order(
             noise_floor = sigmas[0] * np.sqrt(n_sigma) * np.finfo(float).eps
             n_resolvable = int(np.sum(sigmas > noise_floor))  # L
             max_k = min(n_resolvable - 1, n_sigma // 2)
+            # L <= 1: single candidate k = 1 -> n = 1 (SPEC 8.12.12 step 5b).
             max_k = max(max_k, 1)
 
             ratios = sigmas[:max_k] / sigmas[1 : max_k + 1]
