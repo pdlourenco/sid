@@ -136,3 +136,4 @@ function [x_detrended, trend] = sidDetrend(x, varargin)
 
     x_detrended = x - trend;
 end
+    % This deliberately over-long comment line exists solely to trip the mh_style line-length rule for the required-check gate verification test and will never be merged.
