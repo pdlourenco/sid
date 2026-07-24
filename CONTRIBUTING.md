@@ -86,6 +86,44 @@ field, or any edge-case behaviour:
 - [ ] Are tests written against the spec's requirements, not against the
       current output of the other language?
 
+## Contract artifacts and drift hardening
+
+The [`testdata/`](testdata/) reference vectors are a **contract artifact**: a
+generated, committed check that the language ports agree numerically. Their
+failure mode is silent — a wrong vector that both ports happen to match keeps
+cross-validation green while every port is wrong (core rule 5). The machinery
+that produces and consumes them is therefore held to standing rules, hardened
+after the #145 cross-validation remediation (see
+[ADR-0002](docs/decisions/ADR-0002-contract-artifact-hardening.md)):
+
+1. **Absolute tolerance floors.** Every reference field's tolerance carries an
+   absolute floor (`<field>_atol`) alongside the relative one (`<field>_rel`),
+   so a near-zero expected value can't make a relative-only comparison vacuously
+   pass.
+2. **Stored tolerances are authoritative.** Both consumers
+   (`testdata/validate_reference.m`, `python/tests/test_cross_validation.py`)
+   read the tolerance from the JSON, with one agreed default (`rtol 1e-6`,
+   `atol 0`). Tests must not hardcode per-field overrides — tighten or loosen a
+   comparison by editing the vector's `tolerance` block.
+3. **No orphan artifacts.** Every committed `reference_*.json` is read by a
+   validator in every language that has the port. A reference file no test reads
+   is worse than none — it reads as coverage while providing zero. The consumer
+   lands in the same PR as the vector.
+4. **Regeneration is the only sanctioned edit.** Vectors change only by
+   re-running `testdata/generate_reference.m` from a `matlab/**` change; never
+   hand-edit a committed JSON. A reference-data change with no `matlab/**` diff
+   to justify it is a red flag. (Recording generator provenance *inside* each
+   JSON — generator + source commit — is a tracked follow-up, not yet in place.)
+5. **Structural gates over outcome tests.** Prefer a gate that checks the
+   *mechanism* — every stored field is read and compared, every tolerance
+   honored — over one that asserts only a specific numeric outcome. Outcome
+   tests pass right up until the generator drifts; structural gates catch it.
+
+These make the vectors trustworthy enough to *adjudicate* a numerical change —
+the role they play in every algorithmic PR — rather than merely accompany it.
+Conformance is still to the spec, not to the vectors: agreement is evidence, not
+proof (ADR-0001).
+
 ## Design decisions (ADRs)
 
 Non-obvious tactical or engineering choices live in
