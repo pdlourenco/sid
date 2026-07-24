@@ -472,7 +472,8 @@ The ETFE has no closed-form asymptotic variance formula: the periodogram is an i
 
 **Verified by:**
 
-- ETFE ratio, optional smoothing, periodogram time-series mode (§4.1–4.3) — `cross-vector` (`reference_siso_etfe`), `unit(M)` `test_sidFreqETFE.m`, `unit(Py)` `test_freq_etfe.py`.
+- ETFE ratio + optional smoothing (§4.1–4.2) — `cross-vector` (`reference_siso_etfe`, IO-mode `{u, y}`), `unit(M)` `test_sidFreqETFE.m`, `unit(Py)` `test_freq_etfe.py`.
+- Periodogram time-series mode (§4.3) — `unit(M)` `test_sidFreqETFE.m` (Test 6), `unit(Py)` `test_freq_etfe.py::...test_time_series`. **`none` for `cross-vector`** — `reference_siso_etfe` is IO-mode only; the time-series periodogram is in no stored vector (visible debt, tracked for #145d).
 - Degenerate-input warnings + whole-signal NaN (§10.2–10.3) — `unit(M)` `test_sidFreqETFE.m` (constant-input, collinear-MIMO tests), `unit(Py)` `test_freq_etfe.py::TestFreqETFEDegenerate`.
 - `ResponseStd` / `NoiseSpectrumStd` = NaN (no variance formula) — `manual`; held by the response cross-vector's NaN std fields, asserted by no dedicated test.
 
