@@ -290,6 +290,13 @@ This confirms the Kronecker structure and shows that P(k) = [A⁻¹]_{kk} is
 independent of Σ. The matrix A depends only on the data geometry (DᵀD) and the
 regularization (λ_k), not on the noise covariance.
 
+**Note on the prior weight `Υ`.** The `A = VᵀV + FᵀΛF` assembled here is the
+Hessian of the *scaled* problem (scaled data, prior weight `λ`). The posterior
+that must be *reported* is that of the returned estimator, whose effective prior
+weight is `Υ = N·λ` (a consequence of the `1/√N` data scaling, §8.3.2). See the
+scaling note in §5.1: `A_est = VᵀV + FᵀΥF = N·A_scaled`, so
+`P(k) = P_scaled(k)/N`.
+
 
 ## 4. Why This is Not the Frequentist Covariance
 
@@ -421,6 +428,14 @@ A_{k,k+1} = A_{k+1,k} = -λ_{k+1} I
 
 **All other blocks are zero.**
 
+> **Scaling note — `Υ` must match the estimator (SPEC §8.9.2).** The `D(k)` above are the **scaled** data blocks `D_s(k) = [X(k)ᵀ U(k)ᵀ]/√N` of §8.3.2, and `Λ = diag(λ_k)`, so the `A` written here is the *scaled* Hessian `A_scaled = V_sᵀV_s + Fᵀ diag(λ_k) F`. That is **not** the Hessian of the estimator whose mean is returned: the `1/√N` scaling makes the returned MAP the minimiser of `‖unscaled residuals‖² + N·λ·Σ‖ΔC‖²`, whose Hessian is
+>
+> ```
+> A_est = VᵀV + Fᵀ Υ F,     with unscaled data V and Υ = diag(N·λ_k)  =  N · A_scaled.
+> ```
+>
+> The prior weight `Υ` in `A` must be the estimator's effective weight `N·λ`, not `λ`. Because `A_est = N·A_scaled`, the reported posterior blocks are `P(k) = [A_est⁻¹]_{kk} = [A_scaled⁻¹]_{kk} / N = P_scaled(k)/N`. The §8.9.2 recursion realises this by reconstructing `S(k) = N·S_scaled(k)` with off-diagonal couplings `(N·λ_k)²`. Using `A_scaled` (weight `λ`) instead overstates every `P(k)` by up to a factor `N` — the bug fixed in the companion PR to issue #137.
+
 Note that A does not depend on Σ. The noise covariance affects the posterior
 only through the Kronecker product Σ ⊗ A⁻¹.
 
@@ -444,6 +459,13 @@ P(N-1) = Λ_{N-1}⁻¹
 
 P(k) = (Λ_k - λ_{k+1}² P(k+1))⁻¹     for k = N-2,...,0
 ```
+
+> This lemma is stated for the abstract block-tridiagonal `A` with off-diagonal
+> blocks `-λ_{k+1} I` (the *scaled* Hessian `A_scaled`), so it yields
+> `P_scaled(k)`. Applied to the estimator Hessian `A_est = N·A_scaled` (§5.1
+> scaling note), whose off-diagonal blocks are `-N·λ_{k+1} I`, the couplings
+> become `(N·λ_{k+1})²` and it yields the reported `P(k) = P_scaled(k)/N`
+> directly. Both are used interchangeably in SPEC §8.9.2.
 
 **Proof by induction:**
 

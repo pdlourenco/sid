@@ -476,11 +476,14 @@ function J = evaluateFullCost( ...
         end
     end
 
-    % Smoothness: lambda(k) * ||C(k+1) - C(k)||^2_F
+    % Smoothness: N * lambda(k) * ||C(k+1) - C(k)||^2_F. The COSMIC step applies
+    % the 1/sqrt(N) data scaling (§8.3.2), so the objective it actually minimises
+    % -- hence the monotone, reported one -- uses the effective weight N*lambda,
+    % not lambda (SPEC.md §8.12.2, issue #137). The user's knob stays lambda.
     for k = 1:N-1
         Ck  = [A(:,:,k)';  B(:,:,k)'];
         Ck1 = [A(:,:,k+1)'; B(:,:,k+1)'];
-        smoothness = smoothness + lambda(k) * norm(Ck1 - Ck, 'fro')^2;
+        smoothness = smoothness + N * lambda(k) * norm(Ck1 - Ck, 'fro')^2;
     end
 
     J = obs_fidelity + dyn_fidelity + smoothness;

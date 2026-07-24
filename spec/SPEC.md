@@ -1152,13 +1152,21 @@ The full `H⁻¹` is `N(p+q) × N(p+q)` — too large to store. But we only need
 
 For a symmetric block tridiagonal matrix, the diagonal blocks of the inverse can be computed via **left and right Schur complements**:
 
-**Step 1: Reconstruct unscaled Hessian diagonal blocks.** The COSMIC solver normalizes data by `1/sqrt(N)` (§8.3.2), so the scaled block diagonal terms `S_scaled(k)` contain `D_s(k)ᵀD_s(k) + reg(k)`. Reconstruct the unscaled blocks:
+**Step 1: Reconstruct the estimator's Hessian diagonal blocks.** The COSMIC solver normalizes data by `1/sqrt(N)` (§8.3.2), which makes the returned MAP estimate the minimiser of `‖unscaled residuals‖² + N·λ·Σ‖ΔC‖²` — the **effective prior weight relative to the unscaled data is `N·λ`** (that is the stated purpose of the convention: `λ` independent of the horizon `N`). The posterior covariance must therefore be built from the Hessian of *that* estimator,
 
 ```
-S(k) = N × (S_scaled(k) - reg(k)) + reg(k)
+A = Vᵀ V + Fᵀ Υ F,     with unscaled data V and Υ = diag(N·λ_k),
 ```
 
-where `reg(k)` is the regularization contribution: `λ₁I` for `k=0`, `λ_{N-1}I` for `k=N-1`, and `(λ_k + λ_{k+1})I` otherwise.
+which equals `N` times the scaled Hessian `A_scaled = V_sᵀV_s + Fᵀ diag(λ_k) F` whose diagonal blocks are the `S_scaled(k)` returned by the solver. Reconstruct the diagonal blocks by inflating the **whole** scaled block by `N`:
+
+```
+S(k) = N × S_scaled(k)
+```
+
+where `S_scaled(k)` contains `D_s(k)ᵀD_s(k) + reg(k)` with `reg(k) = λ₁I` for `k=0`, `λ_{N-1}I` for `k=N-1`, and `(λ_k + λ_{k+1})I` otherwise. Equivalently, one may run Steps 2–4 on the scaled blocks `S_scaled(k)` with un-inflated couplings `λ_k²` to obtain `P_scaled(k)` and then return **`P(k) = P_scaled(k)/N`** — the two are identical because `A = N·A_scaled ⟹ [A⁻¹]_{kk} = [A_scaled⁻¹]_{kk}/N`.
+
+> **Correction (was a scaling bug).** The previous reconstruction `S(k) = N(S_scaled(k) − reg(k)) + reg(k)` inflated only the data term and left `reg(k)` at weight `λ`, producing the Hessian `VᵀV + λFᵀF` — the posterior of a *different* estimator (prior weight `λ`) than the one whose mean is returned (prior weight `N·λ`). Because the prior was too weak, the reported `P(k)` **overstated** the variance by up to a factor `N`; the error is largest in the mid-`λ` regime where the L-curve corner typically lands, and vanishes only in the `λ→0` / `λ→∞` limits (which is why the OLS-limit sanity checks passed). See `uncertainty_derivation.md` §3.4/§5.1.
 
 **Step 2: Left Schur complements (forward pass):**
 
@@ -1166,7 +1174,7 @@ where `reg(k)` is the regularization contribution: `λ₁I` for `k=0`, `λ_{N-1}
 Λ^L(0) = S(0)
 
 For k = 1, ..., N-1:
-    Λ^L(k) = S(k) - λ_k² [Λ^L(k-1)]⁻¹
+    Λ^L(k) = S(k) - (N·λ_k)² [Λ^L(k-1)]⁻¹
 ```
 
 **Step 3: Right Schur complements (backward pass):**
@@ -1175,7 +1183,7 @@ For k = 1, ..., N-1:
 Λ^R(N-1) = S(N-1)
 
 For k = N-2, ..., 0:
-    Λ^R(k) = S(k) - λ_{k+1}² [Λ^R(k+1)]⁻¹
+    Λ^R(k) = S(k) - (N·λ_{k+1})² [Λ^R(k+1)]⁻¹
 ```
 
 **Step 4: Combine:**
@@ -1196,10 +1204,10 @@ This identity holds because `Λ^L(k)` captures the information from blocks `0..k
 P(N-1) = Λ_{N-1}⁻¹
 
 For k = N-2, ..., 0:
-    P(k) = (Λ_k - λ_{k+1}² P(k+1))⁻¹
+    P(k) = (Λ_k - (N·λ_{k+1})² P(k+1))⁻¹
 ```
 
-To see the equivalence, note that the right Schur complement satisfies `Λ^R(k) = S(k) - λ_{k+1}² [Λ^R(k+1)]⁻¹`. By induction from the boundary `Λ^R(N-1) = S(N-1)`, the identity `[Λ^R(k)]⁻¹ = P(k)` holds for the backward-only formula above. Substituting into the combine step `P(k) = [Λ^L(k) + Λ^R(k) - S(k)]⁻¹ = [Λ_k + S(k) - λ_{k+1}² P(k+1) - S(k)]⁻¹ = [Λ_k - λ_{k+1}² P(k+1)]⁻¹` confirms the equivalence. See `uncertainty_derivation.md` §5.2 for the full proof. The implementation uses the left-right method for numerical robustness; the backward-only form is equivalent and requires one fewer pass.
+where the `Λ_k = Λ^L(k)` are the left Schur complements of the estimator Hessian (Step 2, already using `S(k) = N·S_scaled(k)` and the `(N·λ_k)²` couplings). To see the equivalence, note that the right Schur complement satisfies `Λ^R(k) = S(k) - (N·λ_{k+1})² [Λ^R(k+1)]⁻¹`. By induction from the boundary `Λ^R(N-1) = S(N-1)`, the identity `[Λ^R(k)]⁻¹ = P(k)` holds for the backward-only formula above. Substituting into the combine step `P(k) = [Λ^L(k) + Λ^R(k) - S(k)]⁻¹ = [Λ_k + S(k) - (N·λ_{k+1})² P(k+1) - S(k)]⁻¹ = [Λ_k - (N·λ_{k+1})² P(k+1)]⁻¹` confirms the equivalence. See `uncertainty_derivation.md` §5.2 for the full proof. The implementation uses the left-right method for numerical robustness; the backward-only form is equivalent and requires one fewer pass.
 
 #### 8.9.3 Noise Covariance Estimation
 
@@ -1217,7 +1225,7 @@ where `ν` is the effective degrees of freedom:
 ν = Σ_k |L(k)| - N × Σ_k trace(D_s(k)ᵀ D_s(k) × P(k))
 ```
 
-The second term is the hat-matrix trace correction, ensuring that the effective number of free parameters is subtracted. If `ν ≤ 0` (heavily over-parameterized), a conservative fallback `ν = Σ_k |L(k)| - N × d` is used.
+The second term is the hat-matrix trace correction, ensuring that the effective number of free parameters is subtracted. It uses the **corrected** `P(k)` of §8.9.2 (the posterior of the estimator actually returned). The formula is otherwise unchanged: the effective parameter count is scaling-invariant, since `N × trace(D_s(k)ᵀ D_s(k) × P_est(k)) = trace(D_s(k)ᵀ D_s(k) × P_scaled(k))` — so once `P(k)` is right, so is `ν`. With the previous (too-wide) `P(k)` this term over-counted parameters, deflating `ν` and inflating `Σ̂` (the conservative direction, but wrong). If `ν ≤ 0` (heavily over-parameterized), a conservative fallback `ν = Σ_k |L(k)| - N × d` is used.
 
 **Covariance modes.** The `'CovarianceMode'` option controls the structure imposed on `Σ̂`:
 
@@ -1399,7 +1407,17 @@ where `R ∈ ℝᵖʸˣᵖʸ` is the measurement noise covariance (symmetric pos
 
 The three terms are: observation fidelity (weighted by the measurement information matrix `R⁻¹`), dynamics fidelity (coupling states and dynamics), and dynamics smoothness (the standard COSMIC regulariser with shared `λ`). Multi-trajectory: the observation and dynamics fidelity terms sum over trajectories; the smoothness term is shared.
 
-**Recovery of standard COSMIC:** When `H = I` and `R → 0`, the observation fidelity forces `x(k) = y(k)` and `J` reduces to the standard COSMIC cost (§8.3.3). No additional hyperparameters are introduced in the fully-observed case.
+**Effective smoothness weight and the reported cost.** The COSMIC step (§8.12.3) applies the `1/sqrt(N)` data scaling of §8.3.2, so — exactly as for the posterior in §8.9.2 — the objective it actually minimises has smoothness weight `N·λ` relative to the unscaled fidelity terms, not `λ`. For coordinate descent to be provably monotone, the **reported and convergence-tested** cost must be that same effective objective:
+
+```
+J(X, C) = Σ_k ||y(k) - H x(k)||²_{R⁻¹}
+        + Σ_k ||x(k+1) - A(k) x(k) - B(k) u(k)||²
+        + N·λ Σ_k ||C(k) - C(k-1)||²_F
+```
+
+Both alternating steps decrease this single `J` (the state step holds `C` — hence the smoothness term — fixed; the COSMIC step minimises the dynamics-fidelity + `N·λ`-smoothness sub-problem), so the monotone decrease claimed in §8.12.3 holds for the value reported in the `Cost` field. The user-facing knob remains `λ` (horizon-independent per §8.3.2); only its *effective* weight `N·λ` — and therefore the numeric magnitude of `Cost` — is stated here. Previously the reported `J` used weight `λ` while the step minimised the `N·λ` objective, so the documented monotone decrease was not guaranteed for the reported value.
+
+**Recovery of standard COSMIC:** When `H = I` and `R → 0`, the observation fidelity forces `x(k) = y(k)` and `J` reduces to the standard COSMIC **problem** (§8.3.3) — the same minimiser, with the reported value equal to `N` times §8.3.3's scaled cost `f(C)` (the overall `N` that the `1/√N` normalisation removes from `f`; it does not change the optimiser). No additional hyperparameters are introduced in the fully-observed case.
 
 #### 8.12.3 Algorithm
 

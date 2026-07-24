@@ -150,6 +150,19 @@ At each value of $\mu$, the inner alternating loop minimises a well-defined obje
 
 Combining: $J(\mathbf{x}^{(t+1)}, \mathbf{C}^{(t+1)}) \leq J(\mathbf{x}^{(t)}, \mathbf{C}^{(t)})$. Since $J \geq 0$, the sequence converges. $\square$
 
+> **Effective smoothness weight (matches SPEC §8.12.2).** Step 2 above is honest
+> only if the COSMIC step actually minimises the *same* $J$. Because that step
+> applies the $1/\sqrt{N}$ data scaling (§8.3.2), it minimises the dynamics
+> fidelity plus smoothness with effective weight $N\lambda$, not $\lambda$. The
+> single objective for which both steps are exact block minimisers — and hence
+> the one that is monotone and is reported in the `Cost` field — therefore uses
+> the effective weight:
+> $$ J = \sum_k \|y(k) - Hx(k)\|^2_{R^{-1}} + \sum_k \|x(k+1) - A(k)x(k) - B(k)u(k)\|^2 + N\lambda \sum_k \|C(k) - C(k-1)\|_F^2. $$
+> The $\lambda$-weighted $J$ written in §2 is the user's nominal objective (same
+> minimiser); the $N\lambda$ form above is what the alternating loop provably
+> decreases. Reporting the $\lambda$-weighted value — as the previous
+> implementation did — breaks the monotonicity guarantee of this proposition.
+
 ### 5.2 Convergence to a Stationary Point
 
 **Proposition 2.** *Every limit point of the sequence $\{(\mathbf{x}^{(t)}, \mathbf{C}^{(t)})\}$ is a stationary point of $J$.*
