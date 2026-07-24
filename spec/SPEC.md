@@ -11,6 +11,23 @@
 
 ---
 
+## Verification (right-side mechanisms)
+
+Every binding rule in this document should name the mechanism that gates it — the "right side" of the V. A `**Verified by:**` block at the end of each function section lists the verifier for each rule cluster, using this vocabulary:
+
+- **`cross-vector`** — a `testdata/reference_*.json` reference vector checked by the `cross-validate.yml` CI job; pins MATLAB↔Python numerical equivalence on fixed inputs.
+- **`unit(M)` / `unit(Py)`** — a language unit test (e.g. `matlab/tests/test_sidFreqBT.m`, `python/tests/test_freq_bt.py`).
+- **`lint`** — `check_headers.py` / `check_python_headers.py` / MISS_HIT / ruff.
+- **`manual`** — a convention held by inspection on release PRs; no automated check asserts it.
+- **`deferred`** — rule explicitly out of v1.0 scope (see the implementation-status banner above).
+- **`none`** — no verifier today: **visible debt**. A reviewer in verification mode should flag these.
+
+A `cross-vector` check proves the two ports *agree*, not that either satisfies the spec; the strongest rules pair it with a `unit` test written against the spec requirement (see `CONTRIBUTING.md` §"Cross-language reference vectors are a check, not a proof" and `CLAUDE.md` §3).
+
+**Rollout (issue #113).** Annotation is landing section-by-section rather than as one monster diff, and each block is re-derived against the *current* test suite (post-remediation), not the June recon — the earlier draft over-claimed. **This revision annotates §1–§7 (frequency-domain).** The `**Verified by:**` blocks for §8–§15 follow in subsequent PRs; until then those sections carry no block (their absence is the honest "not yet audited", not a claim of zero coverage).
+
+---
+
 ## 1. System Model
 
 All frequency-domain estimation in this package assumes the general linear time-invariant model:
@@ -40,6 +57,8 @@ where `e(t)` is white noise with covariance matrix `Λ`.
 **LTV extension:** The `sidFreqMap` function (§6) relaxes the time-invariance assumption by applying spectral analysis (Blackman-Tukey or Welch) to overlapping segments, producing a time-varying frequency response Ĝ(ω, t). Within each segment, local time-invariance is assumed.
 
 **Multi-trajectory support:** All `sid` functions accept multiple independent trajectories (experiments) of the same system. For frequency-domain functions (`sidFreqBT`, `sidFreqETFE`, `sidFreqMap`, `sidSpectrogram`), spectral estimates are ensemble-averaged across trajectories before forming transfer function ratios or power spectra, reducing variance by a factor of `L` without sacrificing frequency resolution. For `sidLTVdisc`, multiple trajectories are aggregated in the data matrices as described in §8. Multi-trajectory data is passed as 3D arrays `(N × n_ch × L)` when all trajectories share the same length, or as cell arrays `{y1, y2, ..., yL}` when lengths differ. See §2, §4.1, and §6 below for the mathematical basis.
+
+**Verified by:** the data-model notation is definitional (`manual`). Multi-trajectory ensemble-averaging and time-series mode (`n_u = 0`) are exercised by `unit(M)` `test_multiTrajectory.m` / `test_compareMultiTraj.m` and `unit(Py)` multi-trajectory cases in `test_freq_bt.py` / `test_freq_map.py`, and pinned across ports by the frequency-domain `cross-vector`s below.
 
 ---
 
@@ -269,6 +288,13 @@ To convert to the Signal Processing Toolbox convention, multiply by `Ts`:
 Φ̂_SPT(ω) = Ts × Φ̂_SID(ω)
 ```
 
+**Verified by:**
+
+- Frequency response, noise spectrum, SISO/MIMO/time-series paths (§2.1–2.7) — `cross-vector` (`reference_siso_bt`, `reference_mimo_bt`, `reference_timeseries_bt`, `reference_siso_bt_large_M`), `unit(M)` `test_sidFreqBT.m`, `unit(Py)` `test_freq_bt.py`.
+- Biased covariance §2.3, Hann window §2.4, windowed DFT incl. FFT fast path §2.5 — `cross-vector` (`reference_internals`), `unit(M)` `test_sidCov.m` / `test_sidHannWin.m` / `test_sidWindowedDFT.m` / `test_sidDFT.m`, `unit(Py)` `test_cov.py` / `test_hann_win.py` / `test_windowed_dft.py` / `test_dft.py`.
+- Near-singular `Φ̂_u` guard, whole-slice NaN, PSD clamp (§2.6–2.7; shared with §10.2–10.3) — `unit(M)` `test_sidFreqBT.m` (constant-input, partial-degeneracy tests), `unit(Py)` `test_freq_bt.py::TestFreqBTDegenerate`. **`none` for `cross-vector`** — degenerate inputs are not in a stored vector (visible debt).
+- §2.8 normalization convention (no `Ts`, no `1/2π`) — `manual`; held implicitly by the cross-vectors' absolute values, asserted by no dedicated test.
+
 ---
 
 ## 3. Uncertainty Estimation
@@ -377,6 +403,12 @@ This is equivalent to treating each `(i,j)` channel as an independent SISO syste
 
 **Limitations:** The diagonal approximation ignores cross-channel correlations in both the noise and input spectra. It is exact when inputs are uncorrelated and the noise is channel-independent, and **underestimates** variance otherwise. A full MIMO treatment using `Φ̂_u(ω)⁻¹ ⊗ Φ̂_v(ω)` is deferred to a future version.
 
+**Verified by:**
+
+- Window norm `C_W`, coherence, variance formulas (§3.1–3.5) — `cross-vector` (`reference_uncertainty`), `unit(M)` `test_sidUncertainty.m`, `unit(Py)` `test_uncertainty.py`.
+- §3.3 `σ_G = Inf` sentinel at zero coherence / degenerate input — `unit(M)` `test_sidUncertainty.m` (Test 8, asserts `isinf`), `unit(Py)` `test_uncertainty.py::test_zero_coherence_inf`; the MIMO `isnan(G)` sentinel is exercised by the collinear-MIMO cases in `test_freq_bt.py::TestFreqBTDegenerate` / `test_sidFreqBT.m`.
+- Diagonal MIMO approximation underestimation bound — `manual` (documented above; no test asserts it).
+
 ---
 
 ## 4. `sidFreqETFE` — Empirical Transfer Function Estimate
@@ -438,6 +470,12 @@ When no input is present, the ETFE reduces to the **periodogram**:
 
 The ETFE has no closed-form asymptotic variance formula: the periodogram is an inconsistent estimator whose variance does not decrease with `N`. The `ResponseStd` and `NoiseSpectrumStd` fields are set to `NaN`. For uncertainty quantification, use `sidFreqBT` (which smooths via the lag window) or apply optional smoothing (§4.2) and estimate variance empirically.
 
+**Verified by:**
+
+- ETFE ratio, optional smoothing, periodogram time-series mode (§4.1–4.3) — `cross-vector` (`reference_siso_etfe`), `unit(M)` `test_sidFreqETFE.m`, `unit(Py)` `test_freq_etfe.py`.
+- Degenerate-input warnings + whole-signal NaN (§10.2–10.3) — `unit(M)` `test_sidFreqETFE.m` (constant-input, collinear-MIMO tests), `unit(Py)` `test_freq_etfe.py::TestFreqETFEDegenerate`.
+- `ResponseStd` / `NoiseSpectrumStd` = NaN (no variance formula) — `manual`; held by the response cross-vector's NaN std fields, asserted by no dedicated test.
+
 ---
 
 ## 5. `sidFreqBTFDR` — Frequency-Dependent Resolution
@@ -481,6 +519,13 @@ R = 2π / M_default
 ```
 
 The lower clip at 2 matters for short data: for `N ∈ [10, 19]`, `floor(N/10) = 1` would imply `M_default = 1 < 2` (invalid); flooring at 2 keeps the default window legal and matches the short-data default of `sidFreqBT`.
+
+**Verified by:**
+
+- Response / noise / coherence (§5.1–5.3) — `cross-vector` (`reference_siso_btfdr`), `unit(M)` `test_sidFreqBTFDR.m`, `unit(Py)` `test_freq_btfdr.py`.
+- §5.2 resolution→`M_k` bounds reporting (error on `M_k < 2`, `windowReduced` warning at `⌊N/2⌋`) — `unit(M)` `test_sidFreqBTFDR.m`, `unit(Py)` `test_freq_btfdr.py::...test_coarse_resolution_raises` / `test_window_reduced_warns`.
+- Equivalence to `sidFreqBT` at constant resolution (§5.3) — `unit(M)` `test_sidFreqBTFDR.m` (Test 20 oracle), `unit(Py)` `test_freq_btfdr.py::...test_btfdr_equals_bt_at_constant_resolution`.
+- Degenerate inputs (§10.3) — `unit(M)`/`unit(Py)` `TestFreqBTFDRDegenerate` cases (collinear MIMO, constant input).
 
 ---
 
@@ -706,6 +751,13 @@ The key difference: `sidFreqMap` always produces time-varying output. Setting `S
 
 **Edge effects:** The first and last segments may produce less reliable estimates if the system is non-stationary near the boundaries. No special handling is applied — the uncertainty estimates from each segment naturally reflect the reduced confidence.
 
+**Verified by:**
+
+- Outer segmentation, BT inner path, output struct, time vector (§6.1–6.4, 6.7–6.8) — `cross-vector` (`reference_freqmap_bt`), `unit(M)` `test_sidFreqMap.m`, `unit(Py)` `test_freq_map.py`.
+- Welch inner path one-sided scaling incl. Nyquist un-doubling (§6.5) — `unit(M)` `test_sidFreqMap.m` (Test 30, rect-sub-segment periodogram oracle), `unit(Py)` `test_freq_map.py::TestFreqMapWelchScaling` (`test_welch_matches_scipy_including_nyquist`, bit-exact vs `scipy.signal.welch`). **`none` for `cross-vector`** — no Welch reference vector exists (`reference_freqmap_bt` is the BT path only); visible debt, tracked for #145d.
+- Welch degenerate `Φ̂_u` guard + `σ = Inf` sentinel — `unit(M)` `test_sidFreqMap.m` / `unit(Py)` `test_freq_map.py::TestFreqMapWelchDegenerate`.
+- BT↔Welch 2× relationship (§6.6) — `unit(Py)` `test_freq_map.py::...test_welch_is_twice_bt_off_nyquist`; `manual` cross-port.
+
 ---
 
 ## 7. `sidSpectrogram` — Short-Time Spectral Analysis
@@ -834,6 +886,11 @@ result = sidSpectrogram(x, 'WindowLength', 256, 'Overlap', 128, ...
 ```
 
 The normalization follows the PSD convention (power per unit frequency), matching the MathWorks default when `spectrogram` is called with the `'psd'` option.
+
+**Verified by:**
+
+- STFT, segmentation, one-sided PSD with DC + Nyquist un-doubled (§7.1–7.4) — `cross-vector` (`reference_spectrogram`), `unit(M)` `test_sidSpectrogram.m`, `unit(Py)` `test_spectrogram.py` (incl. a bit-exact `scipy.signal.periodogram` check across the whole one-sided axis, DC…Nyquist).
+- Multi-trajectory ERSP averaging (§7.2) — `unit(M)` `test_sidSpectrogram.m`, `unit(Py)` `test_spectrogram.py` multi-trajectory cases.
 
 ---
 
