@@ -1798,15 +1798,18 @@ The following are out of scope for v1.0:
 
 **Verified by:**
 
-- Core COSMIC — data matrices, cost, closed-form solve, `1/√N` scaling, variable-length (§8.1–8.8) — `cross-vector` (`reference_ltv_cosmic`, `reference_cosmic_internals`, `reference_test_msd`), `unit(M)` `test_sidLTVdisc.m` / `test_sidLTVdiscVarLen.m` / `test_util_msd_ltv.m`, `unit(Py)` `test_ltv_disc.py`.
-- §8.9 Bayesian uncertainty — posterior `P(k) = P_scaled/N`, DoF hat-trace, `Σ̂` (issue #137) — `cross-vector` (`reference_cosmic_internals`, `P` field), `unit(M)` `test_sidLTVdiscUncertainty.m` (Test 15 exact-Hessian oracle), `unit(Py)` `test_ltv_uncertainty_calibration.py` (exact-Hessian + `P=P_scaled/N` oracles + fixed-seed mid-`λ` Monte-Carlo calibration).
+- Core COSMIC — data matrices, cost, closed-form solve, `1/√N` scaling (§8.1–8.8) — `cross-vector` (`reference_ltv_cosmic`, `reference_cosmic_internals`, `reference_test_msd`; all uniform-horizon), `unit(M)` `test_sidLTVdisc.m` / `test_util_msd_ltv.m`, `unit(Py)` `test_ltv_disc.py`.
+- Variable-length trajectories (§8.8) — `unit(M)` `test_sidLTVdiscVarLen.m` (dense-LSQ oracle), `unit(Py)` `test_ltv_disc.py` var-len cases. **`none` for `cross-vector`** — the variable-length reference vector was deferred to #145d.
+- §8.9 Bayesian uncertainty — posterior `P(k) = P_scaled/N`, DoF hat-trace (issue #137) — `cross-vector` (`reference_cosmic_internals`, **`P` field only**), `unit(M)` `test_sidLTVdiscUncertainty.m` (Test 15 exact-Hessian oracle), `unit(Py)` `test_ltv_uncertainty_calibration.py` (exact-Hessian + `P=P_scaled/N` oracles + fixed-seed mid-`λ` Monte-Carlo calibration).
+- §8.9 reported `AStd` / `BStd` / `Σ̂` / `ν` — `unit(Py)` only (the MC calibration checks `AStd` against the empirical spread). **`none` for `cross-vector`** — no stored vector carries these; open as #121.
 - §8.10 online/recursive COSMIC — `deferred` (v2, per the implementation-status banner).
-- §8.11 lambda tuning + frozen transfer function (`sidLTVdiscFrozen`) — `cross-vector` (`reference_ltv_frozen`), `unit(M)` `test_sidLTVdiscTune.m` / `test_sidLTVdiscFrozen.m`, `unit(Py)` `test_ltv_disc_tune.py` / `test_ltv_disc_frozen.py`.
+- §8.11 frozen transfer function (`sidLTVdiscFrozen`) — `cross-vector` (`reference_ltv_frozen`), `unit(M)` `test_sidLTVdiscFrozen.m`, `unit(Py)` `test_ltv_disc_frozen.py`.
+- §8.11 lambda tuning (`sidLTVdiscTune`) — `unit(M)` `test_sidLTVdiscTune.m`, `unit(Py)` `test_ltv_disc_tune.py`. **`none` for `cross-vector`** — no tuning reference vector (#145d).
 - §8.12 Output-COSMIC (`sidLTVdiscIO`) — RTS state step, COSMIC step, `N·λ` reported cost (issue #137) — `cross-vector` (`reference_ltv_io`, `A`/`B`/`Cost`), `unit(M)` `test_sidLTVdiscIO.m`, `unit(Py)` `test_ltv_disc_io.py`.
 - §8.12.4 trust-region interpolation — **`none`**: `TrustRegion` is invoked in `test_sidLTVdiscIO.m` (Test 11) but the assertions are vacuous (`isfield(…,'A')`, `Iterations ≥ 1`) — no test verifies the μ-schedule, monotonicity, or benefit. Known-broken visible debt, issue #138.
 - §8.12.12 model-order selection (`sidModelOrder`) — `cross-vector` (`reference_model_order`), `unit(M)` `test_sidModelOrder.m`, `unit(Py)` `test_model_order.py`.
 - §8.12.13 batch LTV state estimation (`sidLTVStateEst`) — `cross-vector` (`reference_ltv_state_est`), `unit(M)` `test_sidLTVStateEst.m`, `unit(Py)` `test_ltv_state_est.py`.
-- §8.13 LTI realization from I/O frequency response (`sidLTIfreqIO`) — `cross-vector` (`reference_lti_freq_io`), `unit(M)` `test_sidLTIfreqIO.m`, `unit(Py)` `test_lti_freq_io.py`.
+- §8.13 LTI realization from I/O frequency response (`sidLTIfreqIO`) — `cross-vector` (`reference_lti_freq_io`, at `H = I`), `unit(M)` `test_sidLTIfreqIO.m`, `unit(Py)` `test_lti_freq_io.py`. **`none` (#144)** for the defective-`A` stabilization path, accuracy at `H ≠ I`, and the `sidLTVdiscFrozen`-of-an-IO-result contract — all open gaps documented in #144.
 - §8.14 deferred extensions — `deferred`.
 
 ---
@@ -1927,7 +1930,7 @@ Both plotting functions accept name-value options:
 | `'LineWidth'` | `1.5` | Line width |
 | `'Axes'` | `[]` | Axes handle (creates new figure if empty) |
 
-**Verified by:** plotting functions (`sidBodePlot`, `sidSpectrumPlot`, `sidMapPlot`, `sidSpectrogramPlot`, …) — `unit(M)` `test_sidPlotting.m` / `test_sidMapPlot.m` / `test_sidSpectrogramPlot.m`, `unit(Py)` `test_plotting.py` (smoke / structure: figures build, handles returned, no error). Visual appearance is `manual`.
+**Verified by:** plotting functions (`sidBodePlot`, `sidSpectrumPlot`, `sidMapPlot`, `sidSpectrogramPlot`, …) — `unit(M)` `test_sidPlotting.m` / `test_sidMapPlot.m` / `test_sidSpectrogramPlot.m`, `unit(Py)` `test_plotting.py` (smoke / structure: figures build, handles returned, no error). Visual appearance is `manual`. **`none` for the confidence-band *formulas* (§11.1–11.2)** — the smoke tests do not assert their correctness; open as #123.
 
 ---
 
