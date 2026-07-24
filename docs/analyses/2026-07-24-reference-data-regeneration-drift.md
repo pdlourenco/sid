@@ -34,4 +34,4 @@ Committed references are produced **only** by the `tests.yml` MATLAB job — `ma
 
 Pinning `writeJSON`'s number precision was considered and **rejected**: reducing precision (e.g. `%.13g`) would mask the ULP churn but not the `ltv_io` `1e-4` drift, would discard real bits, and is itself a contract-artifact format change (ADR-0002) — it hides rather than resolves the fact that references are inherently version-specific for ill-conditioned paths.
 
-Adopted instead: **document R2025a as the canonical generation environment; CI is the sole authority; do not commit locally-regenerated references.** Recorded in `testdata/README.md` and the `generate_reference.m` header. No code change.
+Adopted instead: **document R2025a as the canonical generation environment; never commit engine-ULP regen *churn*.** A PR that changes reference semantics or adds a vector still commits exactly the files it affects (ADR-0002 rules 3–4 — e.g. #147, #174, #175); only no-semantic-change churn stays out. Recorded in `testdata/README.md` and the `generate_reference.m` header. No code change.

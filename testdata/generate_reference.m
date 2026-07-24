@@ -9,11 +9,12 @@ function generate_reference()
 %   Usage:
 %     run('testdata/generate_reference.m')
 %
-%   Canonical environment: the committed reference_*.json are regenerated and
-%   committed ONLY by CI (the tests.yml MATLAB job, pinned to MATLAB R2025a).
-%   Regenerating under another MATLAB version or Octave produces sub-tolerance
-%   output drift (~1 ULP, surfaced as whole-file text churn by jsonencode's
-%   shortest-round-trip formatting) and must not be committed. See
+%   Canonical environment: CI (the tests.yml MATLAB job, pinned to MATLAB R2025a)
+%   regenerates and commits the reference bytes on push to main. Regenerating under
+%   another MATLAB version or Octave produces sub-tolerance output drift (~1 ULP,
+%   surfaced as whole-file text churn by jsonencode's shortest-round-trip
+%   formatting): never commit that churn. A PR that changes reference semantics or
+%   adds a vector commits only the files it affects (ADR-0002 rules 3-4). See
 %   testdata/README.md.
 
 fprintf('=== Generating cross-language reference data ===\n\n');

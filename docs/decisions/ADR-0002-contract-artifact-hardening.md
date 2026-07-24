@@ -37,7 +37,10 @@ and drift hardening": absolute tolerance floors; stored tolerances authoritative
 port's validator, in the same PR); payloads change only by regeneration (a
 `tolerance` block may be edited directly, but with the generator's matching
 entries changed in the same PR, so a fresh regeneration reproduces the committed
-file); and structural gates over outcome tests. Recording generator provenance
+file); and structural gates over outcome tests. The canonical *generation
+environment* for those regenerations — CI-pinned MATLAB R2025a — and the rule
+against committing engine-ULP regen churn are documented in
+[`testdata/README.md`](../../testdata/README.md). Recording generator provenance
 *inside* each artifact is adopted as a **target**, tracked in #172 — not yet a
 gate.
 
