@@ -117,3 +117,7 @@ Before you finalize a number:
   to standing rules (tolerance floors, authoritative stored tolerances, no orphan
   artifacts, regeneration-only edits, structural gates) so a silent-pass vector
   can't reappear (standing-policy form of the #145 fixes).
+- [ADR-0003](ADR-0003-known-bug-lifecycle.md) — Known bugs are visible debt with
+  a tracked lifecycle — **Accepted** — deferred fixes carry an inline
+  `issue #NNN` marker in every port; the fixing PR closes the issue and removes
+  the marker together (known-bug row on the PR template).
