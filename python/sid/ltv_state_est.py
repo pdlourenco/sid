@@ -154,7 +154,7 @@ def ltv_state_est(
     K = N + 1
 
     # ------------------------------------------------------------------
-    # 3. Build block tridiagonal system (SPEC.md section 8.14)
+    # 3. Build block tridiagonal system (SPEC.md §8.12.13)
     # ------------------------------------------------------------------
     AtQinv = np.zeros((n, n, N))
     for j in range(N):
