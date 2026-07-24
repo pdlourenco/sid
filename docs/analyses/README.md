@@ -20,8 +20,10 @@ The convention (four rules):
    that was later resolved, refined, or refuted is followed up in the issue it
    spawned or in a new dated analysis — never by editing the original into
    disagreement with what it actually said. This is what makes it citable
-   evidence (and pairs with review principle 9 / ADR-0001's "vectors cannot
-   catch joint drift" being provable *because* the finding is fixed in time).
+   evidence — it complements review principle 9's split between user-facing
+   state and dev-side history, and it's why an analysis finding (e.g. ADR-0001's
+   "vectors cannot catch joint drift") stays provable: the finding is fixed in
+   time.
 4. **Not a contract.** Analyses *motivate* decisions; they don't bind. The
    authoritative artifacts are [`spec/SPEC.md`](../../spec/SPEC.md) (the
    contract), [`docs/decisions/`](../decisions/) (ADRs), and the issue tracker
