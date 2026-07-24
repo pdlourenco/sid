@@ -127,3 +127,8 @@ Before you finalize a number:
   the resolvable→floor cliff, keeps the machine-eps floor (no data-aware floor),
   and retains the `floor(m/2)` cap; supersedes issue #160's "data-aware floor then
   lift the cap" direction.
+- [ADR-0005](ADR-0005-required-ci-checks.md) — Required CI checks are enforced as
+  code — **Accepted** — the cheap lint workflows run on every PR (distinct
+  contexts) and `.github/rulesets/main.json` + a dispatch/drift workflow require
+  them, so a red lint gate blocks a normal merge (admin bypass retained,
+  conscious); closes the #174/#178 admin-merge-outran-a-red-check class.

@@ -284,7 +284,13 @@ CI workflows run per-language:
 - **Python Tests** — pytest on Python 3.10–3.13
 - **Cross-Language Validation** — reference test vector consistency
 
-All checks must pass before merging.
+All checks must pass before merging. The **MATLAB/Octave lint** and **Python
+lint** checks run on every PR and are **required** by the `main` ruleset — a red
+lint gate blocks a normal merge. That policy is version-controlled in
+[`.github/rulesets/main.json`](.github/rulesets/main.json) and applied /
+drift-checked by [`.github/workflows/branch-protection.yml`](.github/workflows/branch-protection.yml)
+(see [ADR-0005](docs/decisions/ADR-0005-required-ci-checks.md)); admins can still
+bypass, but as a conscious override.
 
 **Run them locally first.** [`scripts/local-ci`](scripts/local-ci) mirrors these
 legs so the whole suite is one command before you push, instead of tribal
