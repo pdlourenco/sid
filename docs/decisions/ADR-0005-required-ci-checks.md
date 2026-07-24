@@ -38,7 +38,12 @@ The required-checks policy is enforced **as code**:
   `main` ruleset — required status checks (`MATLAB/Octave lint`, `Python lint`),
   plus deletion / non-fast-forward protection — with **admin bypass retained**
   (`bypass_mode: always`), so a maintainer can still admin-merge, but as a
-  *conscious* override rather than a silent default.
+  *conscious* override rather than a silent default. The **`sid-reference-bot`
+  integration is also a bypass actor**: a ruleset's `required_status_checks` rule
+  gates *direct pushes* too, and the bot pushes regenerated `testdata/` commits
+  straight to `main` (`tests.yml`) with no check runs at push time — without the
+  exemption, activation would reject the next regen push and break the machinery
+  three releases lean on. Mirrors the live "Main" ruleset's bot bypass.
 - [`.github/workflows/branch-protection.yml`](../../.github/workflows/branch-protection.yml)
   applies that JSON to the live ruleset on `workflow_dispatch` and drift-checks
   it on PRs that touch the config. It needs a repo-admin token
@@ -48,6 +53,20 @@ The expensive checks (`Python Tests` matrix, `Cross-Language Validation` with it
 Octave install) are **not** required in this pass — they would need the same
 always-run treatment and fork-secret handling first. Extending the required set
 to them is a documented follow-up, not a blocker for closing the lint door.
+
+## Activation
+
+Shipping this PR only version-controls the policy; making it live is a one-time
+maintainer step (the workflow can't self-apply without a token):
+
+1. Merge #179 first, so `main`'s lint is already green when the gate goes live.
+2. Confirm `main.json` `bypass_actors` lists **both** the admin role *and* the
+   `sid-reference-bot` Integration — without the bot, the next `matlab/**` regen
+   push to `main` is rejected.
+3. Add a repo-admin token as the `RULESET_TOKEN` secret.
+4. Run the *Branch protection (as code)* workflow via `workflow_dispatch`.
+5. Verify the verifier: open a scratch PR with a deliberate lint error and
+   confirm the gate blocks the merge, then close it.
 
 ## Consequences
 

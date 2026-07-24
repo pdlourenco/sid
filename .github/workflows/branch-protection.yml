@@ -66,8 +66,12 @@ jobs:
               exit 0
             fi
             gh api "repos/$GH_REPO/rulesets/$id" > live.json
-            desired=$(jq -S '{enforcement, conditions, rules}' .github/rulesets/main.json)
-            live=$(jq -S '{enforcement, conditions, rules}' live.json)
+            # Project the managed fields, sorting bypass_actors by id so array
+            # order doesn't produce false drift — bypass drift (e.g. dropping the
+            # reference-bot exemption) must be caught, not just rule drift.
+            proj='{enforcement, conditions, rules, bypass_actors: (.bypass_actors | sort_by(.actor_id))}'
+            desired=$(jq -S "$proj" .github/rulesets/main.json)
+            live=$(jq -S "$proj" live.json)
             if [ "$desired" != "$live" ]; then
               echo "::error::Live ruleset has drifted from .github/rulesets/main.json"
               diff <(printf '%s\n' "$live") <(printf '%s\n' "$desired") || true
