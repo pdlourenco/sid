@@ -679,11 +679,15 @@ def _evaluate_full_cost(
             res_dyn = Xl[k + 1, :] - A[:, :, k] @ Xl[k, :] - B[:, :, k] @ Ul[k, :]
             dyn_fidelity += res_dyn @ res_dyn
 
-    # Smoothness: lambda(k) * ||C(k+1) - C(k)||^2_F
+    # Smoothness: N * lambda(k) * ||C(k+1) - C(k)||^2_F.  The COSMIC step applies
+    # the 1/sqrt(N) data scaling (§8.3.2), so the objective it actually minimises
+    # -- and hence the one that is monotone and reported here -- uses the
+    # effective weight N*lambda, not lambda (SPEC.md §8.12.2, issue #137).  The
+    # user's knob remains lambda; only its effective weight is N*lambda.
     for k in range(N - 1):
         Ck = np.vstack([A[:, :, k].T, B[:, :, k].T])
         Ck1 = np.vstack([A[:, :, k + 1].T, B[:, :, k + 1].T])
-        smoothness += lambda_vec[k] * np.sum((Ck1 - Ck) ** 2)
+        smoothness += N * lambda_vec[k] * np.sum((Ck1 - Ck) ** 2)
 
     return obs_fidelity + dyn_fidelity + smoothness
 

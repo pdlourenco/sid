@@ -61,39 +61,36 @@ function P = sidLTVuncertaintyBackwardPass(S_scaled, lambda, N, d)
 
     I = eye(d);
 
-    % ---- Reconstruct unscaled Hessian diagonal blocks (SPEC.md §8.9.2) ----
-    % S_u(k) = N * D'D(k) + reg(k), undoing the 1/sqrt(N) data scaling
-    S = zeros(d, d, N);
-    for k = 1:N
-        if k == 1
-            reg = lambda(1) * I;
-        elseif k == N
-            reg = lambda(N-1) * I;
-        else
-            reg = (lambda(k-1) + lambda(k)) * I;
-        end
-        DtD_scaled = S_scaled(:, :, k) - reg;
-        S(:, :, k) = N * DtD_scaled + reg;
-    end
+    % ---- Schur recursion on the SCALED Hessian blocks (SPEC.md §8.9.2) ----
+    % The returned MAP minimises ||unscaled residual||^2 + N*lambda*||dC||^2
+    % (effective prior weight N*lambda, from the 1/sqrt(N) scaling of §8.3.2), so
+    % its Hessian is A_est = N * A_scaled and the reported posterior is
+    % P(k) = [A_est^{-1}]_kk = P_scaled(k) / N. Run the left/right Schur
+    % complements on the scaled blocks (un-inflated lambda_k couplings) to get
+    % P_scaled, then divide by N -- exactly equivalent to inflating S -> N*S with
+    % couplings (N*lambda_k)^2, but minimal. The previous reconstruction rebuilt
+    % V'V + lambda F'F (unscaled data, un-inflated prior -- a different
+    % estimator), overstating P by up to a factor N (issue #137).
+    S = S_scaled;
 
-    % ---- Left Schur complements — forward pass (SPEC.md §8.9.3) ----
+    % ---- Left Schur complements — forward pass (SPEC.md §8.9.2) ----
     LbdL = zeros(d, d, N);
     LbdL(:, :, 1) = S(:, :, 1);
     for k = 2:N
         LbdL(:, :, k) = S(:, :, k) - lambda(k-1)^2 * (LbdL(:, :, k-1) \ I);
     end
 
-    % ---- Right Schur complements — backward pass (SPEC.md §8.9.3) ----
+    % ---- Right Schur complements — backward pass (SPEC.md §8.9.2) ----
     LbdR = zeros(d, d, N);
     LbdR(:, :, N) = S(:, :, N);
     for k = N-1:-1:1
         LbdR(:, :, k) = S(:, :, k) - lambda(k)^2 * (LbdR(:, :, k+1) \ I);
     end
 
-    % ---- Combine: P(k) = (LbdL(k) + LbdR(k) - S(k))^{-1} (SPEC.md §8.9.3) ----
+    % ---- Combine: P_scaled(k) = (LbdL + LbdR - S)^{-1}, then P = P_scaled / N -
     P = zeros(d, d, N);
     for k = 1:N
         M = LbdL(:, :, k) + LbdR(:, :, k) - S(:, :, k);
-        P(:, :, k) = M \ I;
+        P(:, :, k) = (M \ I) / N;
     end
 end
