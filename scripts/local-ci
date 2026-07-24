@@ -47,9 +47,16 @@ for _vdir in "$REPO_ROOT/.venv/bin" "$REPO_ROOT/.venv/Scripts"; do
 done
 export PATH
 
-# Python interpreter: venv (now on PATH) → python3 → python.
-if   command -v python3 >/dev/null 2>&1; then PY=python3
-elif command -v python  >/dev/null 2>&1; then PY=python
+# Python interpreter: prefer the repo venv explicitly, THEN the PATH names.
+# Windows venvs ship python.exe but no python3.exe, so a system `python3` shim
+# (with no dev deps) would otherwise shadow the venv via the name-based chain
+# and the two Python test legs would skip on exactly the reference environment
+# (#173). The venv dir is already on PATH for the ruff / MISS_HIT legs (which
+# ship real executables under Scripts/); only the $PY chain has the gap.
+if   [ -x "$REPO_ROOT/.venv/bin/python" ];         then PY="$REPO_ROOT/.venv/bin/python"
+elif [ -x "$REPO_ROOT/.venv/Scripts/python.exe" ]; then PY="$REPO_ROOT/.venv/Scripts/python.exe"
+elif command -v python3 >/dev/null 2>&1;           then PY=python3
+elif command -v python  >/dev/null 2>&1;           then PY=python
 else PY=; fi
 
 # Engines: overridable so a specific octave/matlab can be named without editing
