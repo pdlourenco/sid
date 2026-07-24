@@ -78,7 +78,7 @@ function X_hat = sidLTVStateEst(Y, U, A, B, H, varargin)
     % Number of blocks: K = N+1 (spec indices 0..N)
     K = N + 1;
 
-    % ---- Build block tridiagonal system (SPEC.md §8.14) ----
+    % ---- Build block tridiagonal system (SPEC.md §8.12.13) ----
     % Diagonal blocks S_k and off-diagonal U_k define the RTS smoother
     % equations. Shared across trajectories — only the RHS differs.
     % For variable-length trajectories, precompute all K blocks; each
