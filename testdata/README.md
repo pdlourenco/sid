@@ -17,8 +17,31 @@ set of test cases. Each JSON file contains:
 - `function` — the sid function name
 - `params` — algorithm parameters used
 - `input` — input data arrays (not seeds, to avoid RNG differences)
-- `output` — expected outputs at 16 significant digits
+- `output` — expected outputs at full double precision (shortest round-trip)
 - `tolerance` — per-field relative tolerances for cross-language comparison
+
+### Canonical environment
+
+CI is the canonical generator: the MATLAB job in
+[`../.github/workflows/tests.yml`](../.github/workflows/tests.yml), pinned to
+**MATLAB R2025a** (`matlab-actions/setup-matlab@v2.7.0`), regenerates the vectors on
+push to `main` and commits any change as `Update cross-language reference data`.
+Those committed bytes are the reference.
+
+**Never commit regen *churn*** — files whose values changed only by engine ULPs. The
+stored *inputs* are RNG-stable and reproduce exactly, but computed *outputs* differ
+by ~1 ULP across MATLAB versions (more for ill-conditioned paths — the LTV-IO solve
+drifts ~1e-4, still within its 1% `A_rel`/`B_rel`/`Cost_rel` tolerance), and because
+`jsonencode` emits shortest-round-trip decimals a 1-ULP change rewrites the whole
+file. So a local regen under any engine other than the pinned R2025a churns most
+`reference_*.json` for no real numerical change — leave those untouched.
+
+A PR that *changes* reference semantics or *adds* a vector is different: commit
+exactly the files the change affects (flag them in the PR, and note the canonical
+R2025a round-trip CI will apply post-merge), and leave the rest untouched. This is
+[ADR-0002](../docs/decisions/ADR-0002-contract-artifact-hardening.md) rules 3–4 —
+the vector and its consumer land together, and payloads change only by regeneration
+— see #147, #174, and #175 for the pattern in practice.
 
 ## Validating against reference data
 
