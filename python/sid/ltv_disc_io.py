@@ -9,6 +9,8 @@
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 
 from sid._exceptions import SidError
@@ -294,85 +296,109 @@ def ltv_disc_io(
     # 3. LTI Initialisation (SPEC.md S8.12.4)
     # ------------------------------------------------------------------
     A0, B0 = lti_freq_io(Y, U, H)
-    A = np.tile(A0[:, :, np.newaxis], (1, 1, N))
-    B = np.tile(B0[:, :, np.newaxis], (1, 1, N))
-    A0_rep = np.tile(A0[:, :, np.newaxis], (1, 1, N))  # trust-region target
+    A_init = np.tile(A0[:, :, np.newaxis], (1, 1, N))
+    B_init = np.tile(B0[:, :, np.newaxis], (1, 1, N))
+    A0_rep = np.tile(A0[:, :, np.newaxis], (1, 1, N))  # trust-region target A0
 
     # ------------------------------------------------------------------
-    # 4. Alternating state-COSMIC loop (SPEC.md S8.12.3)
+    # 4. Two-level alternating loop (SPEC.md S8.12.3 inner / S8.12.4 outer)
     # ------------------------------------------------------------------
-    mu_current = float(do_trust_region) * mu
     cost_history: list[float] = []
+
+    def _inner_loop(
+        mu_val: float, a_start: np.ndarray, b_start: np.ndarray
+    ) -> tuple[tuple, int, bool]:
+        """Alternating state-COSMIC loop at a fixed ``mu`` (SPEC S8.12.4 step 2).
+
+        Runs from ``(a_start, b_start)`` until the relative cost change falls
+        below ``tolerance`` (SPEC S8.12.3) or the per-stage cap ``max_iter`` is
+        reached, appending every evaluated cost to ``cost_history``. Returns
+        ``(best, iters, converged)`` where ``best`` is the **lowest-cost**
+        iterate observed in the stage — not necessarily the last, because for
+        ``mu > 0`` the state step uses ``A_use != A`` so the inner iteration is
+        a homotopy fixed-point, not the monotone descent of S8.12.3.
+        """
+        a_k = a_start.copy()
+        b_k = b_start.copy()
+        best: tuple | None = None  # (J, X, A, B, S_c, D_c, Xl_c, C_c)
+        j_prev: float | None = None
+        iters = 0
+        converged = False
+        for _ in range(max_iter):
+            a_use = (1.0 - mu_val) * a_k + mu_val * A0_rep if mu_val > 0 else a_k
+            x_hat = ltv_state_est(Y_parsed, U_parsed, a_use, b_k, H, R=R_mat)
+            a_k, b_k, s_c, d_c, xl_c, c_c = _cosmic_step(
+                x_hat, U_parsed, lambda_vec, N, n, q, L, is_var_len, horizons
+            )
+            j = _evaluate_full_cost(
+                x_hat,
+                a_k,
+                b_k,
+                Y_parsed,
+                U_parsed,
+                H,
+                Rinv,
+                lambda_vec,
+                N,
+                n,
+                q,
+                L,
+                is_var_len,
+                horizons,
+            )
+            cost_history.append(j)
+            iters += 1
+            if best is None or j <= best[0]:
+                best = (j, x_hat, a_k.copy(), b_k.copy(), s_c, d_c, xl_c, c_c)
+            if j_prev is not None:
+                # SPEC S8.12.3 convergence, with the small-cost floor that keeps
+                # the test from demanding ~machine-precision absolute steps once
+                # J < 1 (pure |dJ|/|J| there fails to converge on ordinary data).
+                rel_change = abs(j - j_prev) / max(abs(j_prev), 1.0)
+                if rel_change < tolerance:
+                    converged = True
+                    break
+            j_prev = j
+        return best, iters, converged
+
     n_iter = 0
 
-    # For trust-region accept/reject
-    J_converged_mu = np.inf
-    X_best: np.ndarray | list | None = None
-    A_best = A.copy()
-    B_best = B.copy()
+    if not do_trust_region or mu <= 0:
+        # Base two-block alternation at mu = 0 (SPEC S8.12.3).
+        best, iters, converged = _inner_loop(0.0, A_init, B_init)
+        n_iter += iters
+        if not converged:
+            warnings.warn(
+                f"ltv_disc_io: alternating loop did not converge in {max_iter} "
+                "iterations (relative cost change stayed above tolerance).",
+                stacklevel=2,
+            )
+    else:
+        # ---- Two-level trust-region schedule (SPEC.md S8.12.4) ----
+        mu_current = mu
+        # Stage at the initial mu (typically 1): trust the LTI initialisation.
+        accepted, iters, _ = _inner_loop(mu_current, A_init, B_init)
+        n_iter += iters
+        # Outer loop: halve mu, accept only if J*(mu') <= J*(mu); reject stops.
+        while mu_current > mu_tol:
+            mu_prime = mu_current / 2.0
+            best_p, iters_p, _ = _inner_loop(mu_prime, accepted[2], accepted[3])
+            n_iter += iters_p
+            if best_p[0] <= accepted[0]:
+                mu_current = mu_prime
+                accepted = best_p
+            else:
+                break  # reject: restore accepted, stop reducing mu (SPEC step 4)
+        # Guarded final mu = 0 refinement (both exits): keep only if it lowers J*.
+        best_zero, iters_z, _ = _inner_loop(0.0, accepted[2], accepted[3])
+        n_iter += iters_z
+        best = best_zero if best_zero[0] < accepted[0] else accepted
 
-    # Hold intermediates from last COSMIC step (for uncertainty)
-    S_c = D_c = Xl_c = C_c = None
-
-    for _iter in range(max_iter):
-        # -- E-step: state estimation --
-        if mu_current > 0:
-            A_use = (1 - mu_current) * A + mu_current * A0_rep
-        else:
-            A_use = A
-
-        X_hat = ltv_state_est(Y_parsed, U_parsed, A_use, B, H, R=R_mat)
-
-        # -- M-step: COSMIC solve --
-        A, B, S_c, D_c, Xl_c, C_c = _cosmic_step(
-            X_hat, U_parsed, lambda_vec, N, n, q, L, is_var_len, horizons
-        )
-
-        # -- Evaluate cost and check convergence --
-        J = _evaluate_full_cost(
-            X_hat,
-            A,
-            B,
-            Y_parsed,
-            U_parsed,
-            H,
-            Rinv,
-            lambda_vec,
-            N,
-            n,
-            q,
-            L,
-            is_var_len,
-            horizons,
-        )
+    J, X_hat, A, B, S_c, D_c, Xl_c, C_c = best
+    # Report the achieved cost as the final history entry (best iterate may not
+    # be the last one evaluated when mu > 0 stages ran).
+    if not cost_history or cost_history[-1] != J:
         cost_history.append(J)
-        n_iter += 1
-
-        if n_iter >= 2:
-            J_prev = cost_history[-2]
-            rel_change = abs(J - J_prev) / max(abs(J_prev), 1.0)
-
-            if rel_change < tolerance:
-                if do_trust_region and mu_current > mu_tol:
-                    if J <= J_converged_mu:
-                        J_converged_mu = J
-                        X_best = X_hat
-                        A_best = A.copy()
-                        B_best = B.copy()
-                        mu_current = mu_current / 2
-                    else:
-                        X_hat = X_best
-                        A = A_best.copy()
-                        B = B_best.copy()
-                        mu_current = 0
-                elif do_trust_region and mu_current > 0:
-                    J_converged_mu = J
-                    X_best = X_hat
-                    A_best = A.copy()
-                    B_best = B.copy()
-                    mu_current = 0
-                else:
-                    break
 
     # ------------------------------------------------------------------
     # 5. Add uncertainty from final COSMIC step (SPEC.md S8.12.9)
@@ -572,6 +598,13 @@ def _parse_inputs(
             f"covariance_mode must be 'full', 'diagonal', or 'isotropic'. Got '{covariance_mode}'.",
         )
 
+    # -- Max iterations (per-stage inner cap, SPEC S8.12.4) --
+    if int(max_iter) != max_iter or max_iter < 1:
+        raise SidError(
+            "bad_input",
+            f"max_iter must be a positive integer, got {max_iter!r}.",
+        )
+
     # -- Trust region --
     if isinstance(trust_region, str) and trust_region.lower() == "off":
         do_trust_region = False
@@ -579,6 +612,11 @@ def _parse_inputs(
     else:
         do_trust_region = True
         mu = float(trust_region)
+        if not 0.0 <= mu <= 1.0:
+            raise SidError(
+                "bad_input",
+                f"trust_region must be in [0, 1] or 'off', got {mu!r}.",
+            )
 
     mu_tol = float(trust_region_tol)
 
