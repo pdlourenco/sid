@@ -121,3 +121,9 @@ Before you finalize a number:
   a tracked lifecycle — **Accepted** — deferred fixes carry an inline
   `issue #NNN` marker in every port; the fixing PR closes the issue and removes
   the marker together (known-bug row on the PR template).
+- [ADR-0004](ADR-0004-model-order-gap-convention.md) — Model-order gap search:
+  machine-eps floor, cliff exclusion, retained cap — **Accepted** — the gap search
+  is defined on singular-value magnitudes (count `L`, not array index) excluding
+  the resolvable→floor cliff, keeps the machine-eps floor (no data-aware floor),
+  and retains the `floor(m/2)` cap; supersedes issue #160's "data-aware floor then
+  lift the cap" direction.

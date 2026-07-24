@@ -318,21 +318,32 @@ ref6.tolerance = struct('x_detrended_rel', 1e-10, 'trend_rel', 1e-10);
 
 writeJSON(fullfile(thisDir, 'reference_detrend.json'), ref6);
 
-% ---- Test case 7: sidModelOrder ----
+% ---- Test case 7: sidModelOrder (strictly-proper finite-zero plant) ----
+% Analytic G(z) = (z + 0.5) / (z^2 - 1.2728 z + 0.81) on the (0, pi] grid
+% (true n = 2, zero at -0.5). An exact response is the meaningful cross-language
+% exemplar for the gap method: the resolvable set is small so the floor(m/2) cap
+% does not bind, which exercises the cliff-exclusion rule (pre-ADR-0004 the MATLAB
+% gap method returned n = 3 here while Python returned 2). Replaces the earlier
+% biproper BT-estimated plant, which was outside the strictly-proper model class
+% and gap-ambiguous (retires the #157 test-case-7 note). See ADR-0004, SPEC §8.12.12.
+% The SV tail is numerical noise (~1e-15), so the tolerance carries an absolute
+% floor (SingularValues_atol) alongside the relative one, per ADR-0002.
 fprintf('Generating reference_model_order.json...\n');
-rng(51);
-N_mo = 500;
-u_mo = randn(N_mo, 1);
-y_mo = filter([1 0.5], [1 -0.8 0.2], u_mo) + 0.05 * randn(N_mo, 1);
-r_mo_bt = sidFreqBT(y_mo, u_mo, 'WindowSize', 40);
-[n_mo, sv_mo] = sidModelOrder(r_mo_bt, 'Horizon', 30);
+nf_mo = 128;
+w_mo = (1:nf_mo)' * pi / nf_mo;
+z_mo = exp(1j * w_mo);
+G_mo = (z_mo + 0.5) ./ (z_mo.^2 - 1.2728 * z_mo + 0.81);
+res_mo = struct('Frequency', w_mo, 'Response', reshape(G_mo, nf_mo, 1, 1), ...
+    'Method', 'analytic');
+[n_mo, sv_mo] = sidModelOrder(res_mo);   % default gap method
 
 ref7 = struct();
 ref7.function_name = 'sidModelOrder';
-ref7.params = struct('Horizon', 30, 'bt_WindowSize', 40);
-ref7.input = struct('y', y_mo, 'u', u_mo);
+ref7.params = struct();
+ref7.input = struct('Frequency', w_mo, ...
+    'Response_real', real(G_mo), 'Response_imag', imag(G_mo));
 ref7.output = struct('n', n_mo, 'SingularValues', sv_mo.SingularValues);
-ref7.tolerance = struct('SingularValues_rel', 1e-8);
+ref7.tolerance = struct('SingularValues_rel', 1e-8, 'SingularValues_atol', 1e-9);
 
 writeJSON(fullfile(thisDir, 'reference_model_order.json'), ref7);
 
