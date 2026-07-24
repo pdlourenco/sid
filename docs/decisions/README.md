@@ -112,3 +112,8 @@ Before you finalize a number:
   spec, not to each other — **Accepted** — `spec/SPEC.md` + `spec/EXAMPLES.md`
   are the sole contract; each language port derives independently; cross-language
   vectors are a check, not a proof.
+- [ADR-0002](ADR-0002-contract-artifact-hardening.md) — Contract artifacts are
+  drift-hardened, not just present — **Accepted** — `testdata/` vectors are held
+  to standing rules (tolerance floors, authoritative stored tolerances, no orphan
+  artifacts, regeneration-only edits, structural gates) so a silent-pass vector
+  can't reappear (standing-policy form of the #145 fixes).
