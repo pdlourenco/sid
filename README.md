@@ -56,12 +56,13 @@ This downloads only the shared specification, test data, and your chosen impleme
 
 **State-space path.** The **COSMIC algorithm** (Carvalho et al., 2022) identifies discrete-time LTV models x(k+1) = A(k)x(k) + B(k)u(k) by solving a block-tridiagonal regularized least-squares problem in O(N) time. Multiple trajectories — including variable-length sequences — are pooled into the data matrices. When only outputs are observed, **Output-COSMIC** alternates between state estimation (RTS smoother) and dynamics identification, converging to a joint optimum. Bayesian uncertainty quantification propagates through to frozen transfer functions G(w,k) for direct comparison with non-parametric frequency estimates.
 
-See [SPEC.md](spec/SPEC.md) for the full mathematical derivation.
+See [SPEC.md](spec/SPEC.md) for the full mathematical derivation, and [DESIGN.md](docs/DESIGN.md) for *why* these methods and this architecture were chosen.
 
 ## Documentation
 
 - [**SPEC.md**](spec/SPEC.md) — Full algorithm specification with mathematical derivations
 - [**EXAMPLES.md**](spec/EXAMPLES.md) — Example-suite specification: binding plant catalog, helper API, and per-example structure that every language port must conform to
+- [**DESIGN.md**](docs/DESIGN.md) — Architectural rationale: why the spec-as-contract polyglot structure, why these algorithms, the trade-offs accepted
 - [**Roadmap**](docs/roadmap.md) — Development phases and planned features
 - [**COSMIC uncertainty derivation**](spec/cosmic/uncertainty_derivation.md) — Bayesian posterior covariance for LTV identification
 - [**COSMIC online recursion**](spec/cosmic/online_recursion.md) — Recursive/streaming formulation of the COSMIC algorithm
