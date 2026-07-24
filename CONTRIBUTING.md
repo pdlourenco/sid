@@ -189,6 +189,37 @@ against what the project cares about. The prompt:
 **Exceptions** — one-line typo fixes, formatting-only changes, and pure reverts
 don't warrant the ceremony.
 
+## Known bugs and their lifecycle
+
+sid ships known limitations and deferred fixes **visibly**, not silently. When a
+change leaves a known bug, a rough edge, or a deliberately-deferred follow-up in
+place, it carries a **visible-debt marker** at the site, pointing at an open
+tracking issue — the style already used across both ports:
+
+```matlab
+% ... an unguarded search locks onto spurious tail gaps (AR(1) -> n=40).
+% Data-aware-floor follow-up: issue #160.
+```
+
+The rules:
+
+1. **Every known-limitation marker names an open issue.** The marker is a
+   pointer; the issue is the register entry (context, why it's deferred, what
+   would resolve it). A marker with no tracking issue is invisible debt — exactly
+   what this convention exists to prevent. Use `issue #NNN` (optionally with the
+   governing `SPEC §X.Y`) in a comment at the site, in **every port** where the
+   limitation exists.
+2. **A fix closes the loop in one PR.** The PR that fixes a known bug **closes
+   its tracking issue and removes the visible-debt marker(s) in the same PR** —
+   marker and open issue disappear together, so the code and the tracker never
+   disagree about what's still broken. This is the known-bug row on the
+   [pull request template](.github/pull_request_template.md).
+3. **Partial fixes re-point, they don't orphan.** A PR that resolves part of a
+   tracked limitation and defers the rest re-points the marker at the follow-up
+   issue rather than deleting a marker while the debt remains.
+
+See [ADR-0003](docs/decisions/ADR-0003-known-bug-lifecycle.md) for the rationale.
+
 ## General Guidelines
 
 - The spec rules above apply to every implementation. The per-language
