@@ -213,4 +213,46 @@ runner__nPassed = runner__nPassed + 1;
 fprintf('  Test 8 passed: exact variance matches brute-force Kronecker (maxRelErr=%.2e).\n', ...
     maxRelErr);
 
+%% Test 9: Frozen TF of an Output-COSMIC (IO) result honors H (#144)
+% For an IO result with H != I (py < n) the response must be (nf x py x q x nk)
+% and equal H*(zI-A)^-1 B -- not the n x q state response the pre-#144 code gave.
+n = 2; q = 1; py = 1; N = 40; L = 6;
+A_t = [0.9 0.2; -0.15 0.85];
+B_t = [1.0; 0.5];
+H9 = [1 0];
+rng(909);
+U9 = randn(N, q, L); Y9 = zeros(N + 1, py, L); X9 = zeros(N + 1, n, L);
+for l = 1:L
+    X9(1, :, l) = randn(1, n);
+    Y9(1, :, l) = (H9 * X9(1, :, l)')';
+    for k = 1:N
+        X9(k + 1, :, l) = (A_t * X9(k, :, l)' + B_t * U9(k, :, l)')';
+        Y9(k + 1, :, l) = (H9 * X9(k + 1, :, l)')';
+    end
+end
+resIO = sidLTVdiscIO(Y9, U9, H9, 'Lambda', 1e3);
+w9 = [0.3; 1.0; 2.5];
+frzIO = sidLTVdiscFrozen(resIO, 'TimeSteps', 6, 'Frequencies', w9);
+
+% Per-dimension checks: MATLAB size() drops trailing singleton dims.
+assert(size(frzIO.Response, 1) == 3 && size(frzIO.Response, 2) == py && ...
+       size(frzIO.Response, 3) == q && size(frzIO.Response, 4) == 1, ...
+    'Frozen-of-IO Response must be (nf x py x q x nk), got %s', ...
+    mat2str(size(frzIO.Response)));
+assert(all(isfinite(frzIO.ResponseStd(:))) && all(frzIO.ResponseStd(:) >= 0), ...
+    'Frozen-of-IO ResponseStd must be finite and non-negative');
+
+% Response must equal H*(zI-A)^-1 B (the H fold-in is real, not a no-op).
+Ak9 = resIO.A(:, :, 6); Bk9 = resIO.B(:, :, 6);
+for iw = 1:3
+    z = exp(1i * w9(iw));
+    stateResp = (z * eye(n) - Ak9) \ Bk9;      % (n x q)
+    expected  = H9 * stateResp;                % (py x q)
+    got = frzIO.Response(iw, 1, 1, 1);
+    assert(abs(got - expected) < 1e-10, ...
+        'Frozen-of-IO must equal H*(zI-A)^-1 B at frequency %d', iw);
+end
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 9 passed: frozen-of-IO honors H (py x q output response).\n');
+
 fprintf('test_sidLTVdiscFrozen: %d/%d passed\n', runner__nPassed, runner__nPassed);

@@ -305,3 +305,47 @@ class TestLTVDiscFrozen:
         assert max_rel_err < 1e-10, (
             f"Exact formula should match brute-force (maxRelErr={max_rel_err:.2e})"
         )
+
+    # ------------------------------------------------------------------
+    # #144: frozen TF of an Output-COSMIC (IO) result honors H
+    # ------------------------------------------------------------------
+    def test_frozen_of_io_applies_h(self) -> None:
+        """Frozen TF of an sidLTVdiscIO result is the OUTPUT response (#144).
+
+        For an IO result with ``H != I`` (``p_y < n``) the response must be
+        ``(nf, p_y, q, nk)`` and equal ``H @ (zI-A)⁻¹B`` at every frequency —
+        not the ``n×q`` state response the pre-#144 code returned.
+        """
+        from sid.ltv_disc_io import ltv_disc_io
+
+        n, q, py, N, L = 2, 1, 1, 40, 6
+        A_t = np.array([[0.9, 0.2], [-0.15, 0.85]])
+        B_t = np.array([[1.0], [0.5]])
+        H = np.array([[1.0, 0.0]])
+        rng = np.random.default_rng(777)
+        U = rng.standard_normal((N, q, L))
+        Y = np.zeros((N + 1, py, L))
+        X = np.zeros((N + 1, n, L))
+        for ll in range(L):
+            X[0, :, ll] = rng.standard_normal(n)
+            Y[0, :, ll] = H @ X[0, :, ll]
+            for k in range(N):
+                X[k + 1, :, ll] = A_t @ X[k, :, ll] + B_t.ravel() * U[k, :, ll]
+                Y[k + 1, :, ll] = H @ X[k + 1, :, ll]
+
+        res = ltv_disc_io(Y, U, H, lambda_=1e3)
+        w = np.array([0.3, 1.0, 2.5])
+        frz = ltv_disc_frozen(res, time_steps=[5], frequencies=w)
+
+        assert frz.response.shape == (3, py, q, 1), "response must be p_y×q, not n×q"
+        assert frz.response_std is not None
+        assert frz.response_std.shape == (3, py, q, 1)
+        assert np.all(np.isfinite(frz.response_std)) and np.all(frz.response_std >= 0)
+
+        # Response must equal H @ (zI - A)⁻¹ B (the H fold-in is real, not a no-op).
+        Ak = res.a[:, :, 5]
+        Bk = res.b[:, :, 5]
+        for iw, wi in enumerate(w):
+            z = np.exp(1j * wi)
+            state_resp = np.linalg.solve(z * np.eye(n) - Ak, Bk)  # (n, q)
+            np.testing.assert_allclose(frz.response[iw, :, :, 0], H @ state_resp, atol=1e-10)

@@ -32,8 +32,9 @@ function result = sidLTVdiscFrozen(ltvResult, varargin)
 %       .Frequency      - (nf x 1) rad/sample
 %       .FrequencyHz    - (nf x 1) Hz
 %       .TimeSteps      - (nk x 1) selected time step indices
-%       .Response       - (nf x p x q x nk) complex transfer function
-%       .ResponseStd    - (nf x p x q x nk) std dev ([] if no uncertainty)
+%       .Response       - (nf x py x q x nk) complex transfer function
+%                         (py = observation dim; equals n only when H = I)
+%       .ResponseStd    - (nf x py x q x nk) std dev ([] if no uncertainty)
 %       .SampleTime     - scalar
 %       .Method         - 'sidLTVdiscFrozen'
 %
@@ -79,11 +80,22 @@ function result = sidLTVdiscFrozen(ltvResult, varargin)
     Ts = opts.SampleTime;
 
     % ---- Extract from ltvResult ----
-    A = ltvResult.A;   % (p x p x N)
-    B = ltvResult.B;   % (p x q x N)
-    p = ltvResult.StateDim;
+    A = ltvResult.A;   % (n x n x N)
+    B = ltvResult.B;   % (n x q x N)
+    n = ltvResult.StateDim;
     q = ltvResult.InputDim;
     N = ltvResult.DataLength;
+
+    % Fold in the observation matrix so the frozen TF is the OUTPUT response
+    % G = H (zI - A)^{-1} B (SPEC.md §8.11.1). A full-state result carries no H,
+    % so it defaults to identity and reduces to the state response
+    % (byte-identical to the pre-#144 behaviour).
+    if isfield(ltvResult, 'H') && ~isempty(ltvResult.H)
+        H = ltvResult.H;
+    else
+        H = eye(n);
+    end
+    py = size(H, 1);
 
     hasUncertainty = isfield(ltvResult, 'P') && ~isempty(ltvResult.P);
 
@@ -101,55 +113,55 @@ function result = sidLTVdiscFrozen(ltvResult, varargin)
 
     % ---- Compute frozen transfer function (SPEC.md §8.6) ----
     % G(w, k) = (e^{jw} I - A(k))^{-1} B(k)
-    G    = zeros(nf, p, q, nk);
+    G    = zeros(nf, py, q, nk);
     GStd = [];
     if hasUncertainty
-        GStd = zeros(nf, p, q, nk);
+        GStd = zeros(nf, py, q, nk);
     end
 
-    Ip = eye(p);
+    In = eye(n);
 
     for ik = 1:nk
         ki = kVec(ik);
-        Ak = A(:, :, ki);    % (p x p)
-        Bk = B(:, :, ki);    % (p x q)
+        Ak = A(:, :, ki);    % (n x n)
+        Bk = B(:, :, ki);    % (n x q)
 
         for iw = 1:nf
             z = exp(1i * w(iw));
             % R = (zI - A(k))^{-1}
-            R = (z * Ip - Ak) \ Ip;   % (p x p)
-            Gk = R * Bk;              % (p x q)
-            G(iw, :, :, ik) = Gk;
+            R = (z * In - Ak) \ In;        % (n x n) state resolvent
+            G(iw, :, :, ik) = H * (R * Bk); % (py x q) output response
         end
 
         if hasUncertainty
-            Pk = ltvResult.P(:, :, ki);   % (d x d), d = p+q
-            Sigma = ltvResult.NoiseCov;    % (p x p)
-            d = p + q;
+            Pk = ltvResult.P(:, :, ki);   % (d x d), d = n+q
+            Sigma = ltvResult.NoiseCov;    % (n x n)
+            d = n + q;
 
             for iw = 1:nf
                 z = exp(1i * w(iw));
-                R = (z * Ip - Ak) \ Ip;    % (p x p) resolvent
-                Gk = R * Bk;               % (p x q)
+                R = (z * In - Ak) \ In;    % (n x n) state resolvent
+                HR = H * R;                % (py x n) output resolvent (r~ = H R)
+                GkState = R * Bk;          % (n x q) state response (enters v)
 
                 % Exact first-order uncertainty propagation (SPEC.md §8.11.1):
                 % The Jacobian J_{ab} = dG_{ab}/dvec(C) has rank-1 structure
-                % J_{ab} = v * r_a where v = [Gk(:,b); e_b], r_a = R(a,:).
-                % Var(G_{ab}) = (v^H P(k) v) * (r_a Sigma r_a^H)
+                % J_{ab} = v * r~_a, v = [GkState(:,b); e_b], r~_a = (H R)(a,:).
+                % Var(G_{ab}) = (v^H P(k) v) * (r~_a Sigma r~_a^H)
 
-                % Sigma quadratic form for each output row
-                sigQuad = zeros(p, 1);      % (p x 1) real
-                for a = 1:p
-                    ra = R(a, :);           % (1 x p) complex
+                % Sigma quadratic form for each OUTPUT row
+                sigQuad = zeros(py, 1);     % (py x 1) real
+                for a = 1:py
+                    ra = HR(a, :);          % (1 x n) complex
                     sigQuad(a) = real(ra * Sigma * ra');
                 end
 
-                varG = zeros(p, q);
+                varG = zeros(py, q);
                 for b = 1:q
-                    % v = [Gk(:,b); e_b] where e_b is b-th unit in R^q
+                    % v = [GkState(:,b); e_b] where e_b is b-th unit in R^q
                     v = zeros(d, 1);
-                    v(1:p) = Gk(:, b);
-                    v(p + b) = 1;
+                    v(1:n) = GkState(:, b);
+                    v(n + b) = 1;
                     pQuad = real(v' * Pk * v);  % scalar, real
                     varG(:, b) = pQuad * sigQuad;
                 end
