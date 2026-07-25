@@ -1282,3 +1282,101 @@ class TestCrossValidationBTFDRVecRes:
             **_tol(ref, "NoiseSpectrum"),
             err_msg="Vector-R BTFDR noise spectrum mismatch vs MATLAB",
         )
+
+
+class TestCrossValidationCosmicUncertainty:
+    """COSMIC Bayesian uncertainty fields: reference_cosmic_uncertainty.json (#145d)."""
+
+    def _run(self):
+        ref = _load("reference_cosmic_uncertainty.json")
+        X = _to_array(ref["input"], "X")
+        U = _to_array(ref["input"], "U")
+        if U.ndim == 1:
+            U = U[:, np.newaxis]
+        from sid.ltv_disc import ltv_disc
+
+        result = ltv_disc(X, U, lambda_=float(ref["params"]["Lambda"]), uncertainty=True)
+        return ref, result
+
+    def test_cosmic_a_std(self):
+        ref, result = self._run()
+        np.testing.assert_allclose(
+            result.a_std.ravel(),
+            _to_array(ref["output"], "AStd").ravel(),
+            **_tol(ref, "AStd"),
+            err_msg="COSMIC AStd mismatch vs MATLAB",
+        )
+
+    def test_cosmic_b_std(self):
+        ref, result = self._run()
+        np.testing.assert_allclose(
+            result.b_std.ravel(),
+            _to_array(ref["output"], "BStd").ravel(),
+            **_tol(ref, "BStd"),
+            err_msg="COSMIC BStd mismatch vs MATLAB",
+        )
+
+    def test_cosmic_noise_cov(self):
+        ref, result = self._run()
+        np.testing.assert_allclose(
+            np.asarray(result.noise_cov).ravel(),
+            _to_array(ref["output"], "NoiseCov").ravel(),
+            **_tol(ref, "NoiseCov"),
+            err_msg="COSMIC NoiseCov mismatch vs MATLAB",
+        )
+
+    def test_cosmic_dof_and_variance(self):
+        ref, result = self._run()
+        np.testing.assert_allclose(
+            float(result.degrees_of_freedom),
+            float(_to_array(ref["output"], "DegreesOfFreedom")),
+            **_tol(ref, "DegreesOfFreedom"),
+            err_msg="COSMIC DegreesOfFreedom mismatch vs MATLAB",
+        )
+        np.testing.assert_allclose(
+            float(result.noise_variance),
+            float(_to_array(ref["output"], "NoiseVariance")),
+            **_tol(ref, "NoiseVariance"),
+            err_msg="COSMIC NoiseVariance mismatch vs MATLAB",
+        )
+
+
+class TestCrossValidationLTVCosmicVarLen:
+    """Variable-length COSMIC: reference_ltv_cosmic_varlen.json (#145d)."""
+
+    def _run(self):
+        ref = _load("reference_ltv_cosmic_varlen.json")
+        # Ragged cell arrays round-trip as lists of per-trajectory arrays.
+        X = [np.array(t, dtype=np.float64) for t in ref["input"]["X"]]
+        U = [np.array(t, dtype=np.float64) for t in ref["input"]["U"]]
+        from sid.ltv_disc import ltv_disc
+
+        result = ltv_disc(X, U, lambda_=float(ref["params"]["Lambda"]))
+        return ref, result
+
+    def test_varlen_a(self):
+        ref, result = self._run()
+        np.testing.assert_allclose(
+            result.a.ravel(),
+            _to_array(ref["output"], "A").ravel(),
+            **_tol(ref, "A"),
+            err_msg="Var-len COSMIC A mismatch vs MATLAB",
+        )
+
+    def test_varlen_b(self):
+        ref, result = self._run()
+        np.testing.assert_allclose(
+            result.b.ravel(),
+            _to_array(ref["output"], "B").ravel(),
+            **_tol(ref, "B"),
+            err_msg="Var-len COSMIC B mismatch vs MATLAB",
+        )
+
+    def test_varlen_cost(self):
+        ref, result = self._run()
+        np.testing.assert_allclose(
+            np.asarray(result.cost).ravel(),
+            _to_array(ref["output"], "Cost").ravel(),
+            **_tol(ref, "Cost"),
+            err_msg="Var-len COSMIC cost mismatch vs MATLAB",
+        )
