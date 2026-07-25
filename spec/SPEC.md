@@ -1950,7 +1950,7 @@ Both plotting functions accept name-value options:
 | `'LineWidth'` | `1.5` | Line width |
 | `'Axes'` | `[]` | Axes handle (creates new figure if empty) |
 
-**Verified by:** plotting functions (`sidBodePlot`, `sidSpectrumPlot`, `sidMapPlot`, `sidSpectrogramPlot`, …) — `unit(M)` `test_sidPlotting.m` / `test_sidMapPlot.m` / `test_sidSpectrogramPlot.m`, `unit(Py)` `test_plotting.py` (smoke / structure: figures build, handles returned, no error). Visual appearance is `manual`. **`none` for the confidence-band *formulas* (§11.1–11.2)** — the smoke tests do not assert their correctness; open as #123.
+**Verified by:** plotting functions (`sidBodePlot`, `sidSpectrumPlot`, `sidMapPlot`, `sidSpectrogramPlot`, …) — `unit(M)` `test_sidPlotting.m` / `test_sidMapPlot.m` / `test_sidSpectrogramPlot.m`, `unit(Py)` `test_plotting.py`. The confidence-band **formulas** (§11.1 Bode magnitude `20·log10(|Ĝ|±p·σ_G)` + phase `±p·σ_G/|Ĝ|·180/π`; §11.2 spectrum `10·log10(Φ̂_v±p·σ_Φv)`) are asserted against the plotted band edges by `test_sidPlotting.m` (Tests 16–17) / `test_plotting.py` (`test_confidence_band_math`) — #123. Visual appearance remains `manual`.
 
 ---
 
@@ -2250,4 +2250,4 @@ comp = sidCompare(ltv, X_val, U_val);
 sidCompare(result, y, u, 'Plot', true);
 ```
 
-**Verified by:** `cross-vector` (`reference_compare`), `unit(M)` `test_sidCompare.m`, `unit(Py)` `test_compare.py`. Multi-trajectory output shapes (§15.5) — the `unit(M)`/`unit(Py)` multi-trajectory cases added with issues #140/#158.
+**Verified by:** `cross-vector` (`reference_compare`), `unit(M)` `test_sidCompare.m`, `unit(Py)` `test_compare.py`. Multi-trajectory output shapes (§15.5) — the `unit(M)`/`unit(Py)` multi-trajectory cases added with issues #140/#158. The frequency-domain simulation helper (§15.2) is `cross-vector` (`reference_freq_domain_sim`) and now also `unit(M/Py)` `test_sidFreqDomainSim.m` / `test_freq_domain_sim.py` (constant-gain oracle + out-of-grid zeroing, #124), closing the port-symmetry gap.
