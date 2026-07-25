@@ -1766,9 +1766,9 @@ Given partial I/O data `(Y, U)` and observation matrix `H`, estimate constant LT
    If the requested order `n` exceeds the **numerical rank** of `H₀` — i.e.
    `σ_n ≤ σ_1 · tol` with `tol = max(r·p_y, r·q)·eps` — then `Σ_n^{-1/2}` is not
    well defined and the realization is singular. The solver **raises an error**
-   (it must not form `1/√σ_n → ∞`, which silently propagates `inf`/`NaN`).
-   Request an order at or below the resolvable rank (see `sidModelOrder`,
-   §8.12.12).
+   with the stable identifier `sid:orderExceedsRank` (code `order_exceeds_rank`);
+   it must not form `1/√σ_n → ∞`, which silently propagates `inf`/`NaN`. Request
+   an order at or below the resolvable rank (see `sidModelOrder`, §8.12.12).
 
 5. **H-basis transform.** Find `T` such that `C_r T⁻¹ = H`:
 
@@ -1784,6 +1784,8 @@ Given partial I/O data `(Y, U)` and observation matrix `H`, estimate constant LT
    The rescaled spectrum is reimposed **in real Schur form**, never by eigenvector inversion. Factor `A₀ = Q T Qᵀ` (real Schur: `Q` orthogonal, `T` block-upper-triangular with 1×1 real and 2×2 complex-conjugate-pair blocks on its diagonal). For each diagonal block, multiply the block by the scalar `s = |λ_target| / |λ_current|` that maps its eigenvalue modulus to the reflected/clamped target — this preserves the argument of a 2×2 complex pair and the sign of a 1×1 real eigenvalue, and leaves the strictly-upper-triangular part of `T` (hence `Q`) untouched. Reconstruct `A₀ ← Q T' Qᵀ`.
 
    Because `Q` is orthogonal (`cond(Q) = 1`), this is numerically stable even when `A₀` is **defective** or has repeated eigenvalues. The eigenvector form `A₀ = V diag(λ) V⁻¹` must **not** be used: `V` is singular for defective `A₀` — e.g. an integrator chain (repeated eigenvalue, defective), which reaches this step because `|λ| = 1 > MaxStabilize` triggers the clamp — and `V⁻¹` then produces a spurious blow-up (entries `~10¹⁴`) rather than a stabilized matrix.
+
+   **Diagnostic (normative).** When stabilization actually fires — one or more eigenvalues reflected or clamped — the solver issues a warning (`sid:stabilized`) reporting how many eigenvalues were moved. The identified model's stability has been altered relative to the raw realization, which the caller should know. No warning is issued when every eigenvalue already satisfies `|λ| ≤ MaxStabilize` (`A₀` returned unchanged).
 
 #### 8.13.2 Inputs
 
