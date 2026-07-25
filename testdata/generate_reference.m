@@ -777,8 +777,8 @@ ref_cu.output = struct( ...
     'NoiseVariance', r_cu.NoiseVariance, ...
     'DegreesOfFreedom', r_cu.DegreesOfFreedom);
 ref_cu.tolerance = struct('AStd_rel', 1e-8, 'BStd_rel', 1e-8, ...
-    'NoiseCov_rel', 1e-8, 'NoiseVariance_rel', 1e-8, ...
-    'DegreesOfFreedom_rel', 1e-8);
+    'NoiseCov_rel', 1e-8, 'NoiseCov_atol', 1e-12, ...
+    'NoiseVariance_rel', 1e-8, 'DegreesOfFreedom_rel', 1e-8);
 
 writeJSON(fullfile(thisDir, 'reference_cosmic_uncertainty.json'), ref_cu);
 
@@ -805,7 +805,8 @@ ref_vc.params = struct('Lambda', 1e4);
 % Wrap the cells ({...}) so struct() stores them as scalar-struct fields.
 ref_vc.input = struct('X', {X_vc}, 'U', {U_vc});
 ref_vc.output = struct('A', r_vc.A, 'B', r_vc.B, 'Cost', r_vc.Cost);
-ref_vc.tolerance = struct('A_rel', 1e-2, 'B_rel', 1e-2, 'Cost_rel', 1e-2);
+ref_vc.tolerance = struct('A_rel', 1e-2, 'B_rel', 1e-2, ...
+    'Cost_rel', 1e-2, 'Cost_atol', 1e-12);
 
 writeJSON(fullfile(thisDir, 'reference_ltv_cosmic_varlen.json'), ref_vc);
 
