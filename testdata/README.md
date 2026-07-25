@@ -62,3 +62,27 @@ in future phases).
 
 All numeric arrays are stored as JSON arrays of numbers with full double
 precision.  Complex arrays are split into `_real` and `_imag` components.
+
+## Serialization conventions (avoid these round-trip traps)
+
+`jsonencode`/`jsondecode` and `numpy` do not round-trip every array shape the
+way you might expect. When adding a vector:
+
+- **Store matrices as genuine 2-D arrays, never a `1×n` row.** MATLAB
+  `jsondecode` collapses a stored row vector to a **column**, silently
+  transposing a `(p_y × n)` observation matrix — the Octave validator then
+  errors while the Python consumer's `H[newaxis, :]` masks it. Use a `2×n`
+  (or larger) `H`, or reshape defensively in *both* consumers.
+- **Store multi-trajectory input as true 3-D `(N × ny × L)`.** A squeezed
+  `(N × L)` matrix is ambiguous — the estimators read it as MIMO (`ny = L`),
+  not multi-trajectory. MATLAB `(d1 × d2 × d3)` maps to numpy `(d1, d2, d3)`
+  directly, so 3-D storage round-trips cleanly and dispatches by `ndims == 3`.
+- **Variable-length trajectories** are stored as cells of unequal-size arrays;
+  `jsondecode` returns a cell and `json.load` a list, so build a list of
+  per-trajectory arrays in the Python consumer.
+- **Floor every field that can hold a zero or near-zero element with an
+  `<field>_atol`** (ADR-0002 rule 1). `atol = 0` makes a near-zero element's
+  pass condition `|diff| <= rtol·|expected|`, which any cross-engine ULP
+  difference fails — latent until the canonical R2025a regen meets the Octave
+  validator. Tolerance blocks may be hand-edited (generator **and** committed
+  block) in the same PR that adds the vector, per #176's amended policy.
