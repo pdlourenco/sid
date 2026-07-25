@@ -310,3 +310,121 @@ class TestLTVDiscIO:
         assert np.all(result.b_std > 0), "b_std should be positive"
         assert np.all(np.isfinite(result.a_std)), "a_std should be finite"
         assert np.all(np.isfinite(result.b_std)), "b_std should be finite"
+
+    # ------------------------------------------------------------------
+    # Trust-region two-level schedule (SPEC S8.12.4, issue #138)
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _make_partial_obs_data() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Deterministic partial-observation I/O data (no RNG, cross-platform).
+
+        Partial observation (H = [1 0]) forces the alternating EM path rather
+        than the full-rank fast path, so the trust-region schedule is exercised.
+        """
+        n, q, py, N, L = 2, 1, 1, 30, 8
+        A = np.array([[0.9, 0.2], [-0.2, 0.85]])
+        B = np.array([[1.0], [0.5]])
+        H = np.array([[1.0, 0.0]])
+        U = np.zeros((N, q, L))
+        Y = np.zeros((N + 1, py, L))
+        X = np.zeros((N + 1, n, L))
+        for ll in range(L):
+            f = (ll + 1) / (3 * N)
+            for k in range(N):
+                U[k, 0, ll] = np.sin(2 * np.pi * f * (k + 1)) + (1.0 if (k + 1) % 5 < 2 else 0.0)
+        for ll in range(L):
+            X[0, :, ll] = [0.4 * (ll + 1) / L, -0.3 * (ll + 1) / L]
+            Y[0, :, ll] = H @ X[0, :, ll]
+            for k in range(N):
+                X[k + 1, :, ll] = A @ X[k, :, ll] + B.ravel() * U[k, 0, ll]
+                Y[k + 1, :, ll] = H @ X[k + 1, :, ll]
+        return Y, U, H
+
+    # A budget large enough for the homotopy stages to make progress. The
+    # trust-region benefit is threshold-dependent: too small a per-stage
+    # MaxIter and the stages never converge, so TR can match or even trail off
+    # (it is a fallback for hard cases, not a free lunch — hence off is the
+    # default). At this budget TR beats off by ~2.5 decades on this data.
+    _TR_MAX_ITER = 40
+    _TR_MU_TOL = 1e-3
+
+    def test_trust_region_helps_on_hard_case(self) -> None:
+        """TrustRegion=1 markedly lowers the achieved cost on a hard partial-obs
+        case where plain (mu=0) alternation stalls in a poor local minimum.
+
+        Revert-check: the pre-#138 fused loop left TrustRegion=1 ~two orders of
+        magnitude WORSE than off, so ``cost_tr < cost_off`` fails against it and
+        passes against the corrected two-level schedule. (Note: ``cost_tr <=
+        cost_off`` is *not* a general invariant — with too small a per-stage
+        MaxIter the homotopy cannot converge and TR may trail off.)
+        """
+        Y, U, H = self._make_partial_obs_data()
+
+        off = ltv_disc_io(Y, U, H, lambda_=1e2, trust_region="off", max_iter=self._TR_MAX_ITER)
+        tr = ltv_disc_io(
+            Y,
+            U,
+            H,
+            lambda_=1e2,
+            trust_region=1.0,
+            max_iter=self._TR_MAX_ITER,
+            trust_region_tol=self._TR_MU_TOL,
+        )
+
+        cost_off = float(np.min(off.cost))
+        cost_tr = float(np.min(tr.cost))
+
+        assert np.all(np.isfinite(tr.a)), "TrustRegion result must be finite"
+        assert not np.any(np.isnan(tr.a)), "TrustRegion result must not be NaN"
+        assert cost_tr < 0.5 * cost_off, (
+            f"TrustRegion should lower the cost markedly: {cost_tr:.3e} vs off {cost_off:.3e}"
+        )
+
+    def test_trust_region_mu_advances_and_terminates(self) -> None:
+        """The outer loop reduces mu across stages and terminates within budget.
+
+        Iterations must exceed a single per-stage cap (proving mu advanced past
+        the initial stage) and stay within the normative worst-case count
+        ``MaxIter x (ceil(log2(1/eps_mu)) + 2)`` from SPEC S8.12.4.
+        """
+        Y, U, H = self._make_partial_obs_data()
+        max_iter, mu_tol = self._TR_MAX_ITER, self._TR_MU_TOL
+
+        tr = ltv_disc_io(
+            Y,
+            U,
+            H,
+            lambda_=1e2,
+            trust_region=1.0,
+            max_iter=max_iter,
+            trust_region_tol=mu_tol,
+        )
+
+        n_stages_worst = int(np.ceil(np.log2(1.0 / mu_tol))) + 2
+        bound = max_iter * n_stages_worst
+        assert tr.iterations > max_iter, (
+            f"Outer loop should run multiple mu stages, got {tr.iterations}"
+        )
+        assert tr.iterations <= bound, (
+            f"Iterations {tr.iterations} exceed worst-case budget {bound}"
+        )
+
+    def test_max_iter_rejects_non_positive(self) -> None:
+        """MaxIter must be a positive integer (guards the empty-loop crash)."""
+        import pytest
+
+        from sid._exceptions import SidError
+
+        Y, U, H = self._make_partial_obs_data()
+        with pytest.raises(SidError):
+            ltv_disc_io(Y, U, H, lambda_=1e2, max_iter=0)
+
+    def test_trust_region_out_of_range(self) -> None:
+        """trust_region must lie in [0, 1] (guards mu>1 dynamics extrapolation)."""
+        import pytest
+
+        from sid._exceptions import SidError
+
+        Y, U, H = self._make_partial_obs_data()
+        with pytest.raises(SidError):
+            ltv_disc_io(Y, U, H, lambda_=1e2, trust_region=2.0)

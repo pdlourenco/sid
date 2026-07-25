@@ -173,7 +173,10 @@ for l = 1:L
     end
 end
 
-result = sidLTVdiscIO(Y, U, H_obs, 'Lambda', 100, 'TrustRegion', 1);
+% Short budget: this is a coherence smoke test, not a TR-benefit test; the
+% two-level schedule (#138) would otherwise run many hundreds of iterations.
+result = sidLTVdiscIO(Y, U, H_obs, 'Lambda', 100, 'TrustRegion', 1, ...
+    'MaxIter', 12, 'TrustRegionTol', 1e-1);
 
 assert(~any(isnan(result.A(:))), 'Partial obs pipeline produced NaN in A');
 assert(~any(isnan(result.X(:))), 'Partial obs pipeline produced NaN in X');
@@ -256,7 +259,10 @@ for l = 1:L
     end
 end
 
-result = sidLTVdiscIO(Y, U, H_obs, 'Lambda', 100, 'TrustRegion', 1);
+% Short budget: this is a coherence smoke test, not a TR-benefit test; the
+% two-level schedule (#138) would otherwise run many hundreds of iterations.
+result = sidLTVdiscIO(Y, U, H_obs, 'Lambda', 100, 'TrustRegion', 1, ...
+    'MaxIter', 12, 'TrustRegionTol', 1e-1);
 
 % Check that observed states match measurements reasonably
 for l = 1:min(L, 3)
@@ -378,12 +384,42 @@ for l = 1:L
     end
 end
 
-result_tr = sidLTVdiscIO(Y, U, H_obs, 'Lambda', 100, 'TrustRegion', 1);
+% Off vs two-level trust-region on this difficult partial-obs case, where plain
+% (mu=0) alternation stalls in a poor local minimum. A budget large enough for
+% the homotopy stages to make progress: the trust-region benefit is threshold-
+% dependent (too small a per-stage MaxIter and TR can match or trail off — it is
+% a fallback for hard cases, hence off is the default). cost_tr <= cost_off is
+% therefore NOT a general invariant; at this budget TR beats off by ~2.5 decades.
+maxIter11 = 40; muTol11 = 1e-3;
+res_off = sidLTVdiscIO(Y, U, H_obs, 'Lambda', 100, 'TrustRegion', 'off', ...
+    'MaxIter', maxIter11);
+res_tr  = sidLTVdiscIO(Y, U, H_obs, 'Lambda', 100, 'TrustRegion', 1, ...
+    'MaxIter', maxIter11, 'TrustRegionTol', muTol11);
 
-assert(isfield(result_tr, 'A'), 'Trust-region should return valid result');
-assert(result_tr.Iterations >= 1, 'Trust-region should iterate');
+cost_off = min(res_off.Cost);
+cost_tr  = min(res_tr.Cost);
+
+assert(all(isfinite(res_tr.A(:))), 'Trust-region A must be finite');
+assert(~any(isnan(res_tr.A(:))), 'Trust-region A must not be NaN');
+
+% Revert-check: the pre-#138 fused loop left TrustRegion=1 ~two orders of
+% magnitude WORSE than off, so this assertion fails against it.
+assert(cost_tr < 0.5 * cost_off, ...
+    'Trust-region should markedly lower cost: %.3e vs off %.3e', ...
+    cost_tr, cost_off);
+
+% mu advances past the initial stage and terminates within the normative
+% worst-case budget MaxIter x (ceil(log2(1/eps_mu)) + 2) (SPEC §8.12.4).
+bound11 = maxIter11 * (ceil(log2(1 / muTol11)) + 2);
+assert(res_tr.Iterations > maxIter11, ...
+    'Outer loop should run multiple mu stages, got %d', res_tr.Iterations);
+assert(res_tr.Iterations <= bound11, ...
+    'Iterations %d exceed worst-case budget %d', res_tr.Iterations, bound11);
+
 runner__nPassed = runner__nPassed + 1;
-fprintf('  Test 11 passed: trust-region converges (%d iterations).\n', result_tr.Iterations);
+fprintf(['  Test 11 passed: two-level trust-region helps ' ...
+    '(cost %.2e vs off %.2e, %d iters).\n'], ...
+    cost_tr, cost_off, res_tr.Iterations);
 
 %% Test 12: Mass-spring-damper LTI, full observation
 % Full pipeline on 6-state MSD with all states measured.
@@ -436,8 +472,13 @@ for l = 1:L
     end
 end
 
+% Cap the budget: the two-level schedule (#138) runs the full mu-homotopy, so
+% on this N=200, L=10 problem the default budget would run many hundreds of
+% inner iterations. A short budget suffices here — this test only checks that
+% the trust-region path stays finite on partial-obs MSD data.
 result = sidLTVdiscIO( ...
-    Y_pos, U, H_pos, 'Lambda', 1e4, 'TrustRegion', 1);
+    Y_pos, U, H_pos, 'Lambda', 1e4, 'TrustRegion', 1, ...
+    'MaxIter', 10, 'TrustRegionTol', 1e-1);
 
 assert(~any(isnan(result.A(:))), 'MSD partial: NaN in A');
 assert(~any(isnan(result.X(:))), 'MSD partial: NaN in X');
@@ -486,7 +527,8 @@ for l = 1:L
 end
 
 result = sidLTVdiscIO( ...
-    Y, U, H_pos, 'Lambda', 100, 'TrustRegion', 1);
+    Y, U, H_pos, 'Lambda', 100, 'TrustRegion', 1, ...
+    'MaxIter', 12, 'TrustRegionTol', 1e-1);
 
 assert(~any(isnan(result.A(:))), 'TV DI: NaN in A');
 assert(result.Iterations >= 1, 'TV DI: no iterations');
@@ -537,7 +579,8 @@ for l = 1:L
 end
 
 result = sidLTVdiscIO( ...
-    Y, U, H_pos, 'Lambda', 1e3, 'TrustRegion', 1);
+    Y, U, H_pos, 'Lambda', 1e3, 'TrustRegion', 1, ...
+    'MaxIter', 12, 'TrustRegionTol', 1e-1);
 
 assert(~any(isnan(result.A(:))), 'TV MSD: NaN in A');
 assert(~any(isnan(result.X(:))), 'TV MSD: NaN in X');
@@ -994,5 +1037,31 @@ end
 assert(threw, 'Invalid CovarianceMode should throw an error');
 runner__nPassed = runner__nPassed + 1;
 fprintf('  Test 29 passed: invalid CovarianceMode throws error.\n');
+
+%% Test 30: MaxIter must be a positive integer (guards empty-loop crash, #138)
+threw30 = false;
+try
+    sidLTVdiscIO(Y26, U26, H26, 'Lambda', 1e3, 'MaxIter', 0);
+catch e
+    threw30 = true;
+    assert(~isempty(strfind(e.identifier, 'badInput')), ...
+        'Expected sid:badInput error, got %s', e.identifier);
+end
+assert(threw30, 'MaxIter=0 should throw an error');
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 30 passed: MaxIter=0 rejected.\n');
+
+%% Test 31: TrustRegion must lie in [0, 1] (guards mu>1 extrapolation, #138)
+threw31 = false;
+try
+    sidLTVdiscIO(Y26, U26, H26, 'Lambda', 1e3, 'TrustRegion', 2);
+catch e
+    threw31 = true;
+    assert(~isempty(strfind(e.identifier, 'badInput')), ...
+        'Expected sid:badInput error, got %s', e.identifier);
+end
+assert(threw31, 'TrustRegion=2 should throw an error');
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 31 passed: TrustRegion out of range rejected.\n');
 
 fprintf('test_sidLTVdiscIO: %d/%d passed\n', runner__nPassed, runner__nPassed);
