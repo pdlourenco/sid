@@ -407,4 +407,77 @@ assert(all(isfinite(B0_def(:))), 'Default horizon should produce finite B0');
 runner__nPassed = runner__nPassed + 1;
 fprintf('  Test 13 passed: default horizon produces valid output.\n');
 
+%% Test 14: Stabilization emits sid:stabilized when it fires (#144)
+% Stabilization is the final realization step, so its warning is the last one
+% emitted -> lastwarn captures it reliably.
+rng(1400);
+n = 2; q = 1; py = 2; N = 200; L = 3;
+A_true = [0.99 0.05; -0.05 0.98];   % max|eig| ~ 0.99 > MaxStabilize 0.9
+B_true = [0.5; 0.3];
+H_obs = eye(2);
+X = zeros(N + 1, n, L); U = randn(N, q, L); Y = zeros(N + 1, py, L);
+for l = 1:L
+    X(1, :, l) = 0.1 * randn(1, n);
+    Y(1, :, l) = (H_obs * X(1, :, l)')';
+    for k = 1:N
+        X(k + 1, :, l) = (A_true * X(k, :, l)' + B_true * U(k, :, l)')';
+        Y(k + 1, :, l) = (H_obs * X(k + 1, :, l)')';
+    end
+end
+% Convert the specific warning to an error so it is captured robustly
+% (lastwarn is polluted by unrelated internal warnings under Octave). The BT
+% realization estimates |eig| ~ 0.86, so MaxStabilize = 0.5 is safely exceeded.
+warning('error', 'sid:stabilized');
+threw14 = false;
+try
+    sidLTIfreqIO(Y, U, H_obs, 'MaxStabilize', 0.5);
+catch e
+    threw14 = ~isempty(strfind(e.identifier, 'stabilized'));
+end
+warning('on', 'sid:stabilized');   % restore to a normal warning
+assert(threw14, 'sid:stabilized should fire when eigenvalues are clamped');
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 14 passed: sid:stabilized warning fires.\n');
+
+%% Test 15: Excessive order never yields inf/NaN (errors or finite) (#144)
+% Pre-#144, requesting an order above the Hankel rank formed 1/sqrt(sigma_n)
+% -> inf/NaN. Now it either raises sid:orderExceedsRank (sharp rank) or returns
+% a finite realization (smeared rank) -- never inf/NaN. This pins the
+% public-path no-inf/NaN guarantee; the RAISE itself fires only for a
+% machine-zero singular value, which sidFreqBT's estimation floor does not
+% produce through this path, so the guard's error contract is pinned directly
+% by the Python unit test (test_order_exceeds_rank_errors, which calls the
+% Ho-Kalman step on an exact rank-2 Hankel -- the MATLAB hoKalman is a local
+% function and not callable in isolation). The guard logic is identical across
+% both ports.
+rng(1500);
+n = 2; q = 1; py = 1; N = 150; L = 4;
+A_true = [0.9 0.1; -0.1 0.8];
+B_true = [0.5; 0.3];
+H_true = [1 0];
+X = zeros(N + 1, n, L); U = randn(N, q, L); Y = zeros(N + 1, py, L);
+for l = 1:L
+    X(1, :, l) = randn(1, n);
+    Y(1, :, l) = (H_true * X(1, :, l)')';
+    for k = 1:N
+        X(k + 1, :, l) = (A_true * X(k, :, l)' + B_true * U(k, :, l)')';
+        Y(k + 1, :, l) = (H_true * X(k + 1, :, l)')';
+    end
+end
+H_wide = [1 0 0 0 0 0];   % request a 6-state realization from an order-2 system
+threw15 = false; finite15 = false;
+try
+    [A15, B15] = sidLTIfreqIO(Y, U, H_wide);
+    finite15 = all(isfinite(A15(:))) && all(isfinite(B15(:)));
+catch e
+    threw15 = true;
+    assert(~isempty(strfind(e.identifier, 'orderExceedsRank')) || ...
+           ~isempty(strfind(e.identifier, 'tooFewSV')), ...
+        'Unexpected error id: %s', e.identifier);
+end
+assert(threw15 || finite15, ...
+    'Excessive order must error cleanly or return finite, never inf/NaN');
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 15 passed: excessive order handled (no inf/NaN).\n');
+
 fprintf('test_sidLTIfreqIO: %d/%d passed\n', runner__nPassed, runner__nPassed);

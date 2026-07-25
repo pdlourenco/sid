@@ -60,9 +60,10 @@ def ltv_disc_frozen(
         - **frequency** (*ndarray, shape (nf,)*) -- Frequency in rad/sample.
         - **frequency_hz** (*ndarray, shape (nf,)*) -- Frequency in Hz.
         - **time_steps** (*ndarray, shape (nk,)*) -- Selected 0-based indices.
-        - **response** (*ndarray, shape (nf, p, q, nk)*) -- Complex
-          frozen transfer function.
-        - **response_std** (*ndarray or None, shape (nf, p, q, nk)*) --
+        - **response** (*ndarray, shape (nf, py, q, nk)*) -- Complex
+          frozen transfer function (``py`` = observation dim; equals the
+          state dim ``n`` only when ``H = I``).
+        - **response_std** (*ndarray or None, shape (nf, py, q, nk)*) --
           Standard deviation of ``response``.  ``None`` when the input
           ``LTVResult`` has no uncertainty.
         - **sample_time** (*float*) -- Sample time.
@@ -136,11 +137,19 @@ def ltv_disc_frozen(
     # ------------------------------------------------------------------
     # 2. Extract from ltv_result
     # ------------------------------------------------------------------
-    A = ltv_result.a  # (p, p, N)
-    B = ltv_result.b  # (p, q, N)
-    p = ltv_result.state_dim
+    A = ltv_result.a  # (n, n, N)
+    B = ltv_result.b  # (n, q, N)
+    n = ltv_result.state_dim
     q = ltv_result.input_dim
     N = ltv_result.data_length
+
+    # Fold in the observation matrix so the frozen TF is the OUTPUT response
+    # G = H (zI - A)^{-1} B (SPEC §8.11.1). A full-state result carries no H, so
+    # it defaults to identity and the result reduces to the state response
+    # (byte-identical to the pre-#144 behaviour).
+    H = getattr(ltv_result, "h", None)
+    H = np.eye(n) if H is None else np.asarray(H)
+    py = H.shape[0]
 
     has_uncertainty = ltv_result.p_cov is not None
 
@@ -164,48 +173,48 @@ def ltv_disc_frozen(
     # ------------------------------------------------------------------
     # 4. Compute frozen transfer function
     # ------------------------------------------------------------------
-    G = np.zeros((nf, p, q, nk), dtype=np.complex128)
+    G = np.zeros((nf, py, q, nk), dtype=np.complex128)
     G_std: np.ndarray | None = None
     if has_uncertainty:
-        G_std = np.zeros((nf, p, q, nk))
+        G_std = np.zeros((nf, py, q, nk))
 
-    Ip = np.eye(p)
+    In = np.eye(n)
 
     for ik in range(nk):
         ki = k_vec[ik]
-        Ak = A[:, :, ki]  # (p, p)
-        Bk = B[:, :, ki]  # (p, q)
+        Ak = A[:, :, ki]  # (n, n)
+        Bk = B[:, :, ki]  # (n, q)
 
         for iw in range(nf):
             z = np.exp(1j * w[iw])
             # R = (z I - A(k))^{-1}  via solve: (z I - Ak) R = I
-            R = solve(z * Ip - Ak, Ip)  # (p, p)
-            Gk = R @ Bk  # (p, q)
-            G[iw, :, :, ik] = Gk
+            R = solve(z * In - Ak, In)  # (n, n) state resolvent
+            G[iw, :, :, ik] = H @ (R @ Bk)  # (py, q) output response
 
         # ---- Uncertainty propagation ----
         if has_uncertainty:
-            Pk = ltv_result.p_cov[:, :, ki]  # (d, d), d = p + q
-            Sigma = ltv_result.noise_cov  # (p, p)
-            d = p + q
+            Pk = ltv_result.p_cov[:, :, ki]  # (d, d), d = n + q
+            Sigma = ltv_result.noise_cov  # (n, n)
+            d = n + q
 
             for iw in range(nf):
                 z = np.exp(1j * w[iw])
-                R = solve(z * Ip - Ak, Ip)  # (p, p) resolvent
-                Gk = R @ Bk  # (p, q)
+                R = solve(z * In - Ak, In)  # (n, n) state resolvent
+                HR = H @ R  # (py, n) output resolvent (r̃ = H R)
+                Gk_state = R @ Bk  # (n, q) state response (enters v)
 
-                # Sigma quadratic form for each output row
-                sig_quad = np.zeros(p)
-                for a in range(p):
-                    ra = R[a, :]  # (p,) complex
+                # Sigma quadratic form for each OUTPUT row: r̃ₐ = (H R)(a, :)
+                sig_quad = np.zeros(py)
+                for a in range(py):
+                    ra = HR[a, :]  # (n,) complex
                     sig_quad[a] = np.real(ra @ Sigma @ ra.conj())
 
                 # P quadratic form for each input column
-                var_G = np.zeros((p, q))
+                var_G = np.zeros((py, q))
                 for b in range(q):
                     v = np.zeros(d, dtype=np.complex128)
-                    v[:p] = Gk[:, b]
-                    v[p + b] = 1.0
+                    v[:n] = Gk_state[:, b]
+                    v[n + b] = 1.0
                     p_quad = np.real(v.conj() @ Pk @ v)  # scalar
                     var_G[:, b] = p_quad * sig_quad
 

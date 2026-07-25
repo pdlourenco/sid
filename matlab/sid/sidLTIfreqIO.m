@@ -319,6 +319,17 @@ function [A_r, B_r, C_r] = hoKalman(H0, H1, n, py, q)
             length(sigmas), n);
     end
 
+    % Order must not exceed the numerical rank of H0 (SPEC §8.13.1 step 4):
+    % a near-zero sigma_n makes 1/sqrt(sigma_n) blow up to inf/NaN.
+    tol = max(size(H0)) * eps;
+    if sigmas(n) <= sigmas(1) * tol
+        error('sid:orderExceedsRank', ...
+            ['Requested order n=%d exceeds the numerical rank of the Hankel ' ...
+             'matrix (sigma_%d=%.3e <= sigma_1*tol, sigma_1=%.3e). Request an ' ...
+             'order at or below the resolvable rank (see sidModelOrder).'], ...
+            n, n, sigmas(n), sigmas(1));
+    end
+
     % Truncate to order n
     U_n = U_svd(:, 1:n);
     S_n = diag(sigmas(1:n));
@@ -360,28 +371,67 @@ function [A0, B0] = transformToHBasis(A_r, B_r, C_r, H, n)
 end
 
 function A = stabilize(A, maxStab)
-% STABILIZE Reflect unstable eigenvalues inside the unit circle.
+% STABILIZE Reflect/clamp unstable eigenvalues via real Schur form.
 %
-%   Eigenvalues with |lambda| > 1 are reflected: lambda <- 1/conj(lambda)
-%   (SPEC.md §8.13.1 step 6). The result is then clamped so that
-%   |lambda| <= maxStab.
+%   Eigenvalues with |lambda| > 1 are reflected (lambda <- 1/conj(lambda)); any
+%   eigenvalue still exceeding maxStab is clamped to that radius (SPEC.md
+%   §8.13.1 step 6). Both operations change only the eigenvalue MODULUS.
+%
+%   The rescaled spectrum is reimposed in REAL SCHUR form A = Q*T*Q' (Q
+%   orthogonal, T quasi-upper-triangular) by scaling each diagonal block in
+%   place -- never via V*diag(lambda)/V, whose V is singular for defective A
+%   (e.g. integrator chains) and produces a spurious blow-up. Warns when
+%   stabilization actually fires; returns A unchanged otherwise.
 
-    [V, D] = eig(A);
-    d = diag(D);
-    magnitudes = abs(d);
-
-    if max(magnitudes) <= maxStab
+    if max(abs(eig(A))) <= maxStab
         return;
     end
 
-    % Step 1: Reflect eigenvalues outside the unit circle (SPEC.md §8.13.1)
-    outside = magnitudes > 1;
-    d(outside) = 1 ./ conj(d(outside));
-    magnitudes(outside) = abs(d(outside));
+    [Q, T] = schur(A, 'real');   % A = Q*T*Q', T quasi-upper-triangular
+    n = size(A, 1);
+    nMoved = 0;
+    i = 1;
+    while i <= n
+        twoByTwo = i < n && T(i + 1, i) ~= 0;
+        if twoByTwo
+            % Complex-conjugate pair: both eigenvalues share this modulus.
+            e = abs(eig(T(i:i + 1, i:i + 1)));
+            r = e(1);
+        else
+            r = abs(T(i, i));
+        end
 
-    % Step 2: Clamp to maxStab radius
-    toolarge = magnitudes > maxStab;
-    d(toolarge) = maxStab * d(toolarge) ./ magnitudes(toolarge);
+        if r > 1
+            target = 1 / r;      % reflect
+        else
+            target = r;
+        end
+        if target > maxStab      % clamp
+            target = maxStab;
+        end
 
-    A = real(V * diag(d) / V);
+        if target ~= r
+            s = target / r;      % scaling the block scales its eigenvalue(s) by s
+            if twoByTwo
+                T(i:i + 1, i:i + 1) = s * T(i:i + 1, i:i + 1);
+                nMoved = nMoved + 2;
+            else
+                T(i, i) = s * T(i, i);
+                nMoved = nMoved + 1;
+            end
+        end
+
+        if twoByTwo
+            i = i + 2;
+        else
+            i = i + 1;
+        end
+    end
+
+    if nMoved > 0
+        warning('sid:stabilized', ...
+            ['sidLTIfreqIO: stabilized %d eigenvalue(s) ' ...
+             '(reflected/clamped to |lambda| <= %g).'], nMoved, maxStab);
+    end
+    A = Q * T * Q';
 end
