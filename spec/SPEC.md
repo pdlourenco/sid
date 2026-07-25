@@ -58,7 +58,7 @@ where `e(t)` is white noise with covariance matrix `Λ`.
 
 **Multi-trajectory support:** All `sid` functions accept multiple independent trajectories (experiments) of the same system. For frequency-domain functions (`sidFreqBT`, `sidFreqETFE`, `sidFreqMap`, `sidSpectrogram`), spectral estimates are ensemble-averaged across trajectories before forming transfer function ratios or power spectra, reducing variance by a factor of `L` without sacrificing frequency resolution. For `sidLTVdisc`, multiple trajectories are aggregated in the data matrices as described in §8. Multi-trajectory data is passed as 3D arrays `(N × n_ch × L)` when all trajectories share the same length, or as cell arrays `{y1, y2, ..., yL}` when lengths differ. See §2, §4.1, and §6 below for the mathematical basis.
 
-**Verified by:** the data-model notation is definitional (`manual`). Multi-trajectory ensemble-averaging and time-series mode (`n_u = 0`) are exercised by `unit(M)` `test_multiTrajectory.m` / `test_compareMultiTraj.m` and `unit(Py)` multi-trajectory cases in `test_freq_bt.py` / `test_freq_map.py`, and pinned across ports by the frequency-domain `cross-vector`s below.
+**Verified by:** the data-model notation is definitional (`manual`). Multi-trajectory ensemble-averaging and time-series mode (`n_u = 0`) are exercised by `unit(M)` `test_multiTrajectory.m` / `test_compareMultiTraj.m` and `unit(Py)` multi-trajectory cases in `test_freq_bt.py` / `test_freq_map.py`, and pinned across ports by `cross-vector` `reference_multitraj_bt` (multi-trajectory ensemble BT, #145d) and the frequency-domain `cross-vector`s below.
 
 ---
 
@@ -473,7 +473,7 @@ The ETFE has no closed-form asymptotic variance formula: the periodogram is an i
 **Verified by:**
 
 - ETFE ratio + optional smoothing (§4.1–4.2) — `cross-vector` (`reference_siso_etfe`, IO-mode `{u, y}`), `unit(M)` `test_sidFreqETFE.m`, `unit(Py)` `test_freq_etfe.py`.
-- Periodogram time-series mode (§4.3) — `unit(M)` `test_sidFreqETFE.m` (Test 6), `unit(Py)` `test_freq_etfe.py::...test_time_series`. **`none` for `cross-vector`** — `reference_siso_etfe` is IO-mode only; the time-series periodogram is in no stored vector (visible debt, tracked for #145d).
+- Periodogram time-series mode (§4.3) — `cross-vector` (`reference_timeseries_etfe`, #145d), `unit(M)` `test_sidFreqETFE.m` (Test 6), `unit(Py)` `test_freq_etfe.py::...test_time_series`.
 - Degenerate-input warnings + whole-signal NaN (§10.2–10.3) — `unit(M)` `test_sidFreqETFE.m` (constant-input, collinear-MIMO tests), `unit(Py)` `test_freq_etfe.py::TestFreqETFEDegenerate`.
 - `ResponseStd` / `NoiseSpectrumStd` = NaN (no variance formula) — `manual`; held by the response cross-vector's NaN std fields, asserted by no dedicated test.
 
@@ -524,7 +524,7 @@ The lower clip at 2 matters for short data: for `N ∈ [10, 19]`, `floor(N/10) =
 **Verified by:**
 
 - Response / noise / coherence (§5.1–5.3) — `cross-vector` (`reference_siso_btfdr`), `unit(M)` `test_sidFreqBTFDR.m`, `unit(Py)` `test_freq_btfdr.py`.
-- §5.2 resolution→`M_k` bounds reporting (error on `M_k < 2`, `windowReduced` warning at `⌊N/2⌋`) — `unit(M)` `test_sidFreqBTFDR.m`, `unit(Py)` `test_freq_btfdr.py::...test_coarse_resolution_raises` / `test_window_reduced_warns`.
+- §5.2 resolution→`M_k` mapping, including the **per-frequency resolution-vector** path — `cross-vector` (`reference_btfdr_vecres`, #145d: pins `WindowSize(ω_k)` and response/noise/coherence under a length-`nf` `Resolution` vector), `unit(M)` `test_sidFreqBTFDR.m`, `unit(Py)` `test_freq_btfdr.py::...test_coarse_resolution_raises` / `test_window_reduced_warns`.
 - Equivalence to `sidFreqBT` at constant resolution (§5.3) — `unit(M)` `test_sidFreqBTFDR.m` (Test 20 oracle), `unit(Py)` `test_freq_btfdr.py::...test_btfdr_equals_bt_at_constant_resolution`.
 - Degenerate inputs (§10.3) — `unit(M)`/`unit(Py)` `TestFreqBTFDRDegenerate` cases (collinear MIMO, constant input).
 
@@ -755,7 +755,7 @@ The key difference: `sidFreqMap` always produces time-varying output. Setting `S
 **Verified by:**
 
 - Outer segmentation, BT inner path, output struct, time vector (§6.1–6.4, 6.7–6.8) — `cross-vector` (`reference_freqmap_bt`), `unit(M)` `test_sidFreqMap.m`, `unit(Py)` `test_freq_map.py`.
-- Welch inner path one-sided scaling incl. Nyquist un-doubling (§6.5) — `unit(M)` `test_sidFreqMap.m` (Test 30, rect-sub-segment periodogram oracle), `unit(Py)` `test_freq_map.py::TestFreqMapWelchScaling` (`test_welch_matches_scipy_including_nyquist`, bit-exact vs `scipy.signal.welch`). **`none` for `cross-vector`** — no Welch reference vector exists (`reference_freqmap_bt` is the BT path only); visible debt, tracked for #145d.
+- Welch inner path one-sided scaling incl. Nyquist un-doubling (§6.5) — `cross-vector` (`reference_freqmap_welch`, #145d), `unit(M)` `test_sidFreqMap.m` (Test 30, rect-sub-segment periodogram oracle), `unit(Py)` `test_freq_map.py::TestFreqMapWelchScaling` (`test_welch_matches_scipy_including_nyquist`, bit-exact vs `scipy.signal.welch`).
 - Welch degenerate `Φ̂_u` guard + `σ = Inf` sentinel — `unit(M)` `test_sidFreqMap.m` / `unit(Py)` `test_freq_map.py::TestFreqMapWelchDegenerate`.
 - BT↔Welch 2× relationship (§6.6) — `unit(Py)` `test_freq_map.py::...test_welch_is_twice_bt_off_nyquist`; `manual` cross-port.
 

@@ -647,6 +647,108 @@ ref17.tolerance = struct('Ad_rel', 1e-10, 'Bd_rel', 1e-10, 'Bd_atol', 1e-14);
 
 writeJSON(fullfile(thisDir, 'reference_test_msd.json'), ref17);
 
+% ---- #145d Batch A: frequency-domain coverage vectors ----
+
+fprintf('Generating reference_multitraj_bt.json...\n');
+rng(3101);
+N_mt = 800; L_mt = 4; a_mt = 0.85;
+y_mt = zeros(N_mt, 1, L_mt); u_mt = zeros(N_mt, 1, L_mt);
+for l = 1:L_mt
+    ul = randn(N_mt, 1);
+    y_mt(:, 1, l) = filter(1, [1 -a_mt], ul) + 0.1 * randn(N_mt, 1);
+    u_mt(:, 1, l) = ul;
+end
+r_mt = sidFreqBT(y_mt, u_mt, 'WindowSize', 30);
+
+ref_mt = struct();
+ref_mt.function_name = 'sidFreqBT';
+ref_mt.params = struct('WindowSize', 30, 'SampleTime', 1.0);
+% Store the full 3D (N x ny x L) input so both validators dispatch it as
+% multi-trajectory unambiguously (ndims == 3), not MIMO.
+ref_mt.input = struct('y', y_mt, 'u', u_mt);
+ref_mt.output = struct( ...
+    'Frequency', r_mt.Frequency, ...
+    'Response_real', real(r_mt.Response), ...
+    'Response_imag', imag(r_mt.Response), ...
+    'NoiseSpectrum', r_mt.NoiseSpectrum, ...
+    'Coherence', r_mt.Coherence, ...
+    'ResponseStd', r_mt.ResponseStd);
+ref_mt.tolerance = struct('Response_rel', 1e-10, 'NoiseSpectrum_rel', 1e-10, ...
+    'Frequency_rel', 1e-12, 'Coherence_rel', 1e-10, 'ResponseStd_rel', 1e-10);
+
+writeJSON(fullfile(thisDir, 'reference_multitraj_bt.json'), ref_mt);
+
+fprintf('Generating reference_timeseries_etfe.json...\n');
+rng(3102);
+N_te = 500;
+y_te = filter([1 0.5], [1 -0.85 0.1], randn(N_te, 1)) + 0.05 * randn(N_te, 1);
+r_te = sidFreqETFE(y_te, []);   % time-series mode -> periodogram, empty Response
+
+ref_te = struct();
+ref_te.function_name = 'sidFreqETFE';
+ref_te.params = struct('SampleTime', 1.0);
+ref_te.input = struct('y', y_te);   % no u: time-series
+ref_te.output = struct( ...
+    'Frequency', r_te.Frequency, ...
+    'NoiseSpectrum', r_te.NoiseSpectrum);
+ref_te.tolerance = struct('NoiseSpectrum_rel', 1e-10, 'Frequency_rel', 1e-12);
+
+writeJSON(fullfile(thisDir, 'reference_timeseries_etfe.json'), ref_te);
+
+fprintf('Generating reference_freqmap_welch.json...\n');
+rng(3103);
+N_fw = 4000;
+u_fw = randn(N_fw, 1);
+y_fw = filter([1], [1 -0.9], u_fw) + 0.1 * randn(N_fw, 1);
+r_fw = sidFreqMap(y_fw, u_fw, 'Algorithm', 'welch', ...
+                  'SegmentLength', 512, 'Overlap', 256);
+
+ref_fw = struct();
+ref_fw.function_name = 'sidFreqMap';
+ref_fw.params = struct('SegmentLength', 512, 'Overlap', 256, ...
+                       'SampleTime', 1.0, 'Algorithm', 'welch');
+ref_fw.input = struct('y', y_fw, 'u', u_fw);
+ref_fw.output = struct( ...
+    'Time', r_fw.Time, ...
+    'Frequency', r_fw.Frequency, ...
+    'Response_real', real(r_fw.Response), ...
+    'Response_imag', imag(r_fw.Response), ...
+    'NoiseSpectrum', r_fw.NoiseSpectrum, ...
+    'Coherence', r_fw.Coherence);
+ref_fw.tolerance = struct('Response_rel', 1e-10, 'NoiseSpectrum_rel', 1e-10, ...
+    'Coherence_rel', 1e-10, 'Time_rel', 1e-12, 'Frequency_rel', 1e-12);
+
+writeJSON(fullfile(thisDir, 'reference_freqmap_welch.json'), ref_fw);
+
+fprintf('Generating reference_btfdr_vecres.json...\n');
+rng(3104);
+N_bv = 1000;
+u_bv = randn(N_bv, 1);
+y_bv = filter([1], [1 -0.9], u_bv) + 0.1 * randn(N_bv, 1);
+% Per-frequency resolution vector: length must match the default freq grid.
+r_bv0 = sidFreqBTFDR(y_bv, u_bv);
+nf_bv = length(r_bv0.Frequency);
+R_vec = linspace(0.3, 2.0, nf_bv)';
+r_bv = sidFreqBTFDR(y_bv, u_bv, 'Resolution', R_vec);
+
+ref_bv = struct();
+ref_bv.function_name = 'sidFreqBTFDR';
+% Resolution lives in params so the generic validator passes it as a
+% name-value arg (Resolution is a parameter, not signal data).
+ref_bv.params = struct('SampleTime', 1.0, 'Resolution', R_vec);
+ref_bv.input = struct('y', y_bv, 'u', u_bv);
+ref_bv.output = struct( ...
+    'Frequency', r_bv.Frequency, ...
+    'Response_real', real(r_bv.Response), ...
+    'Response_imag', imag(r_bv.Response), ...
+    'NoiseSpectrum', r_bv.NoiseSpectrum, ...
+    'Coherence', r_bv.Coherence, ...
+    'WindowSize', r_bv.WindowSize);
+ref_bv.tolerance = struct('Response_rel', 1e-10, 'NoiseSpectrum_rel', 1e-10, ...
+    'Coherence_rel', 1e-10, 'Frequency_rel', 1e-12, 'WindowSize_rel', 1e-12);
+
+writeJSON(fullfile(thisDir, 'reference_btfdr_vecres.json'), ref_bv);
+
 fprintf('\n=== All reference data generated ===\n');
 
 end
