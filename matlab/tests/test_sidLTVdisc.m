@@ -437,4 +437,34 @@ assert(isequal(size(result_short.A), [p, p, N]), 'A should be (p x p x 2)');
 runner__nPassed = runner__nPassed + 1;
 fprintf('  Test 20 passed: N=2 minimum viable data.\n');
 
+%% Test 21: L-curve auto-lambda selects an interior corner (#120)
+% Test 9 only checks positivity; a degenerate corner-picker would silently
+% return grid(1) or grid(end). Assert the corner is interior and the system
+% is recovered (SPEC §8.4.2).
+rng(120);
+p = 2; q = 1; N = 40; L = 6;
+A_true = [0.9 0.1; -0.1 0.85]; B_true = [1.0; 0.5];
+X = zeros(N+1, p, L); U = randn(N, q, L);
+for l = 1:L
+    X(1, :, l) = randn(1, p);
+    for k = 1:N
+        X(k+1, :, l) = (A_true * X(k, :, l)' + B_true * U(k, :, l)')' ...
+            + 0.03 * randn(1, p);
+    end
+end
+grid21 = logspace(-3, 12, 40)';
+res21 = sidLTVdisc(X, U, 'Lambda', 'auto', 'LambdaGrid', grid21);
+chosen21 = res21.Lambda(1);
+assert(any(abs(grid21 - chosen21) < 1e-9 * max(grid21)), ...
+    'Chosen lambda must be a grid value');
+assert(chosen21 > grid21(1) && chosen21 < grid21(end), ...
+    'L-curve corner should be interior, got %.3e', chosen21);
+eig_true = sort(abs(eig(A_true)));
+eig_est = sort(abs(eig(mean(res21.A, 3))));
+assert(norm(eig_true - eig_est) / norm(eig_true) < 0.15, ...
+    'Auto-lambda should recover the system');
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 21 passed: L-curve auto-lambda interior corner (lambda=%.2e).\n', ...
+    chosen21);
+
 fprintf('test_sidLTVdisc: %d/%d passed\n', runner__nPassed, runner__nPassed);

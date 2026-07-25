@@ -298,3 +298,43 @@ class TestLTVDisc:
 
         with pytest.raises(SidError):
             ltv_disc(X, U, lambda_=1.0)
+
+    # ------------------------------------------------------------------
+    # #120: L-curve auto-lambda corner selection + ill-conditioning warning
+    # ------------------------------------------------------------------
+    def test_auto_lambda_selects_interior_corner(self) -> None:
+        """L-curve auto-lambda picks an INTERIOR grid point (a real corner),
+        not an endpoint, and recovers the system (SPEC S8.4.2, #120).
+
+        The pre-existing auto test only checked positivity; a degenerate
+        corner-picker would silently return grid[0] or grid[-1].
+        """
+        rng = np.random.default_rng(120)
+        N, p, q, L = 40, 2, 1, 6
+        A_true = np.array([[0.9, 0.1], [-0.1, 0.85]])
+        B_true = np.array([[1.0], [0.5]])
+        X = np.zeros((N + 1, p, L))
+        U = rng.standard_normal((N, q, L))
+        for ll in range(L):
+            X[0, :, ll] = rng.standard_normal(p)
+            for k in range(N):
+                X[k + 1, :, ll] = (
+                    A_true @ X[k, :, ll]
+                    + B_true.ravel() * U[k, :, ll]
+                    + 0.03 * rng.standard_normal(p)
+                )
+
+        grid = np.logspace(-3, 12, 40)
+        result = ltv_disc(X, U, lambda_="auto", lambda_grid=grid)
+        chosen = float(result.lambda_[0])
+
+        assert np.isclose(grid, chosen).any(), "chosen lambda must be a grid value"
+        assert grid[0] < chosen < grid[-1], (
+            f"L-curve corner should be interior, got {chosen:.3e} (endpoint => "
+            "degenerate corner detection)"
+        )
+        eig_true = np.sort(np.abs(np.linalg.eigvals(A_true)))
+        eig_est = np.sort(np.abs(np.linalg.eigvals(np.mean(result.a, axis=2))))
+        assert np.linalg.norm(eig_true - eig_est) / np.linalg.norm(eig_true) < 0.15, (
+            "auto-lambda should recover the system"
+        )
