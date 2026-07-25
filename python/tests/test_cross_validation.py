@@ -1129,3 +1129,156 @@ class TestCrossValidationLTVdiscIO:
             err_msg="LTV-IO cost history mismatch vs MATLAB",
             **_tol(ref, "Cost"),
         )
+
+
+class TestCrossValidationMultiTrajBT:
+    """Multi-trajectory Blackman-Tukey: reference_multitraj_bt.json (#145d)."""
+
+    def _data(self):
+        ref = _load("reference_multitraj_bt.json")
+        y3 = _to_array(ref["input"], "y")  # (N, ny, L) — stored as true 3D
+        u3 = _to_array(ref["input"], "u")
+        return ref, y3, u3
+
+    def test_multitraj_response(self):
+        ref, y3, u3 = self._data()
+        result = sid.freq_bt(y3, u3, window_size=ref["params"]["WindowSize"])
+        np.testing.assert_allclose(
+            result.response.ravel(),
+            _to_complex(ref["output"], "Response").ravel(),
+            **_tol(ref, "Response"),
+            err_msg="Multi-traj BT response mismatch vs MATLAB",
+        )
+
+    def test_multitraj_response_std(self):
+        ref, y3, u3 = self._data()
+        result = sid.freq_bt(y3, u3, window_size=ref["params"]["WindowSize"])
+        np.testing.assert_allclose(
+            result.response_std.ravel(),
+            _to_array(ref["output"], "ResponseStd").ravel(),
+            **_tol(ref, "ResponseStd"),
+            err_msg="Multi-traj BT ResponseStd mismatch vs MATLAB",
+        )
+
+    def test_multitraj_noise_spectrum(self):
+        ref, y3, u3 = self._data()
+        result = sid.freq_bt(y3, u3, window_size=ref["params"]["WindowSize"])
+        np.testing.assert_allclose(
+            result.noise_spectrum.ravel(),
+            _to_array(ref["output"], "NoiseSpectrum").ravel(),
+            **_tol(ref, "NoiseSpectrum"),
+            err_msg="Multi-traj BT noise spectrum mismatch vs MATLAB",
+        )
+
+
+class TestCrossValidationTimeSeriesETFE:
+    """ETFE time-series periodogram: reference_timeseries_etfe.json (#145d)."""
+
+    def test_timeseries_etfe_noise_spectrum(self):
+        ref = _load("reference_timeseries_etfe.json")
+        y = _to_array(ref["input"], "y")
+        if y.ndim == 1:
+            y = y[:, np.newaxis]
+        result = sid.freq_etfe(y, None)
+        np.testing.assert_allclose(
+            result.noise_spectrum.ravel(),
+            _to_array(ref["output"], "NoiseSpectrum").ravel(),
+            **_tol(ref, "NoiseSpectrum"),
+            err_msg="ETFE time-series periodogram mismatch vs MATLAB",
+        )
+
+    def test_timeseries_etfe_frequency(self):
+        ref = _load("reference_timeseries_etfe.json")
+        y = _to_array(ref["input"], "y")
+        if y.ndim == 1:
+            y = y[:, np.newaxis]
+        result = sid.freq_etfe(y, None)
+        np.testing.assert_allclose(
+            result.frequency.ravel(),
+            _to_array(ref["output"], "Frequency").ravel(),
+            **_tol(ref, "Frequency"),
+            err_msg="ETFE time-series frequency grid mismatch vs MATLAB",
+        )
+
+
+class TestCrossValidationFreqMapWelch:
+    """Welch freq_map inner path: reference_freqmap_welch.json (#145d)."""
+
+    def _run(self):
+        ref = _load("reference_freqmap_welch.json")
+        y = _to_array(ref["input"], "y")
+        u = _to_array(ref["input"], "u")
+        result = sid.freq_map(
+            y,
+            u,
+            algorithm="welch",
+            segment_length=ref["params"]["SegmentLength"],
+            overlap=ref["params"]["Overlap"],
+        )
+        return ref, result
+
+    def test_freqmap_welch_response(self):
+        ref, result = self._run()
+        np.testing.assert_allclose(
+            result.response.ravel(),
+            _to_complex(ref["output"], "Response").ravel(),
+            **_tol(ref, "Response"),
+            err_msg="Welch freq_map response mismatch vs MATLAB",
+        )
+
+    def test_freqmap_welch_noise_spectrum(self):
+        ref, result = self._run()
+        np.testing.assert_allclose(
+            result.noise_spectrum.ravel(),
+            _to_array(ref["output"], "NoiseSpectrum").ravel(),
+            **_tol(ref, "NoiseSpectrum"),
+            err_msg="Welch freq_map noise spectrum mismatch vs MATLAB",
+        )
+
+    def test_freqmap_welch_coherence(self):
+        ref, result = self._run()
+        np.testing.assert_allclose(
+            result.coherence.ravel(),
+            _to_array(ref["output"], "Coherence").ravel(),
+            **_tol(ref, "Coherence"),
+            err_msg="Welch freq_map coherence mismatch vs MATLAB",
+        )
+
+
+class TestCrossValidationBTFDRVecRes:
+    """Vector-resolution BTFDR: reference_btfdr_vecres.json (#145d)."""
+
+    def _run(self):
+        ref = _load("reference_btfdr_vecres.json")
+        y = _to_array(ref["input"], "y")
+        u = _to_array(ref["input"], "u")
+        r_vec = np.asarray(ref["params"]["Resolution"], dtype=np.float64).ravel()
+        result = sid.freq_btfdr(y, u, resolution=r_vec)
+        return ref, result
+
+    def test_btfdr_vecres_response(self):
+        ref, result = self._run()
+        np.testing.assert_allclose(
+            result.response.ravel(),
+            _to_complex(ref["output"], "Response").ravel(),
+            **_tol(ref, "Response"),
+            err_msg="Vector-R BTFDR response mismatch vs MATLAB",
+        )
+
+    def test_btfdr_vecres_window_size(self):
+        ref, result = self._run()
+        np.testing.assert_allclose(
+            np.asarray(result.window_size).ravel(),
+            _to_array(ref["output"], "WindowSize").ravel(),
+            **_tol(ref, "WindowSize"),
+            err_msg="Vector-R BTFDR per-frequency window size mismatch vs MATLAB",
+        )
+
+    def test_btfdr_vecres_noise_spectrum(self):
+        ref, result = self._run()
+        np.testing.assert_allclose(
+            result.noise_spectrum.ravel(),
+            _to_array(ref["output"], "NoiseSpectrum").ravel(),
+            **_tol(ref, "NoiseSpectrum"),
+            err_msg="Vector-R BTFDR noise spectrum mismatch vs MATLAB",
+        )
