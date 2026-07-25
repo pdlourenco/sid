@@ -749,6 +749,62 @@ ref_bv.tolerance = struct('Response_rel', 1e-10, 'NoiseSpectrum_rel', 1e-10, ...
 
 writeJSON(fullfile(thisDir, 'reference_btfdr_vecres.json'), ref_bv);
 
+% ---- #145d Batch B: LTV/COSMIC coverage vectors ----
+
+fprintf('Generating reference_cosmic_uncertainty.json...\n');
+rng(3201);
+N_cu = 40; p_cu = 2; q_cu = 1;
+A_cu = [0.9 0.1; -0.1 0.85]; B_cu = [0.5; 0.3];
+X_cu = zeros(N_cu + 1, p_cu); U_cu = randn(N_cu, q_cu);
+X_cu(1, :) = randn(1, p_cu);
+for k = 1:N_cu
+    X_cu(k+1, :) = (A_cu * X_cu(k, :)' + B_cu * U_cu(k, :)')' ...
+                    + 0.02 * randn(1, p_cu);
+end
+r_cu = sidLTVdisc(X_cu, U_cu, 'Lambda', 1e3, 'Uncertainty', true);
+
+ref_cu = struct();
+ref_cu.function_name = 'sidLTVdisc';
+ref_cu.params = struct('Lambda', 1e3, 'Uncertainty', true);
+ref_cu.input = struct('X', X_cu, 'U', U_cu);
+ref_cu.output = struct( ...
+    'AStd', r_cu.AStd, 'BStd', r_cu.BStd, ...
+    'NoiseCov', r_cu.NoiseCov, ...
+    'NoiseVariance', r_cu.NoiseVariance, ...
+    'DegreesOfFreedom', r_cu.DegreesOfFreedom);
+ref_cu.tolerance = struct('AStd_rel', 1e-8, 'BStd_rel', 1e-8, ...
+    'NoiseCov_rel', 1e-8, 'NoiseVariance_rel', 1e-8, ...
+    'DegreesOfFreedom_rel', 1e-8);
+
+writeJSON(fullfile(thisDir, 'reference_cosmic_uncertainty.json'), ref_cu);
+
+fprintf('Generating reference_ltv_cosmic_varlen.json...\n');
+rng(3202);
+p_vc = 2; q_vc = 1; L_vc = 3;
+A_vc = [0.9 0.1; -0.1 0.85]; B_vc = [0.5; 0.3];
+Ns_vc = [25; 32; 28];   % unequal lengths -> ragged -> cell round-trip
+X_vc = cell(L_vc, 1); U_vc = cell(L_vc, 1);
+for l = 1:L_vc
+    Nl = Ns_vc(l);
+    U_vc{l} = randn(Nl, q_vc);
+    X_vc{l} = zeros(Nl + 1, p_vc); X_vc{l}(1, :) = randn(1, p_vc);
+    for k = 1:Nl
+        X_vc{l}(k+1, :) = (A_vc * X_vc{l}(k, :)' + B_vc * U_vc{l}(k, :)')' ...
+                           + 0.01 * randn(1, p_vc);
+    end
+end
+r_vc = sidLTVdisc(X_vc, U_vc, 'Lambda', 1e4);
+
+ref_vc = struct();
+ref_vc.function_name = 'sidLTVdisc';
+ref_vc.params = struct('Lambda', 1e4);
+% Wrap the cells ({...}) so struct() stores them as scalar-struct fields.
+ref_vc.input = struct('X', {X_vc}, 'U', {U_vc});
+ref_vc.output = struct('A', r_vc.A, 'B', r_vc.B, 'Cost', r_vc.Cost);
+ref_vc.tolerance = struct('A_rel', 1e-2, 'B_rel', 1e-2, 'Cost_rel', 1e-2);
+
+writeJSON(fullfile(thisDir, 'reference_ltv_cosmic_varlen.json'), ref_vc);
+
 fprintf('\n=== All reference data generated ===\n');
 
 end

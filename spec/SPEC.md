@@ -1819,9 +1819,9 @@ The following are out of scope for v1.0:
 **Verified by:**
 
 - Core COSMIC — data matrices, cost, closed-form solve, `1/√N` scaling (§8.1–8.8) — `cross-vector` (`reference_ltv_cosmic`, `reference_cosmic_internals`, `reference_test_msd`; all uniform-horizon), `unit(M)` `test_sidLTVdisc.m` / `test_util_msd_ltv.m`, `unit(Py)` `test_ltv_disc.py`.
-- Variable-length trajectories (§8.8) — `unit(M)` `test_sidLTVdiscVarLen.m` (dense-LSQ oracle), `unit(Py)` `test_ltv_disc.py` var-len cases. **`none` for `cross-vector`** — the variable-length reference vector was deferred to #145d.
+- Variable-length trajectories (§8.8) — `cross-vector` (`reference_ltv_cosmic_varlen`, #145d: unequal-length cell trajectories, ragged round-trip), `unit(M)` `test_sidLTVdiscVarLen.m` (dense-LSQ oracle), `unit(Py)` `test_ltv_disc.py` var-len cases.
 - §8.9 Bayesian uncertainty — posterior `P(k) = P_scaled/N`, DoF hat-trace (issue #137) — `cross-vector` (`reference_cosmic_internals`, **`P` field only**), `unit(M)` `test_sidLTVdiscUncertainty.m` (Test 15 exact-Hessian oracle), `unit(Py)` `test_ltv_uncertainty_calibration.py` (exact-Hessian + `P=P_scaled/N` oracles + fixed-seed mid-`λ` Monte-Carlo calibration).
-- §8.9 reported `AStd` / `BStd` / `Σ̂` / `ν` — `unit(Py)` only (the MC calibration checks `AStd` against the empirical spread). **`none` for `cross-vector`** — no stored vector carries these; open as #121.
+- §8.9 reported `AStd` / `BStd` / `Σ̂` / `ν` — `cross-vector` (`reference_cosmic_uncertainty`, #145d/#121: pins `AStd`/`BStd`/`NoiseCov`/`NoiseVariance`/`DegreesOfFreedom` across ports), `unit(Py)` MC calibration (checks `AStd` against the empirical spread).
 - §8.10 online/recursive COSMIC — `deferred` (v2, per the implementation-status banner).
 - §8.11 frozen transfer function (`sidLTVdiscFrozen`) — `cross-vector` (`reference_ltv_frozen`, `H = I`), `unit(M)` `test_sidLTVdiscFrozen.m`, `unit(Py)` `test_ltv_disc_frozen.py`. The **output** contract `H(e^{jω}I − A)⁻¹B` for an IO result (§8.11.1, issue #144) is covered by `unit(M/Py)` `test_frozen_of_io*` (asserts `p_y×q` shape and equality to `H·(state response)`); the `H = I` collapse keeps `reference_ltv_frozen` byte-identical.
 - §8.11 lambda tuning (`sidLTVdiscTune`) — `unit(M)` `test_sidLTVdiscTune.m`, `unit(Py)` `test_ltv_disc_tune.py`. **`none` for `cross-vector`** — no tuning reference vector (#145d).
