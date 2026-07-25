@@ -1509,24 +1509,29 @@ This eliminates the state as a free variable. A single COSMIC step (§8.3.4) on 
 
 #### 8.12.4 Trust-Region Interpolation (Optional)
 
-When the transition from `A = I` (initialisation) to the first COSMIC estimate of `A(k)` is too abrupt — for instance with high noise, long trajectories, or poorly conditioned data — the state step can use interpolated dynamics:
+The Case-2 alternating loop is initialised from the LTI realisation `(A₀, B₀)` of §8.12.3 step 1 (**not** from `A = I`). When the jump from that initialisation to the first free COSMIC estimate of `A(k)` is too abrupt — high noise, long trajectories, or ill-conditioned data — the **state step** can use dynamics interpolated toward the initialisation:
 
 ```
-Ã(k) = (1 - μ) A(k) + μ I
+Ã(k) = (1 - μ) A(k) + μ A₀
 ```
 
-where `μ ∈ [0, 1]` is the trust-region parameter. The COSMIC step is unaffected (it always solves for `A(k)` and `B(k)` freely).
+where `μ ∈ [0, 1]` is the trust-region parameter and `A₀` is the (constant) LTI-initialisation dynamics. At `μ = 1` the state step trusts the initialisation entirely; at `μ = 0` it trusts the current free estimate `A(k)`. The COSMIC step is unaffected — it always solves for `A(k)`, `B(k)` freely. (Earlier drafts interpolated toward `μ·I`; that predates the LTI initialisation of §8.12.3 and is superseded here — `A₀` is the actual initialisation *and* a stable, data-informed trust anchor. Issue #138.)
 
-**Adaptive schedule.** The outer loop manages `μ`:
+**Two-level schedule.** Trust-region is an **outer** loop over `μ` that wraps the **inner** alternating loop of §8.12.3; the two are distinct, and the inner loop runs to its own stopping point *before* `μ` changes:
 
-1. Initialise `μ = 1` (first state step uses `A = I`, i.e., the initialisation).
-2. Run the alternating state–COSMIC loop to convergence for the current `μ`, yielding `J*(μ)`.
-3. Reduce `μ`: set `μ ← μ / 2`.
-4. Run the alternating loop to convergence with the new `μ`, yielding `J*(μ/2)`.
-5. **Accept/reject:** If `J*(μ/2) ≤ J*(μ)`, accept and continue from step 3. If `J*(μ/2) > J*(μ)`, revert to `μ` and terminate.
-6. Terminate when `μ < ε_μ` and set `μ = 0` for a final pass.
+1. `μ ← 1`.
+2. *Inner loop:* iterate the alternating state–COSMIC step at the fixed current `μ` until the relative change in the cost falls below `ε_J`, or the per-stage inner cap `MaxIter` is reached. Report `J*(μ)` and `(X*, C*)_μ` as the **best (lowest-cost) iterate observed during the stage** — not necessarily the last: for `μ > 0` the state step uses `Ã(k)`, so the inner iteration is a homotopy fixed-point, **not** the plain monotone descent of §8.12.3, and a capped non-converged stage could otherwise report a worse `J*` than it visited and distort the accept/reject. Monotonicity across `μ` is enforced by the outer accept/reject below, not within the inner loop.
+3. Propose `μ' = μ / 2`; run the inner loop at `μ'`, giving `J*(μ')`.
+4. *Accept/reject:* if `J*(μ') ≤ J*(μ)`, **accept** (`μ ← μ'`; keep `(X*, C*)_{μ'}`) and repeat from step 3; otherwise **reject** — restore `(X*, C*)_μ` and stop reducing `μ`.
+5. *Final `μ = 0` refinement (both exits).* On leaving the outer loop — whether by **reject** (step 4) or by `μ < ε_μ` — run one inner loop at `μ = 0` from the current best iterate and **keep its result only if it lowers `J*`** (a guarded pass). Return that iterate. This guarantees the returned iterate is a fixed point of the reported (`μ = 0`, true-objective) alternation, closing the "returned iterate was smoothed under `Ã ≠ A`, never refined at `μ = 0`" gap a bare reject would leave.
 
-When disabled (`μ = 0` from iteration 2 onward), the trust-region adds no computational overhead. This is expected to be sufficient for most practical cases.
+**Budget and defaults (normative).** `MaxIter` is the **per-stage** inner-loop iteration cap (not a global budget); the worst-case total inner-iteration count is `MaxIter × (⌈log₂(1/ε_μ)⌉ + 2)` — the `μ` stages plus the final `μ = 0` pass. Defaults: `ε_μ = 10⁻⁶`, and `μ = 0` (trust-region **off**), for which the outer loop is skipped entirely. `MaxIter` must be a positive integer.
+
+**Convergence diagnostic (normative).** When the base (`μ = 0`) alternation exits on the `MaxIter` cap without meeting `ε_J`, the solver issues a warning (`sid:notConverged`) reporting the cap — the returned iterate is usable but not converged. The trust-region stages (`μ > 0`) do **not** warn: a homotopy stage that caps out is expected (its best iterate is carried forward and the outer accept/reject still governs progress), so warning per stage would be noise.
+
+When disabled (`μ = 0`, the **default**), the outer loop is skipped and the algorithm reduces exactly to the plain alternating loop of §8.12.3 (Proposition 1 monotonicity applies), with no overhead. Trust-region is expected to be unnecessary for most cases; it exists for the abrupt-initialisation regime above.
+
+> **Correction (issue #138).** The previous implementation (a) **fused** the outer `μ` schedule into a single `max_iter` alternating loop, halving `μ` only when the inner relative-change test happened to fire — so at `μ = 1` it never settled and `μ` could remain at `1` for the whole budget; (b) interpolated toward `A₀` while the spec text said `μ·I` (this revision adopts `A₀`); and (c) on reject set `μ = 0` and **kept alternating** instead of terminating, which can move away from the restored best iterate. Net effect: `TrustRegion = 1` left the cost ~two orders of magnitude worse than off. This section specifies the corrected two-level algorithm; §8.12.4's `Verified by:` debt (`none`, #138) clears once the rewrite lands with tests.
 
 #### 8.12.5 Convergence
 
@@ -1559,7 +1564,7 @@ For any invertible `T ∈ ℝⁿˣⁿ`, the transformation `(T x(k), T A(k) T⁻
 | Regularisation | `λ` | scalar or `(N-1 × 1)` vector | required |
 | Noise covariance | `R` | `(p_y × p_y)` SPD matrix | `eye(p_y)` |
 | Convergence tol. | `ε_J` | positive scalar | `1e-6` |
-| Max iterations | | positive integer | `50` |
+| Max iterations (per-stage inner cap, §8.12.4) | `MaxIter` | positive integer | `50` |
 | Trust region | `μ_0` | scalar in `[0, 1]` or `'off'` | `'off'` |
 | Trust region tol. | `ε_μ` | positive scalar | `1e-6` |
 
@@ -1819,7 +1824,7 @@ The following are out of scope for v1.0:
 - §8.11 frozen transfer function (`sidLTVdiscFrozen`) — `cross-vector` (`reference_ltv_frozen`), `unit(M)` `test_sidLTVdiscFrozen.m`, `unit(Py)` `test_ltv_disc_frozen.py`.
 - §8.11 lambda tuning (`sidLTVdiscTune`) — `unit(M)` `test_sidLTVdiscTune.m`, `unit(Py)` `test_ltv_disc_tune.py`. **`none` for `cross-vector`** — no tuning reference vector (#145d).
 - §8.12 Output-COSMIC (`sidLTVdiscIO`) — RTS state step, COSMIC step, `N·λ` reported cost (issue #137) — `cross-vector` (`reference_ltv_io`, `A`/`B`/`Cost`), `unit(M)` `test_sidLTVdiscIO.m`, `unit(Py)` `test_ltv_disc_io.py`.
-- §8.12.4 trust-region interpolation — **`none`**: `TrustRegion` is invoked in `test_sidLTVdiscIO.m` (Test 11) but the assertions are vacuous (`isfield(…,'A')`, `Iterations ≥ 1`) — no test verifies the μ-schedule, monotonicity, or benefit. Known-broken visible debt, issue #138.
+- §8.12.4 two-level trust-region schedule (issue #138) — `unit(M)` `test_sidLTVdiscIO.m` (Test 11: TR markedly lowers the cost vs off on a hard partial-obs case — a revert-check against the pre-#138 fused loop, which left TR ~two decades *worse* than off; the μ-schedule advances past the initial stage and terminates within the normative `MaxIter × (⌈log₂(1/ε_μ)⌉ + 2)` budget; Test 30: `MaxIter = 0` rejected), `unit(Py)` `test_ltv_disc_io.py` (`test_trust_region_helps_on_hard_case`, `test_trust_region_mu_advances_and_terminates`, `test_max_iter_rejects_non_positive`). **`none` for `cross-vector`** — no stored vector exercises `TrustRegion` (the `reference_ltv_io` case runs `μ = 0`); the benefit is threshold-dependent so a pinned vector would be brittle. The guarded final `μ = 0` refinement and best-iterate-per-stage semantics are `manual` (SPEC §8.12.4).
 - §8.12.12 model-order selection (`sidModelOrder`) — `cross-vector` (`reference_model_order`), `unit(M)` `test_sidModelOrder.m`, `unit(Py)` `test_model_order.py`.
 - §8.12.13 batch LTV state estimation (`sidLTVStateEst`) — `cross-vector` (`reference_ltv_state_est`), `unit(M)` `test_sidLTVStateEst.m`, `unit(Py)` `test_ltv_state_est.py`.
 - §8.13 LTI realization from I/O frequency response (`sidLTIfreqIO`) — `cross-vector` (`reference_lti_freq_io`, at `H = I`), `unit(M)` `test_sidLTIfreqIO.m`, `unit(Py)` `test_lti_freq_io.py`. **`none` (#144)** for the defective-`A` stabilization path, accuracy at `H ≠ I`, and the `sidLTVdiscFrozen`-of-an-IO-result contract — all open gaps documented in #144.
