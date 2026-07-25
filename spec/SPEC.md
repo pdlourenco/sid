@@ -1385,28 +1385,28 @@ A_smoothed = rec.A_smoothed;  % improved estimates for last 50 steps
 
 #### 8.11.1 Concept
 
-`sidFreqMap` produces a non-parametric estimate `Ĝ_BT(ω, t)` with uncertainty, independent of `λ`. For any candidate `λ`, compute the frozen transfer function from COSMIC's `A(k)`, `B(k)`:
+`sidFreqMap` produces a non-parametric estimate `Ĝ_BT(ω, t)` with uncertainty, independent of `λ`. For any candidate `λ`, compute the frozen transfer function from COSMIC's `A(k)`, `B(k)` **and the model's observation matrix `H`**:
 
 ```
-G_cosmic(ω, k) = (e^{jω} I - A(k))⁻¹ B(k)
+G_cosmic(ω, k) = H (e^{jω} I - A(k))⁻¹ B(k)
 ```
 
-and propagate the posterior covariance `Σ_kk` to obtain `σ_cosmic(ω, k)` via the Jacobian of the `(A, B) → G(ω)` mapping.
+This is the **output** transfer function (`p_y × q`). `H` is the identity for a full-state `sidLTVdisc` result — then it reduces to the state response `(e^{jω}I − A)⁻¹B` — and the `p_y × n` observation matrix for an `sidLTVdiscIO` result. Folding `H` in keeps the frozen bands in the same output space as the non-parametric estimate `Ĝ_BT(ω, t)` they are compared against; omitting it (returning the `n × q` state response) makes the two dimensionally incomparable whenever `p_y ≠ n`. Propagate the posterior covariance `Σ_kk` to obtain `σ_cosmic(ω, k)` via the Jacobian of the `(A, B) → G(ω)` mapping.
 
-**Frozen transfer function Jacobian.** Let `R = (e^{jω}I - A(k))⁻¹`. The Jacobian entries are:
-
-```
-∂G_{ab}/∂A_{ji} = R_{aj} × [R × B]_{ib}
-∂G_{ab}/∂B_{ji} = R_{aj} × δ_{ib}
-```
-
-Since `C(k) = [A(k)ᵀ; B(k)ᵀ]` and `Cov(vec(C(k))) = Σ ⊗ P(k)`, the Jacobian for entry `G_{ab}` has rank-1 structure `J_{ab} = v rₐ` where `v = [Gk(:,b); eᵦ] ∈ ℝᵈ` (`Gk = R B`, `eᵦ` is the b-th unit vector in `ℝᵍ`) and `rₐ = R(a,:) ∈ ℂ¹ˣᵖ`. The exact first-order variance is:
+**Frozen transfer function Jacobian.** Let `R = (e^{jω}I - A(k))⁻¹` (the `n × n` state resolvent) and `R̃ = H R` (the `p_y × n` output resolvent). The Jacobian entries, for output index `a ∈ {1,…,p_y}`, are:
 
 ```
-Var(G_{ab}) = (vᴴ P(k) v) × (rₐ Σ rₐᴴ)
+∂G_{ab}/∂A_{ji} = R̃_{aj} × [R × B]_{ib}
+∂G_{ab}/∂B_{ji} = R̃_{aj} × δ_{ib}
 ```
 
-This uses the full `P(k)` and full `Σ` via two scalar quadratic forms. Cost: `O(d² + p²)` per entry.
+Since `C(k) = [A(k)ᵀ; B(k)ᵀ]` and `Cov(vec(C(k))) = Σ ⊗ P(k)`, the Jacobian for entry `G_{ab}` has rank-1 structure `J_{ab} = v r̃ₐ` where `v = [Gk(:,b); eᵦ] ∈ ℝᵈ` (`Gk = R B`, the `n × q` state response; `eᵦ` is the b-th unit vector in `ℝᵍ`) and `r̃ₐ = R̃(a,:) = (H R)(a,:) ∈ ℂ¹ˣⁿ`. The exact first-order variance is:
+
+```
+Var(G_{ab}) = (vᴴ P(k) v) × (r̃ₐ Σ r̃ₐᴴ)
+```
+
+This uses the full `P(k)` and full `Σ` via two scalar quadratic forms. Cost: `O(d² + n²)` per entry. When `H = I` (`p_y = n`), `r̃ₐ = R(a,:)` and this recovers the state-response variance exactly, so a full-state `sidLTVdisc` result is unchanged.
 
 The criterion: **find the largest λ whose COSMIC posterior bands are consistent with the non-parametric bands.**
 
@@ -1617,6 +1617,8 @@ frozen = sidLTVdiscFrozen(result, 'SampleTime', Ts);
 sidBodePlot(frozen);
 ```
 
+**Frozen-of-IO contract.** When `sidLTVdiscFrozen` is given an `sidLTVdiscIO` result, it returns the **output** frozen transfer function `H(e^{jω}I − A(k))⁻¹B(k)` (`p_y × q`), using the result's stored `H` (§8.11.1), with uncertainty propagated through the extra left-multiplication by `H`. This is what makes the frozen bands directly comparable to the output-based non-parametric estimate (`sidFreqMap` / `sidBodePlot`) — the comparison this usage is written for. For a full-state `sidLTVdisc` result (`H = I`) the output response equals the state response, so that path is unchanged.
+
 #### 8.12.12 Model Order Determination (`sidModelOrder`)
 
 When the state dimension `n` is unknown, it can be determined prior to calling `sidLTVdiscIO` using `sidModelOrder`, which estimates `n` from the singular value decomposition of a block Hankel matrix built from the frequency response.
@@ -1756,6 +1758,13 @@ Given partial I/O data `(Y, U)` and observation matrix `H`, estimate constant LT
    B_r = Σ_n^{1/2} V_n(1:q, :)^T                   (n × q)
    ```
 
+   If the requested order `n` exceeds the **numerical rank** of `H₀` — i.e.
+   `σ_n ≤ σ_1 · tol` with `tol = max(r·p_y, r·q)·eps` — then `Σ_n^{-1/2}` is not
+   well defined and the realization is singular. The solver **raises an error**
+   (it must not form `1/√σ_n → ∞`, which silently propagates `inf`/`NaN`).
+   Request an order at or below the resolvable rank (see `sidModelOrder`,
+   §8.12.12).
+
 5. **H-basis transform.** Find `T` such that `C_r T⁻¹ = H`:
 
    ```
@@ -1765,7 +1774,11 @@ Given partial I/O data `(Y, U)` and observation matrix `H`, estimate constant LT
 
    The `pinv` handles any `p_y ≤ n` or `p_y > n`. If `T⁻¹` is ill-conditioned (`rcond < 10³ eps`), a warning is issued and the raw realization `(A_r, B_r)` is returned.
 
-6. **Stabilization.** Eigenvalues of `A₀` with `|λ| > 1` are reflected inside the unit circle: `λ ← 1/λ̄`.
+6. **Stabilization.** Eigenvalues of `A₀` with `|λ| > 1` are reflected inside the unit circle (`λ ← 1/λ̄`), and any eigenvalue whose magnitude still exceeds `MaxStabilize` (§8.13.2, default `0.999`) is then clamped to that radius (`λ ← MaxStabilize · λ/|λ|`). Both operations change only the **modulus** of each eigenvalue, never its argument.
+
+   The rescaled spectrum is reimposed **in real Schur form**, never by eigenvector inversion. Factor `A₀ = Q T Qᵀ` (real Schur: `Q` orthogonal, `T` block-upper-triangular with 1×1 real and 2×2 complex-conjugate-pair blocks on its diagonal). For each diagonal block, multiply the block by the scalar `s = |λ_target| / |λ_current|` that maps its eigenvalue modulus to the reflected/clamped target — this preserves the argument of a 2×2 complex pair and the sign of a 1×1 real eigenvalue, and leaves the strictly-upper-triangular part of `T` (hence `Q`) untouched. Reconstruct `A₀ ← Q T' Qᵀ`.
+
+   Because `Q` is orthogonal (`cond(Q) = 1`), this is numerically stable even when `A₀` is **defective** or has repeated eigenvalues. The eigenvector form `A₀ = V diag(λ) V⁻¹` must **not** be used: `V` is singular for defective `A₀` — e.g. an integrator chain (repeated eigenvalue, defective), which reaches this step because `|λ| = 1 > MaxStabilize` triggers the clamp — and `V⁻¹` then produces a spurious blow-up (entries `~10¹⁴`) rather than a stabilized matrix.
 
 #### 8.13.2 Inputs
 
