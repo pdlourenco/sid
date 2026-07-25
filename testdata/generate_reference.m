@@ -810,6 +810,35 @@ ref_vc.tolerance = struct('A_rel', 1e-2, 'B_rel', 1e-2, ...
 
 writeJSON(fullfile(thisDir, 'reference_ltv_cosmic_varlen.json'), ref_vc);
 
+% ---- #145d Batch C: H != I realization vector (closes the #144 deferral) ----
+
+fprintf('Generating reference_lti_freq_io_partial.json...\n');
+rng(3301);
+N_lp = 400; p_lp = 3; q_lp = 1;
+A0p_true = [0.9 0.2 0.0; -0.15 0.85 0.1; 0.0 -0.1 0.8];
+B0p_true = [1.0; 0.5; 0.2];
+% p_y = 2 < n = 3 (partial observation). H is a genuine 2-D matrix so the JSON
+% round-trip preserves its (p_y x n) shape -- a 1xn row would collapse to a
+% column under MATLAB jsondecode and flip the observation orientation.
+H_lp = [1 0 0; 0 1 0];
+X_lp = zeros(N_lp + 1, p_lp); U_lp = randn(N_lp, q_lp);
+X_lp(1, :) = randn(1, p_lp);
+for k = 1:N_lp
+    X_lp(k+1, :) = (A0p_true * X_lp(k, :)' + B0p_true * U_lp(k, :)')';  % noiseless
+end
+Y_lp = (H_lp * X_lp')';
+[A0_lp, B0_lp] = sidLTIfreqIO(Y_lp, U_lp, H_lp);
+
+ref_lp = struct();
+ref_lp.function_name = 'sidLTIfreqIO';
+ref_lp.params = struct();
+ref_lp.input = struct('Y', Y_lp, 'U', U_lp, 'H', H_lp);
+ref_lp.output = struct('A0', A0_lp, 'B0', B0_lp);
+ref_lp.tolerance = struct('A0_rel', 1e-6, 'B0_rel', 1e-6, ...
+    'A0_atol', 1e-8, 'B0_atol', 1e-8);
+
+writeJSON(fullfile(thisDir, 'reference_lti_freq_io_partial.json'), ref_lp);
+
 fprintf('\n=== All reference data generated ===\n');
 
 end

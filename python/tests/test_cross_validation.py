@@ -1380,3 +1380,39 @@ class TestCrossValidationLTVCosmicVarLen:
             **_tol(ref, "Cost"),
             err_msg="Var-len COSMIC cost mismatch vs MATLAB",
         )
+
+
+class TestCrossValidationLTIFreqIOPartial:
+    """LTI realization at H != I (p_y < n): reference_lti_freq_io_partial.json (#145d/#144)."""
+
+    def _run(self):
+        ref = _load("reference_lti_freq_io_partial.json")
+        Y = _to_array(ref["input"], "Y")
+        U = _to_array(ref["input"], "U")
+        if U.ndim == 1:
+            U = U[:, np.newaxis]
+        H = _to_array(ref["input"], "H")
+        if H.ndim == 1:
+            H = H[np.newaxis, :]
+        from sid.lti_freq_io import lti_freq_io
+
+        a0, b0 = lti_freq_io(Y, U, H)
+        return ref, a0, b0
+
+    def test_partial_a0(self):
+        ref, a0, _ = self._run()
+        np.testing.assert_allclose(
+            a0.ravel(),
+            _to_array(ref["output"], "A0").ravel(),
+            **_tol(ref, "A0"),
+            err_msg="lti_freq_io A0 (H!=I) mismatch vs MATLAB",
+        )
+
+    def test_partial_b0(self):
+        ref, _, b0 = self._run()
+        np.testing.assert_allclose(
+            b0.ravel(),
+            _to_array(ref["output"], "B0").ravel(),
+            **_tol(ref, "B0"),
+            err_msg="lti_freq_io B0 (H!=I) mismatch vs MATLAB",
+        )
