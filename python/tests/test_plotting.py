@@ -126,7 +126,6 @@ class TestBodePlot:
         assert h["ax_phase"] is ax2
         plt.close(fig)
 
-
     def test_confidence_band_math(self, siso_result) -> None:
         """The shaded band edges match the SPEC §11.1 formulas (#123).
 
@@ -214,7 +213,6 @@ class TestSpectrumPlot:
         assert len(lines) == 1, "MIMO spectrum should plot one reduced channel"
         assert lines[0].get_ydata().ndim == 1
         plt.close(h["fig"])
-
 
     def test_confidence_band_math(self, siso_result) -> None:
         """The shaded band edges match the SPEC §11.2 formula (#123)."""
