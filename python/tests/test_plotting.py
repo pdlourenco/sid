@@ -126,6 +126,32 @@ class TestBodePlot:
         assert h["ax_phase"] is ax2
         plt.close(fig)
 
+    def test_confidence_band_math(self, siso_result) -> None:
+        """The shaded band edges match the SPEC §11.1 formulas (#123).
+
+        Existing tests check the band patch exists; this checks the actual
+        magnitude/phase edge VALUES (a formula typo would slip past today).
+        """
+        p = 3.0
+        h = bode_plot(siso_result, confidence=p)
+        G = np.asarray(siso_result.response).ravel()
+        gstd = np.asarray(siso_result.response_std).ravel()
+        mag = np.abs(G)
+        eps = 1e-20
+
+        mag_upper = 20.0 * np.log10(np.maximum(mag + p * gstd, eps))
+        mag_lower = 20.0 * np.log10(np.maximum(mag - p * gstd, eps))
+        yv = h["ax_mag"].collections[0].get_paths()[0].vertices[:, 1]
+        for e in np.concatenate([mag_upper, mag_lower]):
+            assert np.min(np.abs(yv - e)) < 1e-9, "Bode magnitude band edge (§11.1)"
+
+        phase = np.angle(G) * 180.0 / np.pi
+        phase_std = p * gstd / np.maximum(mag, eps) * 180.0 / np.pi
+        yvp = h["ax_phase"].collections[0].get_paths()[0].vertices[:, 1]
+        for e in np.concatenate([phase + phase_std, phase - phase_std]):
+            assert np.min(np.abs(yvp - e)) < 1e-9, "Bode phase band edge (§11.1)"
+        plt.close(h["fig"])
+
 
 # ======================================================================
 #  Spectrum plot
@@ -186,6 +212,21 @@ class TestSpectrumPlot:
         lines = h["ax"].get_lines()
         assert len(lines) == 1, "MIMO spectrum should plot one reduced channel"
         assert lines[0].get_ydata().ndim == 1
+        plt.close(h["fig"])
+
+    def test_confidence_band_math(self, siso_result) -> None:
+        """The shaded band edges match the SPEC §11.2 formula (#123)."""
+        p = 3.0
+        h = spectrum_plot(siso_result, confidence=p)
+        phiv = np.asarray(siso_result.noise_spectrum).ravel()
+        phiv_std = np.asarray(siso_result.noise_spectrum_std).ravel()
+        eps = 1e-20
+
+        upper = 10.0 * np.log10(np.maximum(phiv + p * phiv_std, eps))
+        lower = 10.0 * np.log10(np.maximum(phiv - p * phiv_std, eps))
+        yv = h["ax"].collections[0].get_paths()[0].vertices[:, 1]
+        for e in np.concatenate([upper, lower]):
+            assert np.min(np.abs(yv - e)) < 1e-9, "Spectrum band edge (§11.2)"
         plt.close(h["fig"])
 
 

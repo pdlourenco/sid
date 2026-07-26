@@ -167,4 +167,46 @@ close(h.fig);
 runner__nPassed = runner__nPassed + 1;
 fprintf('  Test 15 passed: sidBodePlot with ETFE result data validated.\n');
 
+%% Test 16: sidBodePlot confidence-band MATH (SPEC §11.1, #123)
+% Test 14 only checks a band patch exists; assert the actual edge values.
+p3 = 3;
+h = sidBodePlot(result_siso, 'Confidence', p3);
+G16 = result_siso.Response(:, 1);
+gs16 = result_siso.ResponseStd(:, 1);
+mag16 = abs(G16); nf16 = numel(mag16);
+magPatch = findobj(h.axMag, 'Type', 'patch');
+yd = get(magPatch, 'YData'); yd = yd(:);
+magUpperExp = 20 * log10(mag16 + p3 * gs16);
+magLowerExp = 20 * log10(max(mag16 - p3 * gs16, 1e-20));
+assert(max(abs(yd(1:nf16) - magUpperExp(:))) < 1e-9, ...
+    'Bode magnitude upper-band math (§11.1)');
+assert(max(abs(yd(nf16+1:2*nf16) - flipud(magLowerExp(:)))) < 1e-9, ...
+    'Bode magnitude lower-band math (§11.1)');
+phasePatch = findobj(h.axPhase, 'Type', 'patch');
+ydp = get(phasePatch, 'YData'); ydp = ydp(:);
+phase16 = angle(G16) * 180 / pi;
+pstdExp = p3 * gs16 ./ max(mag16, 1e-20) * 180 / pi;
+assert(max(abs(ydp(1:nf16) - (phase16(:) + pstdExp(:)))) < 1e-9, ...
+    'Bode phase upper-band math (§11.1)');
+close(h.fig);
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 16 passed: sidBodePlot confidence-band math (§11.1).\n');
+
+%% Test 17: sidSpectrumPlot confidence-band MATH (SPEC §11.2, #123)
+h = sidSpectrumPlot(result_siso, 'Confidence', p3);
+PhiV = result_siso.NoiseSpectrum(:, 1);
+PhiVStd = result_siso.NoiseSpectrumStd(:, 1);
+nf17 = numel(PhiV);
+specPatch = findobj(h.ax, 'Type', 'patch');
+yds = get(specPatch, 'YData'); yds = yds(:);
+upperExp = 10 * log10(max(PhiV + p3 * PhiVStd, 1e-20));
+lowerExp = 10 * log10(max(PhiV - p3 * PhiVStd, 1e-20));
+assert(max(abs(yds(1:nf17) - upperExp(:))) < 1e-9, ...
+    'Spectrum upper-band math (§11.2)');
+assert(max(abs(yds(nf17+1:2*nf17) - flipud(lowerExp(:)))) < 1e-9, ...
+    'Spectrum lower-band math (§11.2)');
+close(h.fig);
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 17 passed: sidSpectrumPlot confidence-band math (§11.2).\n');
+
 fprintf('test_sidPlotting: %d/%d passed\n', runner__nPassed, runner__nPassed);
