@@ -52,6 +52,16 @@ for i = 1:numel(files)
 
     ref = jsondecode(fileread(filepath));
 
+    % Structural: every vector must carry a well-formed provenance block
+    % (#172 / ADR-0002) so a stale or hand-edited payload is catchable.
+    if ~isfield(ref, 'provenance') || ~isstruct(ref.provenance) ...
+            || ~all(isfield(ref.provenance, {'generator', 'git_sha', 'git_date'}))
+        nFail = nFail + 1;
+        fprintf('    FAIL\n    missing or malformed provenance block\n');
+        failures{end+1} = name;  %#ok<AGROW>
+        continue;
+    end
+
     % Call the sid function with stored inputs and params
     if isfield(ref, 'params')
         params = ref.params;

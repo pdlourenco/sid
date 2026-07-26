@@ -40,9 +40,10 @@ entries changed in the same PR, so a fresh regeneration reproduces the committed
 file); and structural gates over outcome tests. The canonical *generation
 environment* for those regenerations — CI-pinned MATLAB R2025a — and the rule
 against committing engine-ULP regen churn are documented in
-[`testdata/README.md`](../../testdata/README.md). Recording generator provenance
-*inside* each artifact is adopted as a **target**, tracked in #172 — not yet a
-gate.
+[`testdata/README.md`](../../testdata/README.md). Generator provenance is recorded
+*inside* each artifact — a `provenance` block (generator path, source commit SHA
+and date) stamped by `generate_reference.m` and required by a structural gate in
+both validators (#172).
 
 ## Consequences
 
@@ -54,8 +55,9 @@ gate.
 - **Negative / cost:** adding a reference vector is now strictly more work — its
   consumer, in every port, lands in the same PR, and a near-zero field needs an
   `atol` chosen deliberately rather than defaulted.
-- **Cost / visible debt:** the generator-provenance target is stated but unmet,
-  so it remains debt until #172 lands the metadata and a check for it.
+- **Positive:** generator provenance is now recorded inside every vector and
+  gated by both validators (#172), so a stale or hand-edited payload is
+  catchable at a glance rather than by trust.
 
 ## Alternatives considered
 

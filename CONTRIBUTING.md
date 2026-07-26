@@ -115,9 +115,10 @@ after the #145 cross-validation remediation (see
    diff to justify it is a red flag. The `tolerance` block *may* be edited
    directly (rule 2), but the generator's matching tolerance entries change in
    the **same PR**, so a fresh regeneration reproduces the committed file
-   byte-for-byte — itself a checkable invariant (rule 5). (Recording generator
-   provenance *inside* each JSON — generator + source commit — is a tracked
-   follow-up: #172.)
+   byte-for-byte — itself a checkable invariant (rule 5). Each JSON also carries a
+   `provenance` block (generator + source commit SHA/date) stamped at generation
+   and required by a structural gate in both validators, so a stale or
+   hand-edited payload is caught (#172).
 5. **Structural gates over outcome tests.** Prefer a gate that checks the
    *mechanism* — every stored field is read and compared, every tolerance
    honored — over one that asserts only a specific numeric outcome. Outcome
