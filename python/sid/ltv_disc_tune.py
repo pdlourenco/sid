@@ -244,6 +244,13 @@ def _validation_tune(
     # ---- Dimensions from validation data ----
     X_val = np.asarray(X_val, dtype=np.float64)
     U_val = np.asarray(U_val, dtype=np.float64)
+    # Promote 1-D single-channel (N,) then 2-D single-trajectory (N, ·) to the
+    # canonical (N, ·, L) layout, per the §1 data model — matching how the rest
+    # of the toolbox accepts single-trajectory data (#189).
+    if X_val.ndim == 1:
+        X_val = X_val[:, np.newaxis]
+    if U_val.ndim == 1:
+        U_val = U_val[:, np.newaxis]
     if X_val.ndim == 2:
         X_val = X_val[:, :, np.newaxis]
     if U_val.ndim == 2:

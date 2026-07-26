@@ -213,4 +213,26 @@ assert(all(info_f.fractions >= 0 & info_f.fractions <= 1), 'All fractions should
 runner__nPassed = runner__nPassed + 1;
 fprintf('  Test 12 passed: fractions are in valid range.\n');
 
+%% Test 13: 2-D single-trajectory train/val accepted (SPEC §8.11, #189)
+% Single-trajectory data may be passed as (N+1 x p) / (N x q); the port
+% promotes it to L=1 rather than requiring 3-D. Port-symmetric with the Python
+% 1-D single-channel test (MATLAB has no 1-D vectors).
+rng(1189);
+p13 = 2; q13 = 1; N13 = 30;
+A13 = [0.9 0.1; -0.1 0.8]; B13 = [0.5; 0.3];
+Xtr13 = zeros(N13 + 1, p13); Utr13 = randn(N13, q13); Xtr13(1, :) = randn(1, p13);
+Xva13 = zeros(N13 + 1, p13); Uva13 = randn(N13, q13); Xva13(1, :) = randn(1, p13);
+for k = 1:N13
+    Xtr13(k+1, :) = (A13 * Xtr13(k, :)' + B13 * Utr13(k, :)')' + 0.02 * randn(1, p13);
+    Xva13(k+1, :) = (A13 * Xva13(k, :)' + B13 * Uva13(k, :)')' + 0.02 * randn(1, p13);
+end
+[bestRes13, bestLam13, losses13] = sidLTVdiscTune( ...
+    Xtr13, Utr13, Xva13, Uva13, 'LambdaGrid', logspace(-2, 6, 15));
+assert(isstruct(bestRes13) && isscalar(bestLam13) && bestLam13 > 0, ...
+    '2-D single-trajectory tune should return a valid result');
+assert(numel(losses13) == 15 && all(losses13 > 0), ...
+    '2-D single-trajectory tune should return per-lambda losses');
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 13 passed: 2-D single-trajectory train/val accepted.\n');
+
 fprintf('test_sidLTVdiscTune: %d/%d passed\n', runner__nPassed, runner__nPassed);
