@@ -406,3 +406,40 @@ class TestLTVDiscTune:
         assert np.all(fractions >= 0) and np.all(fractions <= 1), (
             "All fractions should be in [0, 1]"
         )
+
+    # ------------------------------------------------------------------
+    # #189: validation accepts 1-D single-channel val data (port symmetry)
+    # ------------------------------------------------------------------
+    def test_validation_accepts_1d_single_channel(self) -> None:
+        """1-D single-channel val data is promoted and matches 2-D (#189).
+
+        Previously the per-trajectory RMSE indexed a 3-D val set unconditionally,
+        so a 1-D (N,) val vector (what a q=1 column becomes, e.g. via JSON, or a
+        bare 1-D user array) raised IndexError while MATLAB accepted it.
+        """
+        rng = np.random.default_rng(189)
+        n, a, b = 40, 0.85, 1.0
+
+        def mk():
+            x = np.zeros((n + 1, 1))
+            u = rng.standard_normal((n, 1))
+            x[0] = rng.standard_normal(1)
+            for k in range(n):
+                x[k + 1] = a * x[k] + b * u[k] + 0.02 * rng.standard_normal(1)
+            return x, u
+
+        x_tr, u_tr = mk()
+        x_va, u_va = mk()
+        grid = np.logspace(-2, 6, 15)
+
+        _, lam_2d, loss_2d = ltv_disc_tune(x_tr, u_tr, x_va, u_va, lambda_grid=grid)
+        # 1-D single-channel val (both X and U)
+        _, lam_1d, loss_1d = ltv_disc_tune(x_tr, u_tr, x_va.ravel(), u_va.ravel(), lambda_grid=grid)
+
+        assert lam_1d == lam_2d, "1-D val must select the same lambda as 2-D"
+        np.testing.assert_allclose(
+            loss_1d,
+            loss_2d,
+            rtol=1e-12,
+            err_msg="1-D val losses must match 2-D",
+        )

@@ -1073,6 +1073,8 @@ where `x̂` is the state predicted by propagating the identified model from init
 | `'LambdaGrid'` | vector | `logspace(-3, 15, 50)` (validation), `logspace(0, 10, 25)` (frequency) |
 | `'Algorithm'` | char | `'cosmic'` |
 
+The `X`/`U` train and validation arguments follow the standard §1 data-model shape convention: a single trajectory may be passed as `(N+1 × p)` / `(N × q)` (and a single channel as a 1-D `(N+1)` / `(N)` vector), which the implementation promotes to the canonical `(… × L)` layout with `L = 1`. Both ports accept these forms; neither is tightened to reject a shape the other allows (issue #189).
+
 **Outputs:**
 
 | Field | Type | Description |
