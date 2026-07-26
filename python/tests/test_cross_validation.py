@@ -1416,3 +1416,88 @@ class TestCrossValidationLTIFreqIOPartial:
             **_tol(ref, "B0"),
             err_msg="lti_freq_io B0 (H!=I) mismatch vs MATLAB",
         )
+
+
+class TestCrossValidationLTVStateEstVarLen:
+    """Variable-length sidLTVStateEst: reference_ltv_state_est_varlen.json (#145d)."""
+
+    def test_state_est_varlen(self):
+        ref = _load("reference_ltv_state_est_varlen.json")
+        Y = [np.array(t, dtype=np.float64) for t in ref["input"]["Y"]]
+        U = [np.array(t, dtype=np.float64) for t in ref["input"]["U"]]
+        A = _to_array(ref["input"], "A")
+        B = _to_array(ref["input"], "B")
+        H = _to_array(ref["input"], "H")
+
+        from sid.ltv_state_est import ltv_state_est
+
+        x_hat = ltv_state_est(Y, U, A, B, H)
+        # MATLAB flatten(cell) concatenates each trajectory column-major.
+        actual = np.concatenate([np.asarray(x).flatten(order="F") for x in x_hat])
+        expected = np.concatenate([np.array(t).flatten(order="F") for t in ref["output"]["X_hat"]])
+        np.testing.assert_allclose(
+            actual,
+            expected,
+            **_tol(ref, "X_hat"),
+            err_msg="var-len StateEst X_hat mismatch vs MATLAB",
+        )
+
+
+class TestCrossValidationLTVTune:
+    """Validation-mode lambda tuning: reference_ltv_tune.json (#145d)."""
+
+    def _run(self):
+        ref = _load("reference_ltv_tune.json")
+        from sid.ltv_disc_tune import ltv_disc_tune
+
+        grid = np.asarray(ref["params"]["LambdaGrid"], dtype=np.float64).ravel()
+        _, best_lambda, all_losses = ltv_disc_tune(
+            _to_array(ref["input"], "X_train"),
+            _to_array(ref["input"], "U_train"),
+            _to_array(ref["input"], "X_val"),
+            _to_array(ref["input"], "U_val"),
+            method="validation",
+            lambda_grid=grid,
+        )
+        return ref, best_lambda, all_losses
+
+    def test_tune_best_lambda(self):
+        ref, best_lambda, _ = self._run()
+        np.testing.assert_allclose(
+            float(best_lambda),
+            float(_to_array(ref["output"], "BestLambda")),
+            **_tol(ref, "BestLambda"),
+            err_msg="tune BestLambda mismatch vs MATLAB",
+        )
+
+    def test_tune_all_losses(self):
+        ref, _, all_losses = self._run()
+        np.testing.assert_allclose(
+            np.asarray(all_losses).ravel(),
+            _to_array(ref["output"], "AllLosses").ravel(),
+            **_tol(ref, "AllLosses"),
+            err_msg="tune AllLosses mismatch vs MATLAB",
+        )
+
+
+class TestCrossValidationFrozenOfIO:
+    """Frozen TF of an Output-COSMIC (H!=I) result: reference_frozen_of_io.json (#145d)."""
+
+    def test_frozen_of_io_response(self):
+        ref = _load("reference_frozen_of_io.json")
+        Y = _to_array(ref["input"], "Y")
+        U = _to_array(ref["input"], "U")
+        H = _to_array(ref["input"], "H")
+
+        from sid.ltv_disc_frozen import ltv_disc_frozen
+        from sid.ltv_disc_io import ltv_disc_io
+
+        res = ltv_disc_io(Y, U, H, lambda_=float(ref["params"]["Lambda"]))
+        ts = np.array([int(ref["params"]["frozen_TimeSteps"])]) - 1  # 1-based -> 0-based
+        frz = ltv_disc_frozen(res, time_steps=ts)
+        np.testing.assert_allclose(
+            frz.response.ravel(),
+            _to_complex(ref["output"], "Response").ravel(),
+            **_tol(ref, "Response"),
+            err_msg="frozen-of-IO response mismatch vs MATLAB",
+        )

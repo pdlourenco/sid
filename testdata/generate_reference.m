@@ -839,6 +839,97 @@ ref_lp.tolerance = struct('A0_rel', 1e-6, 'B0_rel', 1e-6, ...
 
 writeJSON(fullfile(thisDir, 'reference_lti_freq_io_partial.json'), ref_lp);
 
+% ---- #145d trio: validator-infrastructure cross-vectors ----
+
+fprintf('Generating reference_ltv_state_est_varlen.json...\n');
+rng(3401);
+p_vs = 2; q_vs = 1; py_vs = 2; L_vs = 3;
+A0_vs = [0.9 0.1; -0.1 0.85]; B0_vs = [1; 0.5]; H_vs = eye(p_vs);
+Ns_vs = [22; 30; 26]; Nmax_vs = max(Ns_vs);
+A_vs = repmat(A0_vs, [1 1 Nmax_vs]); B_vs = repmat(B0_vs, [1 1 Nmax_vs]);
+Y_vs = cell(L_vs, 1); U_vs = cell(L_vs, 1);
+for l = 1:L_vs
+    Nl = Ns_vs(l);
+    U_vs{l} = randn(Nl, q_vs);
+    Xl = zeros(Nl + 1, p_vs); Xl(1, :) = randn(1, p_vs);
+    for k = 1:Nl
+        Xl(k+1, :) = (A0_vs * Xl(k, :)' + B0_vs * U_vs{l}(k, :)')' ...
+            + 0.01 * randn(1, p_vs);
+    end
+    Y_vs{l} = (H_vs * Xl')' + 0.05 * randn(Nl + 1, py_vs);
+end
+Xhat_vs = sidLTVStateEst(Y_vs, U_vs, A_vs, B_vs, H_vs);
+
+ref_vs = struct();
+ref_vs.function_name = 'sidLTVStateEst';
+ref_vs.params = struct();
+% Wrap the cells; X_hat is a ragged cell — compareOutputs' flatten() handles it.
+ref_vs.input = struct('Y', {Y_vs}, 'U', {U_vs}, 'A', A_vs, 'B', B_vs, 'H', H_vs);
+ref_vs.output = struct('X_hat', {Xhat_vs});
+ref_vs.tolerance = struct('X_hat_rel', 1e-6, 'X_hat_atol', 1e-10);
+
+writeJSON(fullfile(thisDir, 'reference_ltv_state_est_varlen.json'), ref_vs);
+
+fprintf('Generating reference_ltv_tune.json...\n');
+rng(3402);
+p_tn = 2; q_tn = 1; N_tn = 40; L_tn = 4;
+A_tn = [0.9 0.1; -0.1 0.8]; B_tn = [0.5; 0.3];
+% 3-D (multi-trajectory) train/val — both ports' validation RMSE expect this
+% layout (Python's per-trajectory RMSE indexes the 3rd dim).
+Xtr = zeros(N_tn + 1, p_tn, L_tn); Utr = randn(N_tn, q_tn, L_tn);
+Xva = zeros(N_tn + 1, p_tn, L_tn); Uva = randn(N_tn, q_tn, L_tn);
+for l = 1:L_tn
+    Xtr(1, :, l) = randn(1, p_tn); Xva(1, :, l) = randn(1, p_tn);
+    for k = 1:N_tn
+        Xtr(k+1, :, l) = (A_tn * Xtr(k, :, l)' + B_tn * Utr(k, :, l)')' ...
+            + 0.02 * randn(1, p_tn);
+        Xva(k+1, :, l) = (A_tn * Xva(k, :, l)' + B_tn * Uva(k, :, l)')' ...
+            + 0.02 * randn(1, p_tn);
+    end
+end
+grid_tn = logspace(-2, 8, 20)';
+[~, bestLambda_tn, allLosses_tn] = sidLTVdiscTune( ...
+    Xtr, Utr, Xva, Uva, 'LambdaGrid', grid_tn);
+
+ref_tn = struct();
+ref_tn.function_name = 'sidLTVdiscTune';
+ref_tn.params = struct('LambdaGrid', grid_tn);
+ref_tn.input = struct('X_train', Xtr, 'U_train', Utr, 'X_val', Xva, 'U_val', Uva);
+ref_tn.output = struct('BestLambda', bestLambda_tn, 'AllLosses', allLosses_tn(:));
+ref_tn.tolerance = struct('BestLambda_rel', 1e-6, ...
+    'AllLosses_rel', 1e-6, 'AllLosses_atol', 1e-10);
+
+writeJSON(fullfile(thisDir, 'reference_ltv_tune.json'), ref_tn);
+
+fprintf('Generating reference_frozen_of_io.json...\n');
+rng(3403);
+n_fi = 3; q_fi = 1; py_fi = 2; N_fi = 50; L_fi = 8;
+A_fi = [0.9 0.2 0.0; -0.15 0.85 0.1; 0.0 -0.1 0.8];
+B_fi = [1.0; 0.5; 0.2];
+H_fi = [1 0 0; 0 1 0];   % p_y = 2 < n = 3; genuine 2-D (no row-collapse)
+U_fi = randn(N_fi, q_fi, L_fi);
+Y_fi = zeros(N_fi + 1, py_fi, L_fi); X_fi = zeros(N_fi + 1, n_fi, L_fi);
+for l = 1:L_fi
+    X_fi(1, :, l) = randn(1, n_fi); Y_fi(1, :, l) = (H_fi * X_fi(1, :, l)')';
+    for k = 1:N_fi
+        X_fi(k+1, :, l) = (A_fi * X_fi(k, :, l)' + B_fi * U_fi(k, :, l)')';
+        Y_fi(k+1, :, l) = (H_fi * X_fi(k+1, :, l)')';
+    end
+end
+r_io_fi = sidLTVdiscIO(Y_fi, U_fi, H_fi, 'Lambda', 1e3);
+frz_fi = sidLTVdiscFrozen(r_io_fi, 'TimeSteps', 10);
+
+ref_fi = struct();
+ref_fi.function_name = 'frozen_of_io';   % synthetic dispatch key (validator)
+ref_fi.params = struct('Lambda', 1e3, 'frozen_TimeSteps', 10);
+ref_fi.input = struct('Y', Y_fi, 'U', U_fi, 'H', H_fi);
+ref_fi.output = struct( ...
+    'Response_real', real(frz_fi.Response), ...
+    'Response_imag', imag(frz_fi.Response));
+ref_fi.tolerance = struct('Response_rel', 1e-2, 'Response_atol', 1e-8);
+
+writeJSON(fullfile(thisDir, 'reference_frozen_of_io.json'), ref_fi);
+
 fprintf('\n=== All reference data generated ===\n');
 
 end
