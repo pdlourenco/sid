@@ -63,15 +63,21 @@ upgrading.
 
 - **Numerical diagnostics** (stable warning identifiers, part of the contract):
   `sid:notConverged` (base alternation hit the iteration cap), `sid:stabilized`
-  (stabilization moved eigenvalues), `sid:orderExceedsRank`.
+  (stabilization moved eigenvalues), `sid:orderExceedsRank`. Identifiers are the
+  MATLAB/Octave form; the Python port raises the equivalent diagnostics as
+  message-only warnings (`orderExceedsRank` is an error carrying
+  `code='order_exceeds_rank'`).
 - **Generator-provenance metadata**: every `testdata/reference_*.json` carries a
   `provenance` block (generator, source-commit SHA/date), gated by both
   validators. (#172, ADR-0002)
 
 ### Testing & verification
 
-- Cross-language reference vectors grew 22 → 32; **every `Verified by: none`
-  cross-vector gap is discharged**. New coverage in both ports for the L-curve
+- Cross-language reference vectors grew 22 → 32; **every reference-vector gap
+  tracked by #145d is discharged**. Three `none` cross-vector tags remain by
+  design, each with recorded rationale (§2.6–2.7 / §10.2–10.3 degenerate inputs,
+  §8.12.4 threshold-dependent trust-region benefit). New coverage in both ports
+  for the L-curve
   auto-λ corner selection and ill-conditioning warning (#120), the Welch
   inner-path (#122), the plotting confidence-band formulas (#123), the
   frequency-domain simulation helper and `sidLTIfreqIO` port symmetry (#124),
