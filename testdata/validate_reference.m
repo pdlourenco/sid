@@ -215,10 +215,27 @@ function result = callSidFunction(funcName, input, params)
         case 'sidLTVStateEst'
             X_hat = sidLTVStateEst(input.Y, input.U, ...
                                    input.A, input.B, input.H);
-            result = struct('X_hat', X_hat);
+            % Assign (not struct('X_hat', X_hat)) so a variable-length CELL
+            % X_hat becomes a scalar-struct field rather than a struct array.
+            result = struct();
+            result.X_hat = X_hat;
         case 'sidLTIfreqIO'
             [A0, B0] = sidLTIfreqIO(input.Y, input.U, input.H);
             result = struct('A0', A0, 'B0', B0);
+        case 'sidLTVdiscTune'
+            % Validation-mode tuning (4 positional args -> train/val split).
+            [~, bestLambda, allLosses] = sidLTVdiscTune( ...
+                input.X_train, input.U_train, input.X_val, input.U_val, ...
+                'LambdaGrid', params.LambdaGrid);
+            result = struct('BestLambda', bestLambda, 'AllLosses', allLosses(:));
+        case 'frozen_of_io'
+            % Frozen transfer function OF an Output-COSMIC (H != I) result:
+            % the output response H(zI-A)^-1 B. Synthetic dispatch key.
+            r_io = sidLTVdiscIO(input.Y, input.U, input.H, ...
+                                'Lambda', params.Lambda);
+            frozen = sidLTVdiscFrozen(r_io, ...
+                                      'TimeSteps', params.frozen_TimeSteps);
+            result = struct('Response', frozen.Response);
         case 'util_msd'
             % util_msd (in matlab/examples/) is the canonical spring-
             % mass-damper plant helper. See spec/EXAMPLES.md section 2.1
