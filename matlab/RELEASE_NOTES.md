@@ -1,7 +1,17 @@
-# sid v0.1.0 — matlab/octave — Release Notes
+# sid v0.2.0 — matlab/octave — Release Notes
 
-**Release date:** 2026-04-11
+**Release date:** 2026-07-26
 **License:** MIT
+
+## Changes in this release
+
+v0.2.0 is the correctness-and-verification release: it remediates every finding
+of the 2026-07-12 repo-wide review, closes the cross-language verification gaps,
+and hardens the contract-artifact machinery. Several fixes change numerical
+outputs — notably the COSMIC posterior covariance / `AStd` rescaling (#137), the
+Output-COSMIC trust-region rewrite (#138), and the `sidLTIfreqIO` stabilization
+and `sidLTVdiscFrozen`-of-IO output response (#144). See
+[`../CHANGELOG.md`](../CHANGELOG.md) for the full, grouped list.
 
 ## Overview
 
@@ -24,7 +34,7 @@ Online.
 ## Release Contents
 
 ```
-sid-v0.1.0-matlab/
+sid-v0.2.0-matlab/
 ├── README.md                           # Overview, features, references
 ├── LICENSE                             # MIT License
 ├── spec/
@@ -97,7 +107,7 @@ sid-v0.1.0-matlab/
 Unpack the release archive, then add sid to the MATLAB/Octave path:
 
 ```matlab
-run('/path/to/sid-v0.1.0-matlab/matlab/sidInstall.m')
+run('/path/to/sid-v0.2.0-matlab/matlab/sidInstall.m')
 ```
 
 Or clone the full repository for update access via `git pull`:
@@ -239,8 +249,8 @@ Every estimation function returns a struct with documented fields. Run
 - LPV identification
 - Unknown or time-varying observation matrix H
 - Alternative regularisation norms
-- Python and Julia implementations — Python ships as a separate v0.1.0
-  release (`v0.1-python`); Julia is planned for a later version.
+- Python and Julia implementations — Python ships as a separate v0.2.0
+  release (`v0.2.0-python`); Julia is planned for a later version.
 
 ## References
 
