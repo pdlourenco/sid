@@ -43,7 +43,6 @@ class TestCosmicSolveDiagnostic:
 
         assert np.all(np.isfinite(C)), "solver must still return a finite result"
         assert any(
-            "near-singular" in str(x.message).lower()
-            or "rcond" in str(x.message).lower()
+            "near-singular" in str(x.message).lower() or "rcond" in str(x.message).lower()
             for x in caught
         ), "expected §8.3.4 ill-conditioning warning"
