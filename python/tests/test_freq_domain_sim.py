@@ -39,7 +39,9 @@ class TestFreqDomainSim:
         Y = np.asarray(freq_domain_sim(G, freqs, u, N)).ravel()
 
         np.testing.assert_allclose(
-            Y, 2.0 * u.ravel(), atol=1e-10,
+            Y,
+            2.0 * u.ravel(),
+            atol=1e-10,
             err_msg="constant gain should scale the input by 2",
         )
 
