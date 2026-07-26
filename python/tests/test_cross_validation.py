@@ -1501,3 +1501,22 @@ class TestCrossValidationFrozenOfIO:
             **_tol(ref, "Response"),
             err_msg="frozen-of-IO response mismatch vs MATLAB",
         )
+
+
+class TestProvenanceMetadata:
+    """Every reference vector carries a well-formed provenance block (#172)."""
+
+    def test_all_vectors_have_provenance(self):
+        import glob
+        import os
+
+        files = sorted(glob.glob(str(TESTDATA / "reference_*.json")))
+        assert files, "no reference vectors found"
+        for path in files:
+            name = os.path.basename(path)
+            with open(path) as fh:
+                ref = json.load(fh)
+            prov = ref.get("provenance")
+            assert isinstance(prov, dict), f"{name}: missing provenance block (#172)"
+            for key in ("generator", "git_sha", "git_date"):
+                assert prov.get(key), f"{name}: provenance.{key} missing or empty"

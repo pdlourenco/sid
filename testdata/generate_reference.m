@@ -945,7 +945,8 @@ end
 
 
 function writeJSON(filepath, data)
-%WRITEJSON Write struct to JSON file.
+%WRITEJSON Write struct to JSON file, stamping generator provenance (#172).
+    data.provenance = getProvenance();
     json = jsonencode(data);
     fid = fopen(filepath, 'w');
     if fid == -1
@@ -953,4 +954,33 @@ function writeJSON(filepath, data)
     end
     fwrite(fid, json);
     fclose(fid);
+end
+
+
+function prov = getProvenance()
+%GETPROVENANCE Provenance block stamped into every vector (ADR-0002, #172).
+%   Records which commit's generate_reference.m produced the payload so a
+%   reviewer/gate can spot a stale or hand-edited vector. Uses the commit SHA
+%   and *commit* date (not wall-clock) so re-running the same commit reproduces
+%   identical bytes — provenance changes only when the generating commit does.
+    persistent cached;
+    if isempty(cached)
+        thisDir = fileparts(mfilename('fullpath'));
+        cached = struct( ...
+            'generator', 'testdata/generate_reference.m', ...
+            'git_sha', gitField(thisDir, 'rev-parse --short HEAD'), ...
+            'git_date', gitField(thisDir, 'show -s --format=%cd --date=short HEAD'));
+    end
+    prov = cached;
+end
+
+
+function out = gitField(dir, gitArgs)
+%GITFIELD Run a git command in DIR, returning trimmed stdout or 'unknown'.
+    [st, o] = system(sprintf('git -C "%s" %s', dir, gitArgs));
+    if st ~= 0
+        out = 'unknown';
+    else
+        out = strtrim(o);
+    end
 end
