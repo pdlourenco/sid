@@ -43,7 +43,15 @@ jobs:
           if [ "$EVENT" = "pull_request" ]; then
             files=$(git diff --name-only "origin/$BASE_REF...HEAD")
             echo "Changed files:"; printf '%s\n' "$files"
-            if [ -z "$files" ] || ! printf '%s\n' "$files" \
+            # Markdown is inert to the engine and the reference vectors, so a
+            # PR touching only docs (e.g. matlab/RELEASE_NOTES.md, which matches
+            # the matlab/ prefix) must not fire the suite or reference
+            # regeneration — that once hung for hours with nothing to generate.
+            # Strip .md first, then test the remainder against engine-relevant
+            # paths. testdata/generate_reference.m (issue #145e) survives the
+            # strip since it is not .md, so its edits still trigger a run.
+            code=$(printf '%s\n' "$files" | grep -vE '\.md$' || true)
+            if [ -z "$code" ] || ! printf '%s\n' "$code" \
                  | grep -qE '^(matlab/|testdata/|\.github/workflows/tests\.yml$)'; then
               run=false
             fi
@@ -80,6 +88,11 @@ jobs:
   matlab:
     name: MATLAB tests & examples
     runs-on: ubuntu-latest
+    # As with the octave job: a hung engine (or a stalled toolbox download /
+    # reference-generation step) should fail loudly and fast, not run to the
+    # 6-hour default. Toolbox-cache misses make this job heavier than octave,
+    # so the cap is higher; a genuine run finishes in ~5 min (cache hit).
+    timeout-minutes: 30
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -112,7 +125,15 @@ jobs:
           if [ "$EVENT" = "pull_request" ]; then
             files=$(git diff --name-only "origin/$BASE_REF...HEAD")
             echo "Changed files:"; printf '%s\n' "$files"
-            if [ -z "$files" ] || ! printf '%s\n' "$files" \
+            # Markdown is inert to the engine and the reference vectors, so a
+            # PR touching only docs (e.g. matlab/RELEASE_NOTES.md, which matches
+            # the matlab/ prefix) must not fire the suite or reference
+            # regeneration — that once hung for hours with nothing to generate.
+            # Strip .md first, then test the remainder against engine-relevant
+            # paths. testdata/generate_reference.m (issue #145e) survives the
+            # strip since it is not .md, so its edits still trigger a run.
+            code=$(printf '%s\n' "$files" | grep -vE '\.md$' || true)
+            if [ -z "$code" ] || ! printf '%s\n' "$code" \
                  | grep -qE '^(matlab/|testdata/|\.github/workflows/tests\.yml$)'; then
               run=false
             fi
