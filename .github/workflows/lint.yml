@@ -7,16 +7,23 @@ on:
       - 'matlab/**.m'
       - 'matlab/miss_hit.cfg'
       - '.github/scripts/**'
+  # No pull_request path filter: this is a cheap check (~1 min), so it runs on
+  # every PR to main and can therefore be a *required* status check without
+  # wedging PRs that don't touch matlab/ — a required check that never runs
+  # (because a path filter excluded it) stays "pending" forever. See ADR-0005.
   pull_request:
     branches: [main]
-    paths:
-      - 'matlab/**.m'
-      - 'matlab/miss_hit.cfg'
-      - '.github/scripts/**'
+
+# Least-privilege token: this job only checks out and lints, so contents: read
+# is all actions/checkout needs. Declaring the block explicitly also avoids the
+# private-fork checkout 404 that bites any workflow which later adds a write
+# scope (e.g. issues: write) without re-listing contents.
+permissions:
+  contents: read
 
 jobs:
   miss-hit:
-    name: Style & lint check
+    name: MATLAB/Octave lint
     runs-on: ubuntu-latest
 
     steps:

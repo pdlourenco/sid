@@ -16,7 +16,6 @@ import numpy as np
 from sid._exceptions import SidError
 from sid._results import SpectrogramResult
 
-
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
@@ -318,6 +317,14 @@ def spectrogram(
     Fs = 1.0 / Ts
     n_bins = nfft_val // 2 + 1
     S1 = np.sum(w**2)
+    # A degenerate window (e.g. a symmetric Hann of length <= 2, whose samples
+    # are all zero) has zero energy; the 1/(Fs*S1) PSD normalisation would then
+    # divide by zero and return silent all-NaN. Fail loudly instead (#135).
+    if S1 <= 0.0:
+        raise SidError(
+            "degenerate_window",
+            f"Window of length {L} has zero energy; increase window_length.",
+        )
 
     # ---- Pre-allocate ----
     stft_coeffs = np.zeros((n_bins, K, n_ch), dtype=np.complex128)
@@ -332,7 +339,10 @@ def spectrogram(
             X_sum = np.zeros(n_bins, dtype=np.complex128)
 
             for lt in range(n_traj):
-                if n_traj > 1:
+                # Branch on the array rank, not n_traj: a 3-D single-trajectory
+                # input (N, ch, 1) has n_traj == 1 but still needs the
+                # trajectory index to reduce to a 1-D segment (issue #135).
+                if x.ndim == 3:
                     seg = x[start_idx : start_idx + L, ch, lt] * w
                 else:
                     seg = x[start_idx : start_idx + L, ch] * w

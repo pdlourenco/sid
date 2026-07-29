@@ -63,10 +63,11 @@ def uncertainty_backward_pass(
 
     **Algorithm:**
 
-    1. Reconstruct unscaled ``S_u(k) = N * DtD(k) + reg(k)``
-    2. Forward pass: left Schur complements ``Lbd^L(k)``
-    3. Backward pass: right Schur complements ``Lbd^R(k)``
-    4. Combine: ``P(k) = (Lbd^L(k) + Lbd^R(k) - S_u(k))^{-1}``
+    1. Forward pass: left Schur complements ``Lbd^L(k)`` of the scaled Hessian.
+    2. Backward pass: right Schur complements ``Lbd^R(k)``.
+    3. Combine: ``P_scaled(k) = (Lbd^L(k) + Lbd^R(k) - S_scaled(k))^{-1}``.
+    4. Scale to the returned estimator: ``P(k) = P_scaled(k) / N`` (effective
+       prior weight ``N * lambda``; see SPEC.md §8.9.2 and issue #137).
 
     Complexity: O(N * d^3).
 
@@ -90,17 +91,19 @@ def uncertainty_backward_pass(
 
     eye_d = np.eye(d)
 
-    # ---- Reconstruct unscaled Hessian diagonal blocks ---------------------
-    S = np.zeros((d, d, N))
-    for k in range(N):
-        if k == 0:
-            reg = lambda_[0] * eye_d
-        elif k == N - 1:
-            reg = lambda_[N - 2] * eye_d
-        else:
-            reg = (lambda_[k - 1] + lambda_[k]) * eye_d
-        DtD_scaled = S_scaled[:, :, k] - reg
-        S[:, :, k] = N * DtD_scaled + reg
+    # ---- Schur recursion on the SCALED Hessian blocks --------------------
+    # SPEC.md §8.9.2: the returned MAP minimises ||unscaled residual||^2 +
+    # N*lambda*||dC||^2 (effective prior weight N*lambda, from the 1/sqrt(N)
+    # scaling of §8.3.2), so its Hessian is A_est = N * A_scaled and the
+    # reported posterior is P(k) = [A_est^{-1}]_kk = [A_scaled^{-1}]_kk / N =
+    # P_scaled(k) / N.  We therefore run the left/right Schur complements on the
+    # scaled blocks S_scaled (with the un-inflated lambda_k couplings) to obtain
+    # P_scaled, then divide by N -- exactly equivalent to inflating S -> N*S and
+    # the couplings -> (N*lambda_k)^2, but minimal.  (The previous code rebuilt
+    # V^T V + lambda F^T F -- unscaled data with an un-inflated prior -- the
+    # posterior of a different estimator, overstating P by up to a factor N; see
+    # issue #137.)
+    S = S_scaled
 
     # ---- Left Schur complements -- forward pass ---------------------------
     LbdL = np.zeros((d, d, N))
@@ -114,10 +117,10 @@ def uncertainty_backward_pass(
     for k in range(N - 2, -1, -1):
         LbdR[:, :, k] = S[:, :, k] - lambda_[k] ** 2 * np.linalg.solve(LbdR[:, :, k + 1], eye_d)
 
-    # ---- Combine: P(k) = (LbdL(k) + LbdR(k) - S(k))^{-1} ---------------
+    # ---- Combine: P_scaled(k) = (LbdL + LbdR - S)^{-1}, then P = P_scaled / N
     P = np.zeros((d, d, N))
     for k in range(N):
         M = LbdL[:, :, k] + LbdR[:, :, k] - S[:, :, k]
-        P[:, :, k] = np.linalg.solve(M, eye_d)
+        P[:, :, k] = np.linalg.solve(M, eye_d) / N
 
     return P

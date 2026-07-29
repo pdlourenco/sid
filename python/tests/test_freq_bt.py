@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 from scipy.signal import lfilter
 
-from sid import freq_bt, SidError
+from sid import SidError, freq_bt
 
 
 class TestFreqBT:
@@ -227,3 +227,95 @@ class TestFreqBT:
             np.abs(result_direct.response)
         )
         assert rel_err < 1e-8, f"M={M}: FFT path vs direct path relErr={rel_err:.2e}"
+
+
+class TestFreqBTInputShapes:
+    """Documented input shapes that previously crashed (issue #135)."""
+
+    def test_single_trajectory_3d(self) -> None:
+        """3-D single-trajectory input (N, ch, 1) is one trajectory, not a
+        crash in the L==1 covariance path."""
+        rng = np.random.default_rng(0)
+        y = rng.standard_normal((500, 1, 1))
+        u = rng.standard_normal((500, 1, 1))
+        result = freq_bt(y, u)
+        ref = freq_bt(y[:, :, 0], u[:, :, 0])
+        np.testing.assert_allclose(result.response, ref.response, rtol=1e-12)
+
+
+class TestFreqBTDegenerate:
+    """Degenerate-excitation handling (issues #143, #141)."""
+
+    def test_constant_input_all_nan_inf_warn(self) -> None:
+        """Constant u: G = NaN everywhere, sigma = Inf, one warning (§10.3)."""
+        rng = np.random.default_rng(0)
+        with pytest.warns(UserWarning):
+            r = freq_bt(rng.standard_normal(500), np.ones(500))
+        assert np.all(np.isnan(r.response))
+        assert np.all(np.isinf(r.response_std))
+        assert np.allclose(r.coherence, 0.0)
+
+    def test_zero_input_all_nan(self) -> None:
+        """Identically-zero u is caught the same way."""
+        rng = np.random.default_rng(1)
+        with pytest.warns(UserWarning):
+            r = freq_bt(rng.standard_normal(500), np.zeros(500))
+        assert np.all(np.isnan(r.response))
+        assert np.all(np.isinf(r.response_std))
+
+    def test_u_equals_y_valid(self) -> None:
+        """u = y is valid (perfect coherence), no warning (§10.3 table)."""
+        rng = np.random.default_rng(2)
+        x = lfilter([1.0], [1.0, -0.7], rng.standard_normal(600))
+        import warnings as _w
+
+        with _w.catch_warnings():
+            _w.simplefilter("error")
+            r = freq_bt(x, x)
+        assert np.all(np.isfinite(r.response))
+        assert np.allclose(r.coherence, 1.0, atol=1e-8)
+
+    def test_collinear_mimo_nan_and_inf_sigma(self) -> None:
+        """Collinear MIMO inputs: G all-NaN AND sigma all-Inf (§3.3 MIMO
+        sentinel via the NaN mask), plus a warning -- and no raw exception."""
+        rng = np.random.default_rng(3)
+        u = rng.standard_normal((1000, 1))
+        u2 = np.hstack([u, u])  # exactly collinear
+        y = rng.standard_normal((1000, 2))
+        with pytest.warns(UserWarning):
+            r = freq_bt(y, u2)
+        assert np.all(np.isnan(r.response))
+        assert np.all(np.isinf(r.response_std))
+
+    def test_partial_degeneracy_warns_channel(self) -> None:
+        """One constant input channel among active ones: per-channel warning,
+        healthy channels not NaN'd (§10.3 partial-degeneracy row)."""
+        rng = np.random.default_rng(4)
+        N = 2000
+        u_active = rng.standard_normal((N, 1))
+        u = np.hstack([np.full((N, 1), 3.0), u_active])  # ch0 constant, ch1 active
+        y = np.hstack(
+            [
+                lfilter([1.0], [1.0, -0.6], u_active[:, 0])[:, None]
+                + 0.05 * rng.standard_normal((N, 1)),
+                rng.standard_normal((N, 1)),
+            ]
+        )
+        with pytest.warns(UserWarning, match="channel"):
+            r = freq_bt(y, u)
+        # The active channel's column (input 1) should be finite somewhere.
+        assert np.any(np.isfinite(r.response[:, :, 1]))
+
+    def test_helper_zero_phiu_defense(self) -> None:
+        """regularize_response with all-zero Phi_u (a caller that skipped the
+        excitation check) still returns NaN + warning, not silent 0/0 (#143)."""
+        from sid._internal.degenerate import regularize_response
+
+        nf = 8
+        phi_yu = np.ones(nf, dtype=complex)
+        phi_u = np.zeros(nf)  # vacuous relative mask (0 < 0) without the guard
+        phi_y = np.ones(nf)
+        with pytest.warns(UserWarning):
+            G, PhiV, Coh = regularize_response(phi_yu, phi_u, phi_y)
+        assert np.all(np.isnan(G))
+        assert np.allclose(Coh, 0.0)

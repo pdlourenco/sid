@@ -3,11 +3,19 @@ site_description: Open-source system identification for Python and MATLAB/Octave
 site_url: https://pdlourenco.github.io/sid/
 repo_url: https://github.com/pdlourenco/sid
 repo_name: pdlourenco/sid
-edit_uri: edit/main/docs/
+edit_uri: edit/main/docsite/
 copyright: Copyright &copy; 2026 Pedro Lourenço — MIT License
 
-docs_dir: docs
+docs_dir: docsite
 site_dir: site
+
+# `hooks/` is build machinery, not content. It lives under docs_dir because
+# mkdocs resolves `hooks:` paths from the project root and keeping it beside the
+# site source is where the review asked for it -- but without this exclusion
+# mkdocs copies the .py files (and their __pycache__/*.pyc) into the published
+# site as static assets.
+exclude_docs: |
+  hooks/
 
 theme:
   name: material
@@ -53,6 +61,7 @@ plugins:
       rewrite_relative_urls: false
   - gen-files:
       scripts:
+        - scripts/check_python_api_pages.py
         - scripts/build_matlab_api.py
         - scripts/build_matlab_examples.py
         - scripts/link_notebook_examples.py
@@ -100,12 +109,12 @@ markdown_extensions:
   - pymdownx.arithmatex:
       generic: true
   - pymdownx.snippets:
-      base_path: ['.', 'docs']
+      base_path: ['.', 'docsite']
       check_paths: true
 
 hooks:
-  - docs/hooks/inject_binder_badge.py
-  - docs/hooks/rewrite_external_links.py
+  - docsite/hooks/inject_binder_badge.py
+  - docsite/hooks/rewrite_external_links.py
 
 nav:
   - Home: index.md
@@ -134,9 +143,11 @@ nav:
       - Online recursion: spec/cosmic/online-recursion.md
       - Output-COSMIC: spec/cosmic/output.md
       - Uncertainty derivation: spec/cosmic/uncertainty-derivation.md
+  # Internal engineering documents (docs/roadmap.md, docs/decisions/,
+  # docs/analyses/, docs/plans/, docs/DESIGN.md, docs/REVIEW_CONTEXT.md) are
+  # deliberately NOT published here. They live outside docs_dir so they can
+  # neither leak into the site nor break its build. Publishing any of them is a
+  # separate, deliberate decision — not a side effect of this config.
   - About:
-    - Roadmap: about/roadmap.md
-    - Python roadmap: about/roadmap-python.md
-    - TODO: about/todo.md
     - Contributing: about/contributing.md
     - Changelog: about/changelog.md

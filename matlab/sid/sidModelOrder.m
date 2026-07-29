@@ -143,9 +143,16 @@ function [n, sv] = sidModelOrder(result, varargin)
         for iu = 1:nu
             Gvec = squeeze(G(:, iy, iu));  % (nf x 1) complex
 
-            % Build full-circle: DC, positive freqs, mirror of negative freqs
+            % Build full-circle: DC, positive freqs, mirror of negative freqs.
+            % DC bin: linearly extrapolate from the first two grid points
+            % (real), matching sidLTIfreqIO so both IFFT consumers share one
+            % DC convention (issue #139; SPEC §8.12.12).
             Gfull = zeros(Nfft, 1);
-            Gfull(1) = real(Gvec(1));                    % DC approximation
+            if nf >= 2
+                Gfull(1) = real(2 * Gvec(1) - Gvec(2));
+            else
+                Gfull(1) = real(Gvec(1));
+            end
             Gfull(2:nf) = Gvec(1:nf-1);                  % w1 to w_{nf-1}
             Gfull(nf+1) = real(Gvec(nf));                 % Nyquist (real)
             Gfull(nf+2:Nfft) = conj(Gvec(nf-1:-1:1));    % mirror
@@ -154,9 +161,13 @@ function [n, sv] = sidModelOrder(result, varargin)
         end
     end
 
-    % Use causal part (first half) as impulse response coefficients
-    N_imp = nf;
-    g = g_all(1:N_imp, :, :);
+    % Markov parameters g(k) = H A^{k-1} B start at lag 1. g_all(1) is the
+    % direct feedthrough (lag 0), ~0 for the library's strictly proper model
+    % class. Drop it (aligning with sidLTIfreqIO): keeping lag 0 builds the
+    % Hankel of z^{-1}G(z), whose McMillan degree is n+1 for a strictly proper
+    % plant with a nonzero finite zero — overestimating the order (issue #139).
+    N_imp = nf - 1;
+    g = g_all(2:nf, :, :);
 
     % ---- Determine horizon ----
     if isempty(horizon)
@@ -220,17 +231,23 @@ function [n, sv] = sidModelOrder(result, varargin)
                     'All singular values near zero. Returning n = 1.');
             end
         else
-            % Only consider ratios among singular values above a noise
-            % floor to avoid spurious gaps in the numerical tail.
-            % The floor scales with sigma_1 and the matrix dimension.
+            % Search the singular-value gaps over resolvable modes only.
+            % L = number of singular values above the machine-eps floor; the
+            % ratio search runs k = 1..min(L-1, floor(nSigma/2)). The L-1 bound
+            % EXCLUDES the resolvable->floor cliff sigma_L/sigma_{L+1} (a value
+            % over a numerical zero); the floor(nSigma/2) cap bounds n when the
+            % spectrum decays without a clear cliff (noise-dominated data).
+            % Defined on the count L (not a 1-based index) so MATLAB and Python
+            % agree. See ADR-0004 and SPEC §8.12.12.
             noiseFloor = sigmas(1) * sqrt(nSigma) * eps;
-            lastSig = find(sigmas > noiseFloor, 1, 'last');
-            maxK = min(lastSig, floor(nSigma / 2));
+            L = sum(sigmas > noiseFloor);
+            maxK = min(L - 1, floor(nSigma / 2));
+            % L <= 1: single candidate k = 1 -> n = 1 (SPEC §8.12.12 step 5b).
             maxK = max(maxK, 1);
 
             ratios = sigmas(1:maxK) ./ sigmas(2:maxK+1);
 
-            % Find largest gap
+            % Largest gap
             [~, n] = max(ratios);
         end
     end

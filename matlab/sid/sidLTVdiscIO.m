@@ -156,62 +156,67 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
     % via Ho-Kalman realization. This gives an observable initialisation
     % for any H (including py < n).
     [A0, B0] = sidLTIfreqIO(Y, U, H);
-    A = repmat(A0, [1, 1, N]);
-    B = repmat(B0, [1, 1, N]);
-    A0_rep = repmat(A0, [1, 1, N]);  % trust-region target
+    A_init = repmat(A0, [1, 1, N]);
+    B_init = repmat(B0, [1, 1, N]);
+    A0_rep = repmat(A0, [1, 1, N]);  % trust-region target A0
 
-    % ---- Alternating state-COSMIC loop (SPEC.md §8.12.3) ----
-    mu_current = doTrustRegion * mu;
+    % ---- Two-level alternating loop (SPEC.md §8.12.3 inner / §8.12.4 outer) ----
+    args = {A0_rep, Y, U, H, R, Rinv, lambda, N, n, q, L, ...
+        isVarLen, horizons, maxIter, tol};
     costHistory = [];
     nIter = 0;
 
-    % For trust-region accept/reject
-    J_converged_mu = Inf;
-    X_best = [];  A_best = A;  B_best = B;
-
-    for iter = 1:maxIter
-        % -- E-step: state estimation --
-        if mu_current > 0
-            A_use = (1 - mu_current) * A + mu_current * A0_rep;
-        else
-            A_use = A;
+    if ~doTrustRegion || mu <= 0
+        % Base two-block alternation at mu = 0 (SPEC §8.12.3).
+        [best, iters, converged, cv] = innerLoop(0, A_init, B_init, args{:});
+        costHistory = [costHistory, cv];
+        nIter = nIter + iters;
+        if ~converged
+            warning('sid:notConverged', ...
+                ['sidLTVdiscIO: alternating loop did not converge in %d ' ...
+                 'iterations (relative cost change stayed above tolerance).'], ...
+                maxIter);
         end
-        X_hat = sidLTVStateEst(Y, U, A_use, B, H, 'R', R);
-
-        % -- M-step: COSMIC solve --
-        [A, B, S_c, D_c, Xl_c, C_c] = cosmicStep( ...
-            X_hat, U, lambda, N, n, q, L, isVarLen, horizons);
-
-        % -- Evaluate cost and check convergence --
-        J = evaluateFullCost( ...
-            X_hat, A, B, Y, U, H, Rinv, ...
-            lambda, N, n, q, L, isVarLen, horizons);
-        costHistory(end + 1) = J;  %#ok<AGROW>
-        nIter = nIter + 1;
-
-        if nIter >= 2
-            J_prev = costHistory(end - 1);
-            relChange = abs(J - J_prev) / max(abs(J_prev), 1);
-
-            if relChange < tol
-                if doTrustRegion && mu_current > muTol
-                    if J <= J_converged_mu
-                        J_converged_mu = J;
-                        X_best = X_hat;  A_best = A;  B_best = B;
-                        mu_current = mu_current / 2;
-                    else
-                        X_hat = X_best;  A = A_best;  B = B_best;
-                        mu_current = 0;
-                    end
-                elseif doTrustRegion && mu_current > 0
-                    J_converged_mu = J;
-                    X_best = X_hat;  A_best = A;  B_best = B;
-                    mu_current = 0;
-                else
-                    break;
-                end
+    else
+        % ---- Two-level trust-region schedule (SPEC.md §8.12.4) ----
+        mu_current = mu;
+        % Stage at the initial mu (typically 1): trust the LTI initialisation.
+        [accepted, iters, ~, cv] = innerLoop( ...
+            mu_current, A_init, B_init, args{:});
+        costHistory = [costHistory, cv];
+        nIter = nIter + iters;
+        % Outer loop: halve mu, accept only if J*(mu') <= J*(mu); reject stops.
+        while mu_current > muTol
+            mu_prime = mu_current / 2;
+            [best_p, iters_p, ~, cv_p] = innerLoop( ...
+                mu_prime, accepted.A, accepted.B, args{:});
+            costHistory = [costHistory, cv_p];  %#ok<AGROW>
+            nIter = nIter + iters_p;
+            if best_p.J <= accepted.J
+                mu_current = mu_prime;
+                accepted = best_p;
+            else
+                break;  % reject: restore accepted, stop reducing mu (step 4)
             end
         end
+        % Guarded final mu = 0 refinement (both exits): keep only if J* drops.
+        [best_zero, iters_z, ~, cv_z] = innerLoop( ...
+            0, accepted.A, accepted.B, args{:});
+        costHistory = [costHistory, cv_z];
+        nIter = nIter + iters_z;
+        if best_zero.J < accepted.J
+            best = best_zero;
+        else
+            best = accepted;
+        end
+    end
+
+    A = best.A;  B = best.B;  X_hat = best.X;
+    S_c = best.S;  D_c = best.D;  Xl_c = best.Xl;  C_c = best.C;
+    % Report the achieved cost as the final history entry (the best iterate may
+    % not be the last one evaluated when mu > 0 stages ran).
+    if isempty(costHistory) || costHistory(end) ~= best.J
+        costHistory(end + 1) = best.J;
     end
 
     % ---- Pack result struct ----
@@ -229,6 +234,70 @@ end
 % ========================================================================
 %  LOCAL FUNCTIONS
 % ========================================================================
+
+function [best, iters, converged, costVec] = innerLoop( ...
+    muVal, A_start, B_start, A0_rep, ...
+    Y, U, H, R, Rinv, lambda, N, n, q, L, isVarLen, horizons, maxIter, tol)
+% INNERLOOP Alternating state-COSMIC loop at a fixed mu (SPEC §8.12.4 step 2).
+%   Runs from (A_start, B_start) until the relative cost change falls below TOL
+%   (SPEC §8.12.3) or the per-stage cap MAXITER is reached. Returns the BEST
+%   (lowest-cost) iterate observed — not necessarily the last, since for mu>0
+%   the state step uses A_use != A so the inner iteration is a homotopy
+%   fixed-point, not the monotone descent of §8.12.3. COSTVEC is this stage's
+%   per-iteration cost history; CONVERGED flags whether the relative test fired.
+
+    A_k = A_start;
+    B_k = B_start;
+    best = struct('J', Inf);   % populated on iteration 1 (maxIter >= 1)
+    Jprev = [];
+    iters = 0;
+    converged = false;
+    costVec = zeros(1, maxIter);
+
+    for it = 1:maxIter
+        % -- E-step: state estimation (interpolated dynamics when mu > 0) --
+        if muVal > 0
+            A_use = (1 - muVal) * A_k + muVal * A0_rep;
+        else
+            A_use = A_k;
+        end
+        X_hat = sidLTVStateEst(Y, U, A_use, B_k, H, 'R', R);
+
+        % -- M-step: COSMIC solve (always free A(k), B(k)) --
+        [A_k, B_k, S_c, D_c, Xl_c, C_c] = cosmicStep( ...
+            X_hat, U, lambda, N, n, q, L, isVarLen, horizons);
+
+        % -- Evaluate cost --
+        J = evaluateFullCost( ...
+            X_hat, A_k, B_k, Y, U, H, Rinv, ...
+            lambda, N, n, q, L, isVarLen, horizons);
+        iters = iters + 1;
+        costVec(iters) = J;
+
+        % -- Track the best (lowest-cost) iterate of this stage. Capture on
+        %    iteration 1 unconditionally: NaN <= Inf is false in MATLAB, so a
+        %    stage whose first cost is NaN would otherwise leave `best` without
+        %    its A/B/... fields (matching Python's `best is None or ...`). --
+        if it == 1 || J <= best.J
+            best.J = J;   best.X = X_hat;   best.A = A_k;   best.B = B_k;
+            best.S = S_c;  best.D = D_c;  best.Xl = Xl_c;  best.C = C_c;
+        end
+
+        % -- Relative-cost convergence (SPEC §8.12.3), with the small-cost floor
+        %    that keeps the test from demanding ~machine-precision absolute steps
+        %    once J < 1 (pure |dJ|/|J| there fails to converge on ordinary data).
+        if ~isempty(Jprev)
+            relChange = abs(J - Jprev) / max(abs(Jprev), 1);
+            if relChange < tol
+                converged = true;
+                break;
+            end
+        end
+        Jprev = J;
+    end
+
+    costVec = costVec(1:iters);
+end
 
 function result = packResult( ...
     A, B, X, H, R, cost, nIter, lambda, ...
@@ -380,6 +449,10 @@ function [Y, U, H, lambda, R, maxIter, tol, mu, muTol, doTrustRegion, ...
     lambda = opts.Lambda;
     R = opts.R;
     maxIter = opts.MaxIter;
+    if ~isscalar(maxIter) || maxIter < 1 || maxIter ~= floor(maxIter)
+        error('sid:badInput', ...
+            'MaxIter must be a positive integer, got %g.', maxIter);
+    end
     tol = opts.Tolerance;
     muTol = opts.TrustRegionTol;
     if ischar(opts.TrustRegion) && strcmpi(opts.TrustRegion, 'off')
@@ -388,6 +461,10 @@ function [Y, U, H, lambda, R, maxIter, tol, mu, muTol, doTrustRegion, ...
     else
         doTrustRegion = true;
         mu = opts.TrustRegion;
+        if ~isnumeric(mu) || ~isscalar(mu) || mu < 0 || mu > 1
+            error('sid:badInput', ...
+                'TrustRegion must be a scalar in [0, 1] or ''off''.');
+        end
     end
 
     % Validate lambda
@@ -476,11 +553,14 @@ function J = evaluateFullCost( ...
         end
     end
 
-    % Smoothness: lambda(k) * ||C(k+1) - C(k)||^2_F
+    % Smoothness: N * lambda(k) * ||C(k+1) - C(k)||^2_F. The COSMIC step applies
+    % the 1/sqrt(N) data scaling (§8.3.2), so the objective it actually minimises
+    % -- hence the monotone, reported one -- uses the effective weight N*lambda,
+    % not lambda (SPEC.md §8.12.2, issue #137). The user's knob stays lambda.
     for k = 1:N-1
         Ck  = [A(:,:,k)';  B(:,:,k)'];
         Ck1 = [A(:,:,k+1)'; B(:,:,k+1)'];
-        smoothness = smoothness + lambda(k) * norm(Ck1 - Ck, 'fro')^2;
+        smoothness = smoothness + N * lambda(k) * norm(Ck1 - Ck, 'fro')^2;
     end
 
     J = obs_fidelity + dyn_fidelity + smoothness;

@@ -26,6 +26,13 @@ on:
       - 'python/**'
       - 'julia/**'
 
+# Least-privilege token: these jobs only check out and run validators, so
+# contents: read is all actions/checkout needs. Declaring the block explicitly
+# also avoids the private-fork checkout 404 that bites any workflow which later
+# adds a write scope (e.g. issues: write) without re-listing contents.
+permissions:
+  contents: read
+
 jobs:
   changes:
     name: Detect changed paths
@@ -51,6 +58,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.matlab == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       DEBIAN_FRONTEND: noninteractive
 
@@ -58,13 +66,19 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v5
 
-      - name: Install GNU Octave
+      # Octave 11.x via snap (conda-forge has no octave 11; apt ships 8.4). See
+      # the tests.yml Octave job for the rationale (#163).
+      - name: Install GNU Octave 11.x
         run: |
-          sudo apt-get update
-          sudo apt-get install -y octave
+          sudo snap install octave
+          octave --version | head -1
 
+      # Qt offscreen (no X server), NOT xvfb (snap Octave deadlocks under it);
+      # no plotting here. stdin closed, timeout-guarded.
       - name: Run cross-language validation
-        run: octave --no-gui --eval "run('testdata/validate_reference.m')"
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: timeout 600 octave --no-gui --eval "run('testdata/validate_reference.m')" < /dev/null
 
   validate-python:
     name: Validate Python port

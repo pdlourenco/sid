@@ -78,7 +78,7 @@ function X_hat = sidLTVStateEst(Y, U, A, B, H, varargin)
     % Number of blocks: K = N+1 (spec indices 0..N)
     K = N + 1;
 
-    % ---- Build block tridiagonal system (SPEC.md §8.14) ----
+    % ---- Build block tridiagonal system (SPEC.md §8.12.13) ----
     % Diagonal blocks S_k and off-diagonal U_k define the RTS smoother
     % equations. Shared across trajectories — only the RHS differs.
     % For variable-length trajectories, precompute all K blocks; each
@@ -149,8 +149,19 @@ function X_hat = sidLTVStateEst(Y, U, A, B, H, varargin)
         if Kl == K
             [w, ~] = sidLTVblkTriSolve(S_blk, Uc_blk, Theta);
         else
+            % For a short trajectory (Nl < N) the sliced final block
+            % S_blk{Kl} is an interior block: it carries the dynamics
+            % residual A(Nl)'Q^{-1}A(Nl) of a transition Nl -> Nl+1 that
+            % does not exist for this trajectory. The terminal state has no
+            % such constraint, so its block must be H'R^{-1}H + Q^{-1}
+            % (spec/cosmic/output.md App. A.1) — the precomputed S_blk{K}.
+            % Leaving the interior block imposes a phantom x(Nl+1)=0,
+            % u(Nl)=0 constraint that biases x_hat(Nl) toward null(A(Nl))
+            % and contaminates interior states via the backward pass (#134).
+            diagBlocks = S_blk(1:Kl);
+            diagBlocks{Kl} = S_blk{K};
             [w, ~] = sidLTVblkTriSolve( ...
-                S_blk(1:Kl), Uc_blk(1:Nl), Theta);
+                diagBlocks, Uc_blk(1:Nl), Theta);
         end
 
         % Extract states

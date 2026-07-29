@@ -52,6 +52,16 @@ for i = 1:numel(files)
 
     ref = jsondecode(fileread(filepath));
 
+    % Structural: every vector must carry a well-formed provenance block
+    % (#172 / ADR-0002) so a stale or hand-edited payload is catchable.
+    if ~isfield(ref, 'provenance') || ~isstruct(ref.provenance) ...
+            || ~all(isfield(ref.provenance, {'generator', 'git_sha', 'git_date'}))
+        nFail = nFail + 1;
+        fprintf('    FAIL\n    missing or malformed provenance block\n');
+        failures{end+1} = name;  %#ok<AGROW>
+        continue;
+    end
+
     % Call the sid function with stored inputs and params
     if isfield(ref, 'params')
         params = ref.params;
@@ -137,9 +147,19 @@ function result = callSidFunction(funcName, input, params)
             [x_det, trend] = sidDetrend(input.x, args{:});
             result = struct('x_detrended', x_det, 'trend', trend);
         case 'sidModelOrder'
-            r_bt = sidFreqBT(input.y, input.u, ...
-                             'WindowSize', params.bt_WindowSize);
-            [n, sv] = sidModelOrder(r_bt, 'Horizon', params.Horizon);
+            if isfield(input, 'Response_real')
+                % Analytic frequency-response input: order via the default
+                % gap method (see ADR-0004).
+                nf = numel(input.Frequency);
+                resp = input.Response_real + 1i * input.Response_imag;
+                res_mo = struct('Frequency', input.Frequency(:), ...
+                    'Response', reshape(resp, nf, 1, 1), 'Method', 'analytic');
+                [n, sv] = sidModelOrder(res_mo);
+            else
+                r_bt = sidFreqBT(input.y, input.u, ...
+                                 'WindowSize', params.bt_WindowSize);
+                [n, sv] = sidModelOrder(r_bt, 'Horizon', params.Horizon);
+            end
             result = struct('n', n, 'SingularValues', sv.SingularValues);
         case 'sidCompare'
             r_ltv = sidLTVdisc(input.X, input.U, args{:});
@@ -193,8 +213,10 @@ function result = callSidFunction(funcName, input, params)
             end
             [cost, fid, reg] = sidLTVevaluateCost( ...
                 A_est, B_est, D, Xl, lam, N_ci, p_ci, q_ci);
-            S_scaled = S / N_ci;
-            P = sidLTVuncertaintyBackwardPass(S_scaled, lam, N_ci, d_ci);
+            % Pass S directly, matching production (sidLTVdisc.m:200); S
+            % already carries the 1/sqrt(N) normalization from
+            % sidLTVbuildBlockTerms, so it must not be divided by N again.
+            P = sidLTVuncertaintyBackwardPass(S, lam, N_ci, d_ci);
             result = struct('D', D, 'Xl', Xl, 'S', S, 'T', T, 'C', C, ...
                             'cost', cost, 'fidelity', fid, ...
                             'regularization', reg, 'P', P);
@@ -203,10 +225,27 @@ function result = callSidFunction(funcName, input, params)
         case 'sidLTVStateEst'
             X_hat = sidLTVStateEst(input.Y, input.U, ...
                                    input.A, input.B, input.H);
-            result = struct('X_hat', X_hat);
+            % Assign (not struct('X_hat', X_hat)) so a variable-length CELL
+            % X_hat becomes a scalar-struct field rather than a struct array.
+            result = struct();
+            result.X_hat = X_hat;
         case 'sidLTIfreqIO'
             [A0, B0] = sidLTIfreqIO(input.Y, input.U, input.H);
             result = struct('A0', A0, 'B0', B0);
+        case 'sidLTVdiscTune'
+            % Validation-mode tuning (4 positional args -> train/val split).
+            [~, bestLambda, allLosses] = sidLTVdiscTune( ...
+                input.X_train, input.U_train, input.X_val, input.U_val, ...
+                'LambdaGrid', params.LambdaGrid);
+            result = struct('BestLambda', bestLambda, 'AllLosses', allLosses(:));
+        case 'frozen_of_io'
+            % Frozen transfer function OF an Output-COSMIC (H != I) result:
+            % the output response H(zI-A)^-1 B. Synthetic dispatch key.
+            r_io = sidLTVdiscIO(input.Y, input.U, input.H, ...
+                                'Lambda', params.Lambda);
+            frozen = sidLTVdiscFrozen(r_io, ...
+                                      'TimeSteps', params.frozen_TimeSteps);
+            result = struct('Response', frozen.Response);
         case 'util_msd'
             % util_msd (in matlab/examples/) is the canonical spring-
             % mass-damper plant helper. See spec/EXAMPLES.md section 2.1

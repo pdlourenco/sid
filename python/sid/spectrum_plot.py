@@ -100,14 +100,17 @@ def spectrum_plot(
         freq_label = "Frequency (rad/s)"
 
     # ---- Extract first output channel ----
+    # MIMO noise spectrum is 3-D (nf, ny, ny); reduce every trailing axis to
+    # index 0 so the plotted curve is 1-D (nf,). A single [:, 0] leaves a 3-D
+    # array 2-D and the (line,) = semilogx(...) unpack fails (issue #135).
     PhiV = np.asarray(result.noise_spectrum)
-    if PhiV.ndim > 1:
+    while PhiV.ndim > 1:
         PhiV = PhiV[:, 0]
 
     PhiV_std = None
     if result.noise_spectrum_std is not None:
         PhiV_std = np.asarray(result.noise_spectrum_std)
-        if PhiV_std.ndim > 1:
+        while PhiV_std.ndim > 1:
             PhiV_std = PhiV_std[:, 0]
 
     spec_db = 10.0 * np.log10(np.maximum(PhiV, _EPS))

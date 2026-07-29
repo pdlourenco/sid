@@ -191,6 +191,6 @@ pytest python/tests/test_cross_validation.py -v
 
 - [Algorithm specification](../spec/SPEC.md)
 - [Examples](examples/README.md)
-- [Python development roadmap](../docs/roadmap_python.md)
+- [Function catalogue and roadmap](../docs/roadmap.md)
 - [Contributing guide](CONTRIBUTING.md)
 - [MATLAB reference implementation](../matlab/README.md)

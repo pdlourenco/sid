@@ -18,6 +18,7 @@ import numpy as np
 # It is made importable here by python/tests/conftest.py, which prepends
 # the examples directory to sys.path.
 from util_msd import util_msd as _test_msd  # noqa: E402
+
 from sid.ltv_state_est import ltv_state_est
 
 
@@ -240,6 +241,80 @@ class TestLTVStateEst:
         assert X_hat.shape == (N + 1, n, L), (
             f"Expected shape ({N + 1}, {n}, {L}), got {X_hat.shape}"
         )
+
+    # ------------------------------------------------------------------
+    # Test: variable-length input minimizes J_state at every state (#134)
+    # ------------------------------------------------------------------
+    def test_var_len_matches_dense_lsq(self) -> None:
+        """Mixed-horizon list input matches the dense LSQ minimizer of
+        J_state, including short-trajectory endpoints.
+
+        Regression for issue #134. The shared block-tridiagonal diagonal
+        blocks are built for the maximal horizon N, so a short trajectory
+        (Nl < N) must have its terminal block replaced by H'R^-1H + Q^-1.
+        Before the fix the sliced interior block leaked an A(Nl)'Q^-1A(Nl)
+        term, imposing a phantom x(Nl+1)=0 constraint that biased the
+        estimate (~2.4 max-abs error in the issue's repro; ~0.24 on this
+        test's setup); the full-length trajectory was unaffected, so looser
+        accuracy tests could not see it.
+        """
+        rng = np.random.default_rng(134)
+        n, q, py = 2, 1, 2
+        N = 8
+        A = np.zeros((n, n, N))
+        B = np.zeros((n, q, N))
+        for k in range(N):
+            A[:, :, k] = 0.5 * rng.standard_normal((n, n))
+            B[:, :, k] = rng.standard_normal((n, q))
+        H = rng.standard_normal((py, n))
+        # General symmetric positive-definite R, Q (exercise off-diagonals).
+        R = np.array([[0.20, 0.05], [0.05, 0.15]])
+        Q = np.array([[0.10, -0.02], [-0.02, 0.08]])
+
+        def simulate(Nl: int) -> tuple[np.ndarray, np.ndarray]:
+            u = rng.standard_normal((Nl, q))
+            x = np.zeros((Nl + 1, n))
+            x[0] = rng.standard_normal(n)
+            for k in range(Nl):
+                x[k + 1] = A[:, :, k] @ x[k] + B[:, :, k] @ u[k]
+            y = (H @ x.T).T + 0.05 * rng.standard_normal((Nl + 1, py))
+            return y, u
+
+        def dense_lsq(y: np.ndarray, u: np.ndarray, Nl: int) -> np.ndarray:
+            # Independent dense minimizer of
+            #   sum_k ||y(k)-H x(k)||^2_{R^-1} + sum_k ||x(k+1)-A x(k)-B u(k)||^2_{Q^-1}
+            # Whitening W with W'W = M^-1 (via Cholesky of the inverse).
+            Wr = np.linalg.cholesky(np.linalg.inv(R)).T
+            Wq = np.linalg.cholesky(np.linalg.inv(Q)).T
+            K = Nl + 1
+            M = np.zeros((K * py + Nl * n, K * n))
+            b = np.zeros(K * py + Nl * n)
+            r = 0
+            for k in range(K):  # measurement residuals (all states)
+                M[r : r + py, k * n : (k + 1) * n] = Wr @ H
+                b[r : r + py] = Wr @ y[k]
+                r += py
+            for k in range(Nl):  # dynamics residuals (transitions only)
+                M[r : r + n, k * n : (k + 1) * n] = -Wq @ A[:, :, k]
+                M[r : r + n, (k + 1) * n : (k + 2) * n] = Wq
+                b[r : r + n] = Wq @ (B[:, :, k] @ u[k])
+                r += n
+            xhat, *_ = np.linalg.lstsq(M, b, rcond=None)
+            return xhat.reshape(K, n)
+
+        y_full, u_full = simulate(N)
+        y_short, u_short = simulate(N - 3)  # mixed horizons: 8 and 5
+
+        X_list = ltv_state_est([y_full, y_short], [u_full, u_short], A, B, H, R=R, Q=Q)
+
+        assert isinstance(X_list, list) and len(X_list) == 2
+        for i, (yy, uu, Nl) in enumerate([(y_full, u_full, N), (y_short, u_short, N - 3)]):
+            np.testing.assert_allclose(
+                X_list[i],
+                dense_lsq(yy, uu, Nl),
+                atol=1e-10,
+                err_msg=f"trajectory {i} (Nl={Nl}) does not minimize J_state",
+            )
 
     # ------------------------------------------------------------------
     # Test 6: Default R=I, Q=I produces same result as explicit

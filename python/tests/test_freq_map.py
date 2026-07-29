@@ -590,3 +590,159 @@ class TestFreqMapVariableLength:
             rtol=1e-10,
             atol=1e-12,
         )
+
+
+class TestFreqMapInputShapes:
+    """Documented input shapes that previously crashed (issue #135)."""
+
+    def test_multi_output_time_series_bt(self) -> None:
+        """Multi-output time-series (SPEC §6.1): ny>1, u=None, BT path.
+
+        Previously the storage branch ``if ny == 1 or is_time_series`` ravelled
+        an (nf, ny, ny) per-segment spectrum into an incompatible slice.
+        """
+        rng = np.random.default_rng(0)
+        y = rng.standard_normal((1000, 2))
+        result = freq_map(y, None, segment_length=256, algorithm="bt")
+        nf = len(result.frequency)
+        assert result.noise_spectrum.shape[0] == nf
+        assert result.noise_spectrum.shape[2:] == (2, 2)
+        assert np.all(np.isfinite(result.noise_spectrum))
+
+    def test_multi_output_time_series_welch(self) -> None:
+        """Same, Welch path."""
+        rng = np.random.default_rng(1)
+        y = rng.standard_normal((1200, 2))
+        result = freq_map(y, None, segment_length=256, algorithm="welch")
+        assert result.noise_spectrum.shape[2:] == (2, 2)
+        assert np.all(np.isfinite(result.noise_spectrum))
+
+    def test_mimo_freq_map(self) -> None:
+        """2x2 MIMO map produces 4-D response/noise without crashing."""
+        rng = np.random.default_rng(2)
+        N = 2000
+        u = rng.standard_normal((N, 2))
+        y = np.column_stack(
+            [
+                lfilter([1], [1, -0.8], u[:, 0]) + 0.1 * rng.standard_normal(N),
+                lfilter([0.5], [1, -0.7], u[:, 1]) + 0.1 * rng.standard_normal(N),
+            ]
+        )
+        result = freq_map(y, u, segment_length=400, algorithm="bt")
+        assert result.response.ndim == 4 and result.response.shape[2:] == (2, 2)
+        assert result.noise_spectrum.shape[2:] == (2, 2)
+
+    def test_single_trajectory_3d(self) -> None:
+        """3-D single-trajectory input (N, ch, 1) — e.g. arr[..., :1] —
+        is treated as one trajectory, not rejected by the L==1 cov path."""
+        rng = np.random.default_rng(3)
+        u = rng.standard_normal((800, 1, 1))
+        y = rng.standard_normal((800, 1, 1))
+        result = freq_map(y, u, segment_length=256, algorithm="bt")
+        assert np.all(np.isfinite(result.response))
+
+    def test_tiny_welch_segment_raises_cleanly(self) -> None:
+        """A segment too short to sub-divide raises SidError, not a raw
+        math-domain error from log2(Lsub) (issue #135)."""
+        from sid._exceptions import SidError
+
+        rng = np.random.default_rng(4)
+        with pytest.raises(SidError):
+            freq_map(
+                rng.standard_normal(1000),
+                rng.standard_normal(1000),
+                segment_length=8,
+                algorithm="welch",
+            )
+
+
+class TestFreqMapWelchDegenerate:
+    """Welch-path degenerate handling (issues #141, #143, SPEC.md §2.6/§3.3)."""
+
+    def test_welch_mimo_collinear_no_crash(self) -> None:
+        """#141: collinear MIMO inputs no longer raise LinAlgError from the solve."""
+        rng = np.random.default_rng(0)
+        N = 1024
+        u0 = rng.standard_normal(N)
+        u = np.column_stack([u0, 2.0 * u0])  # rank-deficient Phi_u
+        y = np.column_stack([u0 + 0.1 * rng.standard_normal(N)] * 2)
+        with pytest.warns(UserWarning, match="singular|constant"):
+            r = freq_map(y, u, algorithm="welch", segment_length=256)
+        resp = r.response[0] if isinstance(r.response, list) else r.response
+        assert np.any(np.isnan(resp))  # degenerate bins are NaN, not garbage
+
+    def test_welch_siso_low_coherence_sigma_inf(self) -> None:
+        """SISO sigma_G uses the Inf sentinel (not NaN) at zero-coherence bins."""
+        rng = np.random.default_rng(1)
+        N = 1024
+        u = rng.standard_normal(N)
+        # Pure-noise output => coherence ~ 0 at many bins => sigma must be Inf.
+        y = rng.standard_normal(N)
+        r = freq_map(y, u, algorithm="welch", segment_length=256)
+        gstd = r.response_std[0] if isinstance(r.response_std, list) else r.response_std
+        assert not np.any(np.isnan(gstd)), "low-coherence sigma should be Inf, never NaN"
+
+
+class TestFreqMapWelchScaling:
+    """Welch one-sided PSD scaling (issue #142, SPEC.md §6.5)."""
+
+    def test_welch_matches_scipy_including_nyquist(self) -> None:
+        """sid Welch Phi_y is bit-exact to scipy.signal.welch, Nyquist included.
+
+        The same window is handed to both so S1 (and thus the scaling) is
+        identical; the only thing under test is the one-sided factor, which must
+        double every bin except DC (excluded) and Nyquist. Before the fix the
+        Nyquist bin was exactly 2x too large.
+        """
+        from scipy.signal import welch as scipy_welch
+
+        rng = np.random.default_rng(0)
+        N, Lsub, Psub, nfft = 4096, 256, 128, 256
+        y = rng.standard_normal(N)
+        n = np.arange(Lsub)
+        w = 0.5 * (1.0 - np.cos(2.0 * np.pi * n / (Lsub - 1)))  # sid symmetric Hann
+
+        r = freq_map(
+            y,
+            algorithm="welch",
+            segment_length=N,
+            sub_segment_length=Lsub,
+            sub_overlap=Psub,
+            nfft=nfft,
+        )
+        phi = np.asarray(r.noise_spectrum).squeeze()
+
+        _, pxx = scipy_welch(
+            y,
+            fs=1.0,
+            window=w,
+            nperseg=Lsub,
+            noverlap=Psub,
+            nfft=nfft,
+            detrend=False,
+            scaling="density",
+            return_onesided=True,
+        )
+        pxx_nodc = pxx[1:]  # sid grid excludes DC
+
+        assert phi.shape == pxx_nodc.shape
+        np.testing.assert_allclose(phi, pxx_nodc, rtol=1e-10, atol=0.0)
+        # Nyquist bin specifically (the regressed one): ratio must be 1, not 2.
+        assert abs(phi[-1] / pxx_nodc[-1] - 1.0) < 1e-9
+
+    def test_welch_is_twice_bt_off_nyquist(self) -> None:
+        """SPEC.md §6.6: Welch (one-sided) noise spectrum is ~2x BT (two-sided).
+
+        Pins the documented convention relationship on white noise, away from
+        the Nyquist bin where Welch is un-doubled.
+        """
+        rng = np.random.default_rng(1)
+        N = 8000
+        y = rng.standard_normal(N)
+        r_bt = freq_map(y, algorithm="bt", segment_length=2000)
+        r_w = freq_map(y, algorithm="welch", segment_length=2000)
+        bt_mean = float(np.mean(np.asarray(r_bt.noise_spectrum)))
+        # Exclude the last (Nyquist) Welch bin, which is intentionally un-doubled.
+        w_mean = float(np.mean(np.asarray(r_w.noise_spectrum)[:-1]))
+        ratio = w_mean / bt_mean
+        assert 1.7 < ratio < 2.3, f"Welch/BT noise-spectrum ratio {ratio:.2f} should be ~2"

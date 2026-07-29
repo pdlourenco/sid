@@ -9,6 +9,10 @@ dist/
 build/
 *.egg
 .pytest_cache/
+.venv/
+
+# Claude Code (personal, machine-specific settings)
+.claude/settings.local.json
 
 # Docs build artefacts
 site/

@@ -76,22 +76,42 @@ function result = sidCompare(model, y, u, varargin)
             'Model struct must have Response field (freq-domain) or A,B fields (state-space).');
     end
 
-    % ---- Compute NRMSE fit ----
-    % fit = 100 * (1 - ||y - y_pred|| / ||y - mean(y)||)
-    ny = size(y_meas, 2);
+    % ---- Compute NRMSE fit per channel (SPEC §15.3) ----
+    % fit = 100 * (1 - ||y - y_pred|| / ||y - mean(y)||), computed PER
+    % TRAJECTORY and averaged. y_meas/y_pred are (N x ny) for single-
+    % trajectory / frequency models or (N x ny x L) for multi-trajectory
+    % state-space models; normalise to 3-D so one code path handles both.
+    ym3 = y_meas;
+    yp3 = y_pred;
+    if ismatrix(ym3)
+        ym3 = reshape(ym3, size(ym3, 1), size(ym3, 2), 1);
+        yp3 = reshape(yp3, size(yp3, 1), size(yp3, 2), 1);
+    end
+    ny = size(ym3, 2);
+    L = size(ym3, 3);
     fitVec = zeros(1, ny);
     for ch = 1:ny
-        ym = y_meas(:, ch);
-        yp = y_pred(:, ch);
-        denom = norm(ym - mean(ym));
-        if denom > 0
-            fitVec(ch) = 100 * (1 - norm(ym - yp) / denom);
+        perTraj = nan(1, L);
+        for l = 1:L
+            ym = ym3(:, ch, l);
+            yp = yp3(:, ch, l);
+            denom = norm(ym - mean(ym));
+            if denom > 0
+                perTraj(l) = 100 * (1 - norm(ym - yp) / denom);
+            end
+        end
+        % Average per-trajectory fits; a degenerate (constant) trajectory
+        % contributes NaN and is skipped. NaN only if all are degenerate.
+        if any(isfinite(perTraj))
+            fitVec(ch) = mean(perTraj(isfinite(perTraj)));
         else
             fitVec(ch) = NaN;
         end
     end
 
     % ---- Pack result ----
+    % Predicted / Measured / Residual are per-trajectory: (N x ny) for
+    % single-trajectory data, (N x ny x L) for multi-trajectory.
     result.Predicted = y_pred;
     result.Measured  = y_meas;
     result.Fit       = fitVec;
@@ -102,9 +122,9 @@ function result = sidCompare(model, y, u, varargin)
         result.Method = 'unknown';
     end
 
-    % ---- Plot ----
+    % ---- Plot (overlay the first trajectory for multi-trajectory data) ----
     if doPlot
-        plotComparison(y_meas, y_pred, fitVec, result.Method);
+        plotComparison(ym3(:, :, 1), yp3(:, :, 1), fitVec, result.Method);
     end
 end
 
@@ -118,18 +138,21 @@ function [y_pred, y_meas] = simulateSS(model, X, U, x0)
     Nm = model.DataLength;
     p = model.StateDim;
 
-    % Handle multi-trajectory: average fit across trajectories
     if ndims(X) == 3 %#ok<ISMAT>
         L = size(X, 3);
     else
         L = 1;
     end
 
-    y_pred_sum = zeros(Nm, p);
-    y_meas_sum = zeros(Nm, p);
+    % Keep trajectories separate: SPEC §15.3 computes the fit per trajectory,
+    % so this must NOT ensemble-average the signals (which cancels independent
+    % per-trajectory errors and is optimistic — degenerate for mirror-image
+    % trajectories that sum to zero; issue #140).
+    y_pred = zeros(Nm, p, L);
+    y_meas = zeros(Nm, p, L);
 
     for l = 1:L
-        if L > 1
+        if ndims(X) == 3 %#ok<ISMAT>
             Xl = X(:, :, l);
             Ul = U(:, :, l);
         else
@@ -152,12 +175,14 @@ function [y_pred, y_meas] = simulateSS(model, X, U, x0)
         end
 
         % Measured: x(2:N+1), Predicted: x_hat(1:N)
-        y_meas_sum = y_meas_sum + Xl(2:end, :);
-        y_pred_sum = y_pred_sum + x_hat;
+        y_meas(:, :, l) = Xl(2:end, :);
+        y_pred(:, :, l) = x_hat;
     end
 
-    y_meas = y_meas_sum / L;
-    y_pred = y_pred_sum / L;
+    if L == 1
+        y_meas = y_meas(:, :, 1);
+        y_pred = y_pred(:, :, 1);
+    end
 end
 
 function [y_pred, y_meas] = simulateFreq(model, y, u)

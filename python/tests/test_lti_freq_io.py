@@ -162,3 +162,89 @@ class TestLTIFreqIO:
 
         assert np.all(np.isfinite(A0)), "Horizon=20 produced non-finite A"
         assert np.all(np.isfinite(B0)), "Horizon=20 produced non-finite B"
+
+    # ------------------------------------------------------------------
+    # #144: real-Schur stabilization, rank guard, H != I accuracy
+    # ------------------------------------------------------------------
+    def test_stabilize_defective_is_bounded(self) -> None:
+        """Stabilizing a DEFECTIVE unstable matrix stays bounded (#144).
+
+        Revert-check: the pre-#144 eigenvector form ``V·diag(λ)·V⁻¹`` produced
+        entries ~1e14 on a Jordan block (V singular). The real-Schur form keeps
+        the reconstruction O(‖T‖) and reflects the eigenvalues to 1/1.5.
+        """
+        from sid.lti_freq_io import _stabilize
+
+        jordan = np.array([[1.5, 1.0, 0.0], [0.0, 1.5, 1.0], [0.0, 0.0, 1.5]])
+        A_s = _stabilize(jordan, 0.999)
+
+        assert np.max(np.abs(A_s)) < 10.0, (
+            f"Defective stabilization blew up: max|A|={np.max(np.abs(A_s)):.3e} "
+            "(pre-#144 eigenvector form gave ~1e14)"
+        )
+        eig_mags = np.abs(np.linalg.eigvals(A_s))
+        assert np.allclose(eig_mags, 1.0 / 1.5, atol=1e-6), (
+            f"Reflected eigenvalues should be 1/1.5, got {np.sort(eig_mags)}"
+        )
+
+    def test_stabilize_warns_only_when_it_fires(self) -> None:
+        """`sid:stabilized` warns when eigenvalues move, silent otherwise (#144)."""
+        import pytest
+
+        from sid.lti_freq_io import _stabilize
+
+        unstable = np.array([[1.5, 0.0], [0.0, 0.5]])
+        with pytest.warns(UserWarning, match="stabilized"):
+            _stabilize(unstable, 0.999)
+
+        stable = np.array([[0.5, 0.1], [-0.1, 0.4]])
+        import warnings as _w
+
+        with _w.catch_warnings():
+            _w.simplefilter("error")  # any warning becomes an error
+            out = _stabilize(stable, 0.999)
+        assert np.array_equal(out, stable), "Already-stable A must be unchanged"
+
+    def test_order_exceeds_rank_errors(self) -> None:
+        """Requesting an order above the Hankel rank errors, not inf/NaN (#144).
+
+        Exercises the guard directly on a rank-2 Hankel: `1/√σ_n` for a
+        near-zero `σ_n` would otherwise propagate inf/NaN silently.
+        """
+        import pytest
+
+        from sid._exceptions import SidError
+        from sid.lti_freq_io import _ho_kalman
+
+        rng = np.random.default_rng(444)
+        m = 8
+        u_mat, _, vt_mat = np.linalg.svd(rng.standard_normal((m, m)))
+        # Exact rank 2 (only two nonzero singular values).
+        h0 = (u_mat[:, :2] * np.array([5.0, 2.0])) @ vt_mat[:2, :]
+        h1 = rng.standard_normal((m, m))
+
+        with pytest.raises(SidError) as exc_info:
+            _ho_kalman(h0, h1, n=6, py=2, q=2)
+        assert exc_info.value.code == "order_exceeds_rank"
+
+    def test_accuracy_partial_observation(self) -> None:
+        """Accuracy (not just shape) when p_y < n — the raison d'être (#144).
+
+        H = [1 0] observes one of two states; the recovered A0 must match the
+        true eigenvalues (similarity-invariant), which the pre-#144 shape-only
+        tests never checked.
+        """
+        _n, _q = 2, 1
+        N, L = 400, 6
+        A_true = np.array([[0.9, 0.2], [-0.15, 0.85]])
+        B_true = np.array([[1.0], [0.5]])
+        H_obs = np.array([[1.0, 0.0]])  # p_y = 1 < n = 2
+
+        Y, U = self._make_data(A_true, B_true, H_obs, N, L, sigma=0.0, seed=505)
+
+        A0, B0 = lti_freq_io(Y, U, H_obs)
+
+        eig_true = np.sort(np.abs(np.linalg.eigvals(A_true)))
+        eig_est = np.sort(np.abs(np.linalg.eigvals(A0)))
+        eig_err = np.linalg.norm(eig_true - eig_est) / np.linalg.norm(eig_true)
+        assert eig_err < 0.1, f"p_y<n eigenvalue error {eig_err:.4f} too large"

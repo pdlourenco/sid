@@ -3,10 +3,28 @@
 **Version:** 1.0.0
 **Date:** 2026-04-04
 **Reference:** Ljung, L. *System Identification: Theory for the User*, 2nd ed., Prentice Hall, 1999.
+**Rationale:** see [`docs/DESIGN.md`](../docs/DESIGN.md) for why these methods and this architecture were chosen (this document is the *contract*; DESIGN is the *why*).
 
 ---
 
 > **Implementation status:** All sections are implemented except §8.10 (online/recursive COSMIC), which is deferred to v2.
+
+---
+
+## Verification (right-side mechanisms)
+
+Every binding rule in this document should name the mechanism that gates it — the "right side" of the V. A `**Verified by:**` block at the end of each function section lists the verifier for each rule cluster, using this vocabulary:
+
+- **`cross-vector`** — a `testdata/reference_*.json` reference vector checked by the `cross-validate.yml` CI job; pins MATLAB↔Python numerical equivalence on fixed inputs.
+- **`unit(M)` / `unit(Py)`** — a language unit test (e.g. `matlab/tests/test_sidFreqBT.m`, `python/tests/test_freq_bt.py`).
+- **`lint`** — `check_headers.py` / `check_python_headers.py` / MISS_HIT / ruff.
+- **`manual`** — a convention held by inspection on release PRs; no automated check asserts it.
+- **`deferred`** — rule explicitly out of v1.0 scope (see the implementation-status banner above).
+- **`none`** — no verifier today: **visible debt**. A reviewer in verification mode should flag these.
+
+A `cross-vector` check proves the two ports *agree*, not that either satisfies the spec; the strongest rules pair it with a `unit` test written against the spec requirement (see `CONTRIBUTING.md` §"Cross-language reference vectors are a check, not a proof" and `CLAUDE.md` §3).
+
+**Rollout (issue #113).** Annotation is landing section-by-section rather than as one monster diff, and each block is re-derived against the *current* test suite (post-remediation), not the June recon — the earlier draft over-claimed. **All function sections §1–§15 now carry a `**Verified by:**` block** (the rollout completed §1–§7, then §8, then §9–§15). Each was re-derived against the current suite; the uncovered rules are tagged `none` rather than left silent.
 
 ---
 
@@ -39,6 +57,8 @@ where `e(t)` is white noise with covariance matrix `Λ`.
 **LTV extension:** The `sidFreqMap` function (§6) relaxes the time-invariance assumption by applying spectral analysis (Blackman-Tukey or Welch) to overlapping segments, producing a time-varying frequency response Ĝ(ω, t). Within each segment, local time-invariance is assumed.
 
 **Multi-trajectory support:** All `sid` functions accept multiple independent trajectories (experiments) of the same system. For frequency-domain functions (`sidFreqBT`, `sidFreqETFE`, `sidFreqMap`, `sidSpectrogram`), spectral estimates are ensemble-averaged across trajectories before forming transfer function ratios or power spectra, reducing variance by a factor of `L` without sacrificing frequency resolution. For `sidLTVdisc`, multiple trajectories are aggregated in the data matrices as described in §8. Multi-trajectory data is passed as 3D arrays `(N × n_ch × L)` when all trajectories share the same length, or as cell arrays `{y1, y2, ..., yL}` when lengths differ. See §2, §4.1, and §6 below for the mathematical basis.
+
+**Verified by:** the data-model notation is definitional (`manual`). Multi-trajectory ensemble-averaging and time-series mode (`n_u = 0`) are exercised by `unit(M)` `test_multiTrajectory.m` / `test_compareMultiTraj.m` and `unit(Py)` multi-trajectory cases in `test_freq_bt.py` / `test_freq_map.py`, and pinned across ports by `cross-vector` `reference_multitraj_bt` (multi-trajectory ensemble BT, #145d) and the frequency-domain `cross-vector`s below.
 
 ---
 
@@ -216,10 +236,11 @@ For **cross-covariance**, `R̂_xz(-τ) = conj(R̂_zx(τ))` (scalar case) or `R̂
 
 where `Φ̂_yu(ω)` is `n_y × n_u` and `Φ̂_u(ω)` is `n_u × n_u`. The matrix inverse is computed independently at each frequency.
 
-**Regularization:** If `Φ̂_u(ω)` is singular or nearly singular at some frequency `ω_k`:
+**Regularization.** If `Φ̂_u(ω)` is singular or nearly singular at some frequency `ω_k`:
 - SISO: if `|Φ̂_u(ω_k)| < ε × max(|Φ̂_u|)` where `ε = 1e-10`, set `Ĝ(ω_k) = NaN + j×NaN`.
-- MIMO: if `cond(Φ̂_u(ω_k)) > 1/ε`, set the corresponding row of `Ĝ(ω_k)` to `NaN`.
+- MIMO: if `cond(Φ̂_u(ω_k)) > 1/ε`, the shared input spectrum cannot be inverted, so the estimate at that frequency is invalid for **every** output — set the entire slice `Ĝ(ω_k)` (all `n_y` rows) to `NaN`. (This whole-slice behaviour supersedes the earlier "affected row" wording: a singular `Φ̂_u` degrades all outputs jointly, not one row.)
 - Issue a warning when this occurs.
+- This degenerate-input handling — the `Φ̂_u` guard, the `NaN` substitution, the `Φ̂_v` clamp (§2.7), the `σ_G = Inf` sentinel (§3.3), and the warning — is shared verbatim by `sidFreqBT`, `sidFreqBTFDR`, `sidFreqETFE`, and the Welch path of `sidFreqMap`, so the estimators cannot drift apart. A whole-signal constant/zero input is caught earlier by the input-excitation check of §10.3.
 
 ### 2.7 Noise Spectrum Estimate
 
@@ -245,6 +266,8 @@ where `'` denotes conjugate transpose.
 
 For MIMO, ensure the matrix is positive semi-definite by zeroing any negative eigenvalues.
 
+The clamp acts only on **finite** negative values. A `NaN` entry of `Φ̂_v(ω)` — produced at a degenerate frequency (§2.6) or when the input-excitation check fires (§10.3) — must be **preserved as `NaN`**, not turned into `0`. This is a cross-platform hazard: `max(NaN, 0)` returns `0` in MATLAB but `NaN` in NumPy, so implementations must guard the clamp (e.g. clamp only where the value is finite and `< 0`) to keep degenerate frequencies `NaN` in both languages. The same rule applies to the MIMO eigenvalue clamp.
+
 **Time series mode:** No noise spectrum is computed separately. The output spectrum `Φ̂_y(ω)` is returned in the `NoiseSpectrum` field.
 
 ### 2.8 Normalization
@@ -264,6 +287,13 @@ To convert to the Signal Processing Toolbox convention, multiply by `Ts`:
 ```
 Φ̂_SPT(ω) = Ts × Φ̂_SID(ω)
 ```
+
+**Verified by:**
+
+- Frequency response, noise spectrum, SISO/MIMO/time-series paths (§2.1–2.7) — `cross-vector` (`reference_siso_bt`, `reference_mimo_bt`, `reference_timeseries_bt`, `reference_siso_bt_large_M`), `unit(M)` `test_sidFreqBT.m`, `unit(Py)` `test_freq_bt.py`.
+- Biased covariance §2.3, Hann window §2.4, windowed DFT incl. FFT fast path §2.5 — `cross-vector` (`reference_internals`), `unit(M)` `test_sidCov.m` / `test_sidHannWin.m` / `test_sidWindowedDFT.m` / `test_sidDFT.m`, `unit(Py)` `test_cov.py` / `test_hann_win.py` / `test_windowed_dft.py` / `test_dft.py`.
+- Near-singular `Φ̂_u` guard, whole-slice NaN, PSD clamp (§2.6–2.7; shared with §10.2–10.3) — `unit(M)` `test_sidFreqBT.m` (constant-input, partial-degeneracy tests), `unit(Py)` `test_freq_bt.py::TestFreqBTDegenerate`. **`none` for `cross-vector`** — degenerate inputs are not in a stored vector (visible debt).
+- §2.8 normalization convention (no `Ts`, no `1/2π`) — `manual`; held implicitly by the cross-vectors' absolute values, asserted by no dedicated test.
 
 ---
 
@@ -309,7 +339,7 @@ The standard deviation returned in the result struct is:
 σ_G(ω) = sqrt(Var{Ĝ(ω)})
 ```
 
-**Regularization:** If `γ̂²(ω_k) < ε` (where `ε = 1e-10`), set `σ_G(ω_k) = Inf`. This corresponds to frequencies where the input has negligible power and the estimate is unreliable.
+**Regularization (single convention for all estimators).** If `γ̂²(ω_k) < ε` (where `ε = 1e-10`) — equivalently, at any frequency where `Ĝ(ω_k)` was set to `NaN` because `Φ̂_u(ω_k)` is degenerate (§2.6), or at every frequency when the input-excitation check fires (§10.3) — set `σ_G(ω_k) = Inf`. Implementations must **not** floor the coherence to a small positive value to keep `σ_G` finite, and must **not** substitute `NaN`: a coherence below `ε` means the input carries no usable information at that frequency, so the response is unidentifiable and `Inf` is the honest report. Every estimator that returns `σ_G` — `sidFreqBT`, `sidFreqBTFDR`, `sidFreqETFE`, and the Welch path of `sidFreqMap` — uses this same `Inf` sentinel.
 
 **Note:** This formula gives the variance of the complex-valued `Ĝ`, defined as `E[|Ĝ - G|²]`. The real and imaginary parts of the estimation error have equal variance `σ_G²/2` each (by isotropy of the asymptotic distribution). Confidence bands for magnitude use the total complex standard deviation `σ_G`, corresponding to a circular region of radius `p × σ_G` in the complex plane (Ljung 1999, §6.4):
 
@@ -373,6 +403,12 @@ This is equivalent to treating each `(i,j)` channel as an independent SISO syste
 
 **Limitations:** The diagonal approximation ignores cross-channel correlations in both the noise and input spectra. It is exact when inputs are uncorrelated and the noise is channel-independent, and **underestimates** variance otherwise. A full MIMO treatment using `Φ̂_u(ω)⁻¹ ⊗ Φ̂_v(ω)` is deferred to a future version.
 
+**Verified by:**
+
+- Window norm `C_W`, coherence, variance formulas (§3.1–3.5) — `cross-vector` (`reference_uncertainty`), `unit(M)` `test_sidUncertainty.m`, `unit(Py)` `test_uncertainty.py`.
+- §3.3 `σ_G = Inf` sentinel at zero coherence / degenerate input — `unit(M)` `test_sidUncertainty.m` (Test 8, asserts `isinf`), `unit(Py)` `test_uncertainty.py::test_zero_coherence_inf`; the MIMO `isnan(G)` sentinel is exercised by the collinear-MIMO cases in `test_freq_bt.py::TestFreqBTDegenerate` / `test_sidFreqBT.m`.
+- Diagonal MIMO approximation underestimation bound — `manual` (documented above; no test asserts it).
+
 ---
 
 ## 4. `sidFreqETFE` — Empirical Transfer Function Estimate
@@ -434,6 +470,13 @@ When no input is present, the ETFE reduces to the **periodogram**:
 
 The ETFE has no closed-form asymptotic variance formula: the periodogram is an inconsistent estimator whose variance does not decrease with `N`. The `ResponseStd` and `NoiseSpectrumStd` fields are set to `NaN`. For uncertainty quantification, use `sidFreqBT` (which smooths via the lag window) or apply optional smoothing (§4.2) and estimate variance empirically.
 
+**Verified by:**
+
+- ETFE ratio + optional smoothing (§4.1–4.2) — `cross-vector` (`reference_siso_etfe`, IO-mode `{u, y}`), `unit(M)` `test_sidFreqETFE.m`, `unit(Py)` `test_freq_etfe.py`.
+- Periodogram time-series mode (§4.3) — `cross-vector` (`reference_timeseries_etfe`, #145d), `unit(M)` `test_sidFreqETFE.m` (Test 6), `unit(Py)` `test_freq_etfe.py::...test_time_series`.
+- Degenerate-input warnings + whole-signal NaN (§10.2–10.3) — `unit(M)` `test_sidFreqETFE.m` (constant-input, collinear-MIMO tests), `unit(Py)` `test_freq_etfe.py::TestFreqETFEDegenerate`.
+- `ResponseStd` / `NoiseSpectrumStd` = NaN (no variance formula) — `manual`; held by the response cross-vector's NaN std fields, asserted by no dedicated test.
+
 ---
 
 ## 5. `sidFreqBTFDR` — Frequency-Dependent Resolution
@@ -454,6 +497,8 @@ where `R_k = R(ω_k)` is the desired resolution at that frequency. Here "resolut
 
 If `R` is a scalar, it applies uniformly. If `R` is a vector of the same length as the frequency grid, each entry specifies the local resolution.
 
+Each `M_k` obeys the same bounds as the fixed window of §10.1: it is capped at `⌊N/2⌋` (a resolution finer than the data supports), and `M_k < 2` is invalid. Reaching either bound is reported the same way as for `sidFreqBT` — a warning (`sid:windowReduced`) when any `M_k` is reduced to `⌊N/2⌋`, and an error when the requested resolution implies `M_k < 2` — rather than being silently clamped.
+
 ### 5.3 Algorithm
 
 For each frequency `ω_k`:
@@ -470,10 +515,18 @@ For each frequency `ω_k`:
 If no resolution is specified:
 
 ```
-R = 2π / min(floor(N/10), 30)
+M_default = clip(floor(N/10), 2, 30)
+R = 2π / M_default
 ```
 
-This matches the default behavior of `sidFreqBT`.
+The lower clip at 2 matters for short data: for `N ∈ [10, 19]`, `floor(N/10) = 1` would imply `M_default = 1 < 2` (invalid); flooring at 2 keeps the default window legal and matches the short-data default of `sidFreqBT`.
+
+**Verified by:**
+
+- Response / noise / coherence (§5.1–5.3) — `cross-vector` (`reference_siso_btfdr`), `unit(M)` `test_sidFreqBTFDR.m`, `unit(Py)` `test_freq_btfdr.py`.
+- §5.2 resolution→`M_k` mapping, including the **per-frequency resolution-vector** path — `cross-vector` (`reference_btfdr_vecres`, #145d: pins `WindowSize(ω_k)` and response/noise/coherence under a length-`nf` `Resolution` vector), `unit(M)` `test_sidFreqBTFDR.m`, `unit(Py)` `test_freq_btfdr.py::...test_coarse_resolution_raises` / `test_window_reduced_warns`.
+- Equivalence to `sidFreqBT` at constant resolution (§5.3) — `unit(M)` `test_sidFreqBTFDR.m` (Test 20 oracle), `unit(Py)` `test_freq_btfdr.py::...test_btfdr_equals_bt_at_constant_resolution`.
+- Degenerate inputs (§10.3) — `unit(M)`/`unit(Py)` `TestFreqBTFDRDegenerate` cases (collinear MIMO, constant input).
 
 ---
 
@@ -584,20 +637,24 @@ Within each segment of length `L`, apply the Welch method (equivalent to `tfesti
    Φ̂_u(ω)  = (2 / (J_total × S₁)) Σ_{j,l} |U_{j,l}(ω)|²
    Φ̂_y(ω)  = (2 / (J_total × S₁)) Σ_{j,l} |Y_{j,l}(ω)|²
    ```
-   where `S₁ = Σ_n w(n)²` is the window power normalization, `J_total = J × L` is the total number of averaged periodograms, and the factor of 2 converts to one-sided spectra (positive frequencies only, excluding DC). This factor cancels in the transfer function ratio `Ĝ = Φ̂_yu / Φ̂_u` but is needed for correct spectral magnitudes.
+   where `S₁ = Σ_n w(n)²` is the window power normalization, `J_total = J × L` is the total number of averaged periodograms, and the factor of 2 converts to one-sided spectra. The factor of 2 applies to every bin **except those with no distinct negative-frequency mirror — DC and, for even `NFFT`, the Nyquist bin `ω = π`, which carry a factor of 1** (the frequency grid already excludes DC, so in practice only the Nyquist bin is un-doubled). This is the same one-sided convention as `sidSpectrogram` (§7.3) and as `scipy.signal`/`cpsd`; without the Nyquist exception the estimate is exactly 2× too large at `ω = π`. The factor cancels in the transfer function ratio `Ĝ = Φ̂_yu / Φ̂_u` and in the coherence, but is needed for correct spectral magnitudes.
+
+   **Relationship to BT.** The Welch spectra are **one-sided**, while the BT correlogram `Φ̂ = Σ_τ R(τ) W(τ) e^{−jωτ}` is a **two-sided** convention evaluated on `(0, π]`. Consequently, on the same data `Φ̂_v` (and `Φ̂_y`, `Φ̂_u`) from `'welch'` is **twice** that from `'bt'` at every non-DC, non-Nyquist bin. `Ĝ` and `γ̂²` are identical between the two (the factor cancels). Users comparing noise-spectrum magnitudes across algorithms must account for this 2× — it is a convention difference, not an error, and is stated here because §6.6 previously implied the two used an identical scale.
 
 4. Form `Ĝ(ω) = Φ̂_yu(ω) / Φ̂_u(ω)`.
 5. Form `Φ̂_v(ω)` and `γ̂²(ω)` as in the BT case.
 
 **Frequency resolution** is determined by the sub-segment length `L_sub` and the NFFT: `Δf = Fs / NFFT`. The sub-segment overlap `P_sub` controls variance reduction — more sub-segments (higher overlap) → lower variance but no change in resolution.
 
-**Uncertainty:** The variance of the Welch spectral estimate is approximately:
+**Uncertainty:** The averaged periodogram follows a scaled `χ²_ν` law, so the variance of the Welch spectral estimate is approximately:
 
 ```
-Var{Φ̂(ω)} ≈ Φ²(ω) / ν
+Var{Φ̂(ω)} ≈ 2 Φ²(ω) / ν
 ```
 
-where `ν` is the equivalent degrees of freedom. With no overlap, the `J` periodograms are independent and `ν = 2J`. With overlap, periodograms become correlated and `ν` decreases. For 50% overlap with a Hann window, `ν ≈ 1.8J` (Harris 1978). The exact formula involves the autocorrelation of the window function at the overlap lag and is not expressible in simple closed form; the implementation uses the empirical `1.8J` value directly.
+where `ν` is the equivalent degrees of freedom (the factor of 2 is the `χ²_ν` result and must not be dropped). With no overlap, the `J` periodograms are independent and `ν = 2J`. With overlap, periodograms become correlated and `ν` decreases. For 50% overlap with a Hann window, `ν ≈ 1.8J` (Harris 1978).
+
+**Limitation.** The exact `ν` depends on the window autocorrelation at the overlap lag and is not expressible in simple closed form. The implementation uses `ν = 2J` for zero overlap and the empirical `ν ≈ 1.8J` for **any** nonzero overlap. The `1.8J` value is calibrated for a Hann window at ~50% overlap; for other windows or much higher overlap it is an approximation that can **understate** the uncertainty (the reported `ResponseStd` / `NoiseSpectrumStd` are then optimistic). A window/overlap-aware `ν` is a documented future refinement.
 
 ### 6.6 Comparison of BT and Welch
 
@@ -607,7 +664,7 @@ where `ν` is the equivalent degrees of freedom. With no overlap, the `J` period
 | Variance control | `M` (smaller M → lower variance) | Number of sub-segments `J` (more → lower variance) |
 | Guaranteed non-negative spectrum | Yes (biased covariance estimator) | Yes (averaged periodograms) |
 | Custom frequency grid | Yes (direct DFT path) | No (FFT bins only) |
-| Normalization | System ID convention (no Ts factor) | System ID convention (no Ts factor) within `sidFreqMap`; standalone `tfestimate` includes Ts |
+| Normalization | Two-sided (correlogram), no Ts factor | One-sided periodogram (= **2× BT** on `Φ̂_y`/`Φ̂_u`/`Φ̂_v`; `Ĝ`, `γ̂²` identical), no Ts factor within `sidFreqMap`; standalone `tfestimate` includes Ts. See §6.5. |
 | Best for | Smooth spectra, custom frequencies | Standard analysis, `tfestimate` compatibility |
 
 **Default choice:** `'bt'` is the default because it matches the `sid` package's primary use case (system identification with `sidFreqBT`-compatible output) and supports custom frequency grids. Users coming from `tfestimate` should use `'welch'`.
@@ -694,6 +751,13 @@ The key difference: `sidFreqMap` always produces time-varying output. Setting `S
 **Computational cost:** `K` calls to the inner estimator. For BT, each is O(L×M + M×n_f). For Welch, each is O(J×L_sub×log(L_sub)). Both are fast for typical parameters.
 
 **Edge effects:** The first and last segments may produce less reliable estimates if the system is non-stationary near the boundaries. No special handling is applied — the uncertainty estimates from each segment naturally reflect the reduced confidence.
+
+**Verified by:**
+
+- Outer segmentation, BT inner path, output struct, time vector (§6.1–6.4, 6.7–6.8) — `cross-vector` (`reference_freqmap_bt`), `unit(M)` `test_sidFreqMap.m`, `unit(Py)` `test_freq_map.py`.
+- Welch inner path one-sided scaling incl. Nyquist un-doubling (§6.5) — `cross-vector` (`reference_freqmap_welch`, #145d), `unit(M)` `test_sidFreqMap.m` (Test 30, rect-sub-segment periodogram oracle), `unit(Py)` `test_freq_map.py::TestFreqMapWelchScaling` (`test_welch_matches_scipy_including_nyquist`, bit-exact vs `scipy.signal.welch`).
+- Welch degenerate `Φ̂_u` guard + `σ = Inf` sentinel — `unit(M)` `test_sidFreqMap.m` / `unit(Py)` `test_freq_map.py::TestFreqMapWelchDegenerate`.
+- BT↔Welch 2× relationship (§6.6) — `unit(Py)` `test_freq_map.py::...test_welch_is_twice_bt_off_nyquist`; `manual` cross-port.
 
 ---
 
@@ -823,6 +887,11 @@ result = sidSpectrogram(x, 'WindowLength', 256, 'Overlap', 128, ...
 ```
 
 The normalization follows the PSD convention (power per unit frequency), matching the MathWorks default when `spectrogram` is called with the `'psd'` option.
+
+**Verified by:**
+
+- STFT, segmentation, one-sided PSD with DC + Nyquist un-doubled (§7.1–7.4) — `cross-vector` (`reference_spectrogram`), `unit(M)` `test_sidSpectrogram.m`, `unit(Py)` `test_spectrogram.py` (incl. a bit-exact `scipy.signal.periodogram` check across the whole one-sided axis, DC…Nyquist).
+- Multi-trajectory ERSP averaging (§7.2) — `unit(M)` `test_sidSpectrogram.m`, `unit(Py)` `test_spectrogram.py` multi-trajectory cases.
 
 ---
 
@@ -1004,6 +1073,8 @@ where `x̂` is the state predicted by propagating the identified model from init
 | `'LambdaGrid'` | vector | `logspace(-3, 15, 50)` (validation), `logspace(0, 10, 25)` (frequency) |
 | `'Algorithm'` | char | `'cosmic'` |
 
+The `X`/`U` train and validation arguments follow the standard §1 data-model shape convention: a single trajectory may be passed as `(N+1 × p)` / `(N × q)` (and a single channel as a 1-D `(N+1)` / `(N)` vector), which the implementation promotes to the canonical `(… × L)` layout with `L = 1`. Both ports accept these forms; neither is tightened to reject a shape the other allows (issue #189).
+
 **Outputs:**
 
 | Field | Type | Description |
@@ -1141,13 +1212,21 @@ The full `H⁻¹` is `N(p+q) × N(p+q)` — too large to store. But we only need
 
 For a symmetric block tridiagonal matrix, the diagonal blocks of the inverse can be computed via **left and right Schur complements**:
 
-**Step 1: Reconstruct unscaled Hessian diagonal blocks.** The COSMIC solver normalizes data by `1/sqrt(N)` (§8.3.2), so the scaled block diagonal terms `S_scaled(k)` contain `D_s(k)ᵀD_s(k) + reg(k)`. Reconstruct the unscaled blocks:
+**Step 1: Reconstruct the estimator's Hessian diagonal blocks.** The COSMIC solver normalizes data by `1/sqrt(N)` (§8.3.2), which makes the returned MAP estimate the minimiser of `‖unscaled residuals‖² + N·λ·Σ‖ΔC‖²` — the **effective prior weight relative to the unscaled data is `N·λ`** (that is the stated purpose of the convention: `λ` independent of the horizon `N`). The posterior covariance must therefore be built from the Hessian of *that* estimator,
 
 ```
-S(k) = N × (S_scaled(k) - reg(k)) + reg(k)
+A = Vᵀ V + Fᵀ Υ F,     with unscaled data V and Υ = diag(N·λ_k),
 ```
 
-where `reg(k)` is the regularization contribution: `λ₁I` for `k=0`, `λ_{N-1}I` for `k=N-1`, and `(λ_k + λ_{k+1})I` otherwise.
+which equals `N` times the scaled Hessian `A_scaled = V_sᵀV_s + Fᵀ diag(λ_k) F` whose diagonal blocks are the `S_scaled(k)` returned by the solver. Reconstruct the diagonal blocks by inflating the **whole** scaled block by `N`:
+
+```
+S(k) = N × S_scaled(k)
+```
+
+where `S_scaled(k)` contains `D_s(k)ᵀD_s(k) + reg(k)` with `reg(k) = λ₁I` for `k=0`, `λ_{N-1}I` for `k=N-1`, and `(λ_k + λ_{k+1})I` otherwise. Equivalently, one may run Steps 2–4 on the scaled blocks `S_scaled(k)` with un-inflated couplings `λ_k²` to obtain `P_scaled(k)` and then return **`P(k) = P_scaled(k)/N`** — the two are identical because `A = N·A_scaled ⟹ [A⁻¹]_{kk} = [A_scaled⁻¹]_{kk}/N`.
+
+> **Correction (was a scaling bug).** The previous reconstruction `S(k) = N(S_scaled(k) − reg(k)) + reg(k)` inflated only the data term and left `reg(k)` at weight `λ`, producing the Hessian `VᵀV + λFᵀF` — the posterior of a *different* estimator (prior weight `λ`) than the one whose mean is returned (prior weight `N·λ`). Because the prior was too weak, the reported `P(k)` **overstated** the variance by up to a factor `N`; the error is largest in the mid-`λ` regime where the L-curve corner typically lands, and vanishes only in the `λ→0` / `λ→∞` limits (which is why the OLS-limit sanity checks passed). See `uncertainty_derivation.md` §3.4/§5.1.
 
 **Step 2: Left Schur complements (forward pass):**
 
@@ -1155,7 +1234,7 @@ where `reg(k)` is the regularization contribution: `λ₁I` for `k=0`, `λ_{N-1}
 Λ^L(0) = S(0)
 
 For k = 1, ..., N-1:
-    Λ^L(k) = S(k) - λ_k² [Λ^L(k-1)]⁻¹
+    Λ^L(k) = S(k) - (N·λ_k)² [Λ^L(k-1)]⁻¹
 ```
 
 **Step 3: Right Schur complements (backward pass):**
@@ -1164,7 +1243,7 @@ For k = 1, ..., N-1:
 Λ^R(N-1) = S(N-1)
 
 For k = N-2, ..., 0:
-    Λ^R(k) = S(k) - λ_{k+1}² [Λ^R(k+1)]⁻¹
+    Λ^R(k) = S(k) - (N·λ_{k+1})² [Λ^R(k+1)]⁻¹
 ```
 
 **Step 4: Combine:**
@@ -1185,10 +1264,10 @@ This identity holds because `Λ^L(k)` captures the information from blocks `0..k
 P(N-1) = Λ_{N-1}⁻¹
 
 For k = N-2, ..., 0:
-    P(k) = (Λ_k - λ_{k+1}² P(k+1))⁻¹
+    P(k) = (Λ_k - (N·λ_{k+1})² P(k+1))⁻¹
 ```
 
-To see the equivalence, note that the right Schur complement satisfies `Λ^R(k) = S(k) - λ_{k+1}² [Λ^R(k+1)]⁻¹`. By induction from the boundary `Λ^R(N-1) = S(N-1)`, the identity `[Λ^R(k)]⁻¹ = P(k)` holds for the backward-only formula above. Substituting into the combine step `P(k) = [Λ^L(k) + Λ^R(k) - S(k)]⁻¹ = [Λ_k + S(k) - λ_{k+1}² P(k+1) - S(k)]⁻¹ = [Λ_k - λ_{k+1}² P(k+1)]⁻¹` confirms the equivalence. See `uncertainty_derivation.md` §5.2 for the full proof. The implementation uses the left-right method for numerical robustness; the backward-only form is equivalent and requires one fewer pass.
+where the `Λ_k = Λ^L(k)` are the left Schur complements of the estimator Hessian (Step 2, already using `S(k) = N·S_scaled(k)` and the `(N·λ_k)²` couplings). To see the equivalence, note that the right Schur complement satisfies `Λ^R(k) = S(k) - (N·λ_{k+1})² [Λ^R(k+1)]⁻¹`. By induction from the boundary `Λ^R(N-1) = S(N-1)`, the identity `[Λ^R(k)]⁻¹ = P(k)` holds for the backward-only formula above. Substituting into the combine step `P(k) = [Λ^L(k) + Λ^R(k) - S(k)]⁻¹ = [Λ_k + S(k) - (N·λ_{k+1})² P(k+1) - S(k)]⁻¹ = [Λ_k - (N·λ_{k+1})² P(k+1)]⁻¹` confirms the equivalence. See `uncertainty_derivation.md` §5.2 for the full proof. The implementation uses the left-right method for numerical robustness; the backward-only form is equivalent and requires one fewer pass.
 
 #### 8.9.3 Noise Covariance Estimation
 
@@ -1206,7 +1285,7 @@ where `ν` is the effective degrees of freedom:
 ν = Σ_k |L(k)| - N × Σ_k trace(D_s(k)ᵀ D_s(k) × P(k))
 ```
 
-The second term is the hat-matrix trace correction, ensuring that the effective number of free parameters is subtracted. If `ν ≤ 0` (heavily over-parameterized), a conservative fallback `ν = Σ_k |L(k)| - N × d` is used.
+The second term is the hat-matrix trace correction, ensuring that the effective number of free parameters is subtracted. It uses the **corrected** `P(k)` of §8.9.2 (the posterior of the estimator actually returned). The formula is otherwise unchanged: the effective parameter count is scaling-invariant, since `N × trace(D_s(k)ᵀ D_s(k) × P_est(k)) = trace(D_s(k)ᵀ D_s(k) × P_scaled(k))` — so once `P(k)` is right, so is `ν`. With the previous (too-wide) `P(k)` this term over-counted parameters, deflating `ν` and inflating `Σ̂` (the conservative direction, but wrong). If `ν ≤ 0` (heavily over-parameterized), a conservative fallback `ν = Σ_k |L(k)| - N × d` is used.
 
 **Covariance modes.** The `'CovarianceMode'` option controls the structure imposed on `Σ̂`:
 
@@ -1308,28 +1387,28 @@ A_smoothed = rec.A_smoothed;  % improved estimates for last 50 steps
 
 #### 8.11.1 Concept
 
-`sidFreqMap` produces a non-parametric estimate `Ĝ_BT(ω, t)` with uncertainty, independent of `λ`. For any candidate `λ`, compute the frozen transfer function from COSMIC's `A(k)`, `B(k)`:
+`sidFreqMap` produces a non-parametric estimate `Ĝ_BT(ω, t)` with uncertainty, independent of `λ`. For any candidate `λ`, compute the frozen transfer function from COSMIC's `A(k)`, `B(k)` **and the model's observation matrix `H`**:
 
 ```
-G_cosmic(ω, k) = (e^{jω} I - A(k))⁻¹ B(k)
+G_cosmic(ω, k) = H (e^{jω} I - A(k))⁻¹ B(k)
 ```
 
-and propagate the posterior covariance `Σ_kk` to obtain `σ_cosmic(ω, k)` via the Jacobian of the `(A, B) → G(ω)` mapping.
+This is the **output** transfer function (`p_y × q`). `H` is the identity for a full-state `sidLTVdisc` result — then it reduces to the state response `(e^{jω}I − A)⁻¹B` — and the `p_y × n` observation matrix for an `sidLTVdiscIO` result. Folding `H` in keeps the frozen bands in the same output space as the non-parametric estimate `Ĝ_BT(ω, t)` they are compared against; omitting it (returning the `n × q` state response) makes the two dimensionally incomparable whenever `p_y ≠ n`. Propagate the posterior covariance `Σ_kk` to obtain `σ_cosmic(ω, k)` via the Jacobian of the `(A, B) → G(ω)` mapping.
 
-**Frozen transfer function Jacobian.** Let `R = (e^{jω}I - A(k))⁻¹`. The Jacobian entries are:
-
-```
-∂G_{ab}/∂A_{ji} = R_{aj} × [R × B]_{ib}
-∂G_{ab}/∂B_{ji} = R_{aj} × δ_{ib}
-```
-
-Since `C(k) = [A(k)ᵀ; B(k)ᵀ]` and `Cov(vec(C(k))) = Σ ⊗ P(k)`, the Jacobian for entry `G_{ab}` has rank-1 structure `J_{ab} = v rₐ` where `v = [Gk(:,b); eᵦ] ∈ ℝᵈ` (`Gk = R B`, `eᵦ` is the b-th unit vector in `ℝᵍ`) and `rₐ = R(a,:) ∈ ℂ¹ˣᵖ`. The exact first-order variance is:
+**Frozen transfer function Jacobian.** Let `R = (e^{jω}I - A(k))⁻¹` (the `n × n` state resolvent) and `R̃ = H R` (the `p_y × n` output resolvent). The Jacobian entries, for output index `a ∈ {1,…,p_y}`, are:
 
 ```
-Var(G_{ab}) = (vᴴ P(k) v) × (rₐ Σ rₐᴴ)
+∂G_{ab}/∂A_{ji} = R̃_{aj} × [R × B]_{ib}
+∂G_{ab}/∂B_{ji} = R̃_{aj} × δ_{ib}
 ```
 
-This uses the full `P(k)` and full `Σ` via two scalar quadratic forms. Cost: `O(d² + p²)` per entry.
+Since `C(k) = [A(k)ᵀ; B(k)ᵀ]` and `Cov(vec(C(k))) = Σ ⊗ P(k)`, the Jacobian for entry `G_{ab}` has rank-1 structure `J_{ab} = v r̃ₐ` where `v = [Gk(:,b); eᵦ] ∈ ℝᵈ` (`Gk = R B`, the `n × q` state response; `eᵦ` is the b-th unit vector in `ℝᵍ`) and `r̃ₐ = R̃(a,:) = (H R)(a,:) ∈ ℂ¹ˣⁿ`. The exact first-order variance is:
+
+```
+Var(G_{ab}) = (vᴴ P(k) v) × (r̃ₐ Σ r̃ₐᴴ)
+```
+
+This uses the full `P(k)` and full `Σ` via two scalar quadratic forms. Cost: `O(d² + n²)` per entry. When `H = I` (`p_y = n`), `r̃ₐ = R(a,:)` and this recovers the state-response variance exactly, so a full-state `sidLTVdisc` result is unchanged.
 
 The criterion: **find the largest λ whose COSMIC posterior bands are consistent with the non-parametric bands.**
 
@@ -1388,7 +1467,17 @@ where `R ∈ ℝᵖʸˣᵖʸ` is the measurement noise covariance (symmetric pos
 
 The three terms are: observation fidelity (weighted by the measurement information matrix `R⁻¹`), dynamics fidelity (coupling states and dynamics), and dynamics smoothness (the standard COSMIC regulariser with shared `λ`). Multi-trajectory: the observation and dynamics fidelity terms sum over trajectories; the smoothness term is shared.
 
-**Recovery of standard COSMIC:** When `H = I` and `R → 0`, the observation fidelity forces `x(k) = y(k)` and `J` reduces to the standard COSMIC cost (§8.3.3). No additional hyperparameters are introduced in the fully-observed case.
+**Effective smoothness weight and the reported cost.** The COSMIC step (§8.12.3) applies the `1/sqrt(N)` data scaling of §8.3.2, so — exactly as for the posterior in §8.9.2 — the objective it actually minimises has smoothness weight `N·λ` relative to the unscaled fidelity terms, not `λ`. For coordinate descent to be provably monotone, the **reported and convergence-tested** cost must be that same effective objective:
+
+```
+J(X, C) = Σ_k ||y(k) - H x(k)||²_{R⁻¹}
+        + Σ_k ||x(k+1) - A(k) x(k) - B(k) u(k)||²
+        + N·λ Σ_k ||C(k) - C(k-1)||²_F
+```
+
+Both alternating steps decrease this single `J` (the state step holds `C` — hence the smoothness term — fixed; the COSMIC step minimises the dynamics-fidelity + `N·λ`-smoothness sub-problem), so the monotone decrease claimed in §8.12.3 holds for the value reported in the `Cost` field. The user-facing knob remains `λ` (horizon-independent per §8.3.2); only its *effective* weight `N·λ` — and therefore the numeric magnitude of `Cost` — is stated here. Previously the reported `J` used weight `λ` while the step minimised the `N·λ` objective, so the documented monotone decrease was not guaranteed for the reported value.
+
+**Recovery of standard COSMIC:** When `H = I` and `R → 0`, the observation fidelity forces `x(k) = y(k)` and `J` reduces to the standard COSMIC **problem** (§8.3.3) — the same minimiser, with the reported value equal to `N` times §8.3.3's scaled cost `f(C)` (the overall `N` that the `1/√N` normalisation removes from `f`; it does not change the optimiser). No additional hyperparameters are introduced in the fully-observed case.
 
 #### 8.12.3 Algorithm
 
@@ -1422,24 +1511,29 @@ This eliminates the state as a free variable. A single COSMIC step (§8.3.4) on 
 
 #### 8.12.4 Trust-Region Interpolation (Optional)
 
-When the transition from `A = I` (initialisation) to the first COSMIC estimate of `A(k)` is too abrupt — for instance with high noise, long trajectories, or poorly conditioned data — the state step can use interpolated dynamics:
+The Case-2 alternating loop is initialised from the LTI realisation `(A₀, B₀)` of §8.12.3 step 1 (**not** from `A = I`). When the jump from that initialisation to the first free COSMIC estimate of `A(k)` is too abrupt — high noise, long trajectories, or ill-conditioned data — the **state step** can use dynamics interpolated toward the initialisation:
 
 ```
-Ã(k) = (1 - μ) A(k) + μ I
+Ã(k) = (1 - μ) A(k) + μ A₀
 ```
 
-where `μ ∈ [0, 1]` is the trust-region parameter. The COSMIC step is unaffected (it always solves for `A(k)` and `B(k)` freely).
+where `μ ∈ [0, 1]` is the trust-region parameter and `A₀` is the (constant) LTI-initialisation dynamics. At `μ = 1` the state step trusts the initialisation entirely; at `μ = 0` it trusts the current free estimate `A(k)`. The COSMIC step is unaffected — it always solves for `A(k)`, `B(k)` freely. (Earlier drafts interpolated toward `μ·I`; that predates the LTI initialisation of §8.12.3 and is superseded here — `A₀` is the actual initialisation *and* a stable, data-informed trust anchor. Issue #138.)
 
-**Adaptive schedule.** The outer loop manages `μ`:
+**Two-level schedule.** Trust-region is an **outer** loop over `μ` that wraps the **inner** alternating loop of §8.12.3; the two are distinct, and the inner loop runs to its own stopping point *before* `μ` changes:
 
-1. Initialise `μ = 1` (first state step uses `A = I`, i.e., the initialisation).
-2. Run the alternating state–COSMIC loop to convergence for the current `μ`, yielding `J*(μ)`.
-3. Reduce `μ`: set `μ ← μ / 2`.
-4. Run the alternating loop to convergence with the new `μ`, yielding `J*(μ/2)`.
-5. **Accept/reject:** If `J*(μ/2) ≤ J*(μ)`, accept and continue from step 3. If `J*(μ/2) > J*(μ)`, revert to `μ` and terminate.
-6. Terminate when `μ < ε_μ` and set `μ = 0` for a final pass.
+1. `μ ← 1`.
+2. *Inner loop:* iterate the alternating state–COSMIC step at the fixed current `μ` until the relative change in the cost falls below `ε_J`, or the per-stage inner cap `MaxIter` is reached. Report `J*(μ)` and `(X*, C*)_μ` as the **best (lowest-cost) iterate observed during the stage** — not necessarily the last: for `μ > 0` the state step uses `Ã(k)`, so the inner iteration is a homotopy fixed-point, **not** the plain monotone descent of §8.12.3, and a capped non-converged stage could otherwise report a worse `J*` than it visited and distort the accept/reject. Monotonicity across `μ` is enforced by the outer accept/reject below, not within the inner loop.
+3. Propose `μ' = μ / 2`; run the inner loop at `μ'`, giving `J*(μ')`.
+4. *Accept/reject:* if `J*(μ') ≤ J*(μ)`, **accept** (`μ ← μ'`; keep `(X*, C*)_{μ'}`) and repeat from step 3; otherwise **reject** — restore `(X*, C*)_μ` and stop reducing `μ`.
+5. *Final `μ = 0` refinement (both exits).* On leaving the outer loop — whether by **reject** (step 4) or by `μ < ε_μ` — run one inner loop at `μ = 0` from the current best iterate and **keep its result only if it lowers `J*`** (a guarded pass). Return that iterate. This guarantees the returned iterate is a fixed point of the reported (`μ = 0`, true-objective) alternation, closing the "returned iterate was smoothed under `Ã ≠ A`, never refined at `μ = 0`" gap a bare reject would leave.
 
-When disabled (`μ = 0` from iteration 2 onward), the trust-region adds no computational overhead. This is expected to be sufficient for most practical cases.
+**Budget and defaults (normative).** `MaxIter` is the **per-stage** inner-loop iteration cap (not a global budget); the worst-case total inner-iteration count is `MaxIter × (⌈log₂(1/ε_μ)⌉ + 2)` — the `μ` stages plus the final `μ = 0` pass. Defaults: `ε_μ = 10⁻⁶`, and `μ = 0` (trust-region **off**), for which the outer loop is skipped entirely. `MaxIter` must be a positive integer.
+
+**Convergence diagnostic (normative).** When the base (`μ = 0`) alternation exits on the `MaxIter` cap without meeting `ε_J`, the solver issues a warning (`sid:notConverged`) reporting the cap — the returned iterate is usable but not converged. The trust-region stages (`μ > 0`) do **not** warn: a homotopy stage that caps out is expected (its best iterate is carried forward and the outer accept/reject still governs progress), so warning per stage would be noise.
+
+When disabled (`μ = 0`, the **default**), the outer loop is skipped and the algorithm reduces exactly to the plain alternating loop of §8.12.3 (Proposition 1 monotonicity applies), with no overhead. Trust-region is expected to be unnecessary for most cases; it exists for the abrupt-initialisation regime above.
+
+> **Correction (issue #138).** The previous implementation (a) **fused** the outer `μ` schedule into a single `max_iter` alternating loop, halving `μ` only when the inner relative-change test happened to fire — so at `μ = 1` it never settled and `μ` could remain at `1` for the whole budget; (b) interpolated toward `A₀` while the spec text said `μ·I` (this revision adopts `A₀`); and (c) on reject set `μ = 0` and **kept alternating** instead of terminating, which can move away from the restored best iterate. Net effect: `TrustRegion = 1` left the cost ~two orders of magnitude worse than off. This section specifies the corrected two-level algorithm; §8.12.4's `Verified by:` debt (`none`, #138) clears once the rewrite lands with tests.
 
 #### 8.12.5 Convergence
 
@@ -1472,7 +1566,7 @@ For any invertible `T ∈ ℝⁿˣⁿ`, the transformation `(T x(k), T A(k) T⁻
 | Regularisation | `λ` | scalar or `(N-1 × 1)` vector | required |
 | Noise covariance | `R` | `(p_y × p_y)` SPD matrix | `eye(p_y)` |
 | Convergence tol. | `ε_J` | positive scalar | `1e-6` |
-| Max iterations | | positive integer | `50` |
+| Max iterations (per-stage inner cap, §8.12.4) | `MaxIter` | positive integer | `50` |
 | Trust region | `μ_0` | scalar in `[0, 1]` or `'off'` | `'off'` |
 | Trust region tol. | `ε_μ` | positive scalar | `1e-6` |
 
@@ -1530,6 +1624,8 @@ frozen = sidLTVdiscFrozen(result, 'SampleTime', Ts);
 sidBodePlot(frozen);
 ```
 
+**Frozen-of-IO contract.** When `sidLTVdiscFrozen` is given an `sidLTVdiscIO` result, it returns the **output** frozen transfer function `H(e^{jω}I − A(k))⁻¹B(k)` (`p_y × q`), using the result's stored `H` (§8.11.1), with uncertainty propagated through the extra left-multiplication by `H`. This is what makes the frozen bands directly comparable to the output-based non-parametric estimate (`sidFreqMap` / `sidBodePlot`) — the comparison this usage is written for. For a full-state `sidLTVdisc` result (`H = I`) the output response equals the state response, so that path is unchanged.
+
 #### 8.12.12 Model Order Determination (`sidModelOrder`)
 
 When the state dimension `n` is unknown, it can be determined prior to calling `sidLTVdiscIO` using `sidModelOrder`, which estimates `n` from the singular value decomposition of a block Hankel matrix built from the frequency response.
@@ -1537,7 +1633,7 @@ When the state dimension `n` is unknown, it can be determined prior to calling `
 **Algorithm:**
 
 1. Take a frequency response estimate `Ĝ(ω)` from any `sidFreq*` function.
-2. Compute impulse response coefficients `g(k)` via IFFT of `Ĝ(ω)`.
+2. Compute impulse response coefficients `g(k)` via IFFT of `Ĝ(ω)`. The one-sided grid `(0, π]` carries no DC sample, so the DC bin of the conjugate-symmetric spectrum is linearly extrapolated from the first two grid points, `G(0) ≈ Re(2Ĝ(ω₁) − Ĝ(ω₂))` (the same convention `sidLTIfreqIO` uses). The Hankel is built from the **lag-1 onward** Markov parameters `g(k) = H A^{k-1} B`, `k ≥ 1`; the lag-0 IFFT sample (direct feedthrough, zero for a strictly proper plant) is discarded. Retaining it would build the Hankel of `z⁻¹Ĝ(z)`, whose McMillan degree is `n+1` for a strictly proper plant with a nonzero finite zero.
 3. Build the block Hankel matrix:
    ```
    H_hankel = [ g(1)   g(2)   ... g(r)   ]
@@ -1547,11 +1643,23 @@ When the state dimension `n` is unknown, it can be determined prior to calling `
    ```
    where `r` is the prediction horizon (default: `min(floor(N_imp/3), 50)` where `N_imp` is the number of impulse response coefficients). For MIMO systems with `n_y` outputs and `n_u` inputs, each entry `g(k)` is an `n_y × n_u` block.
 4. Compute the SVD: `H_hankel = U Σ V'`.
-5. Detect model order `n` as the index of the largest normalised singular value gap:
-   ```
-   n = argmax_k  σ_k / σ_{k+1}       for k = 1, ..., r-1
-   ```
-   Alternatively, when a threshold `τ` is specified, `n` is the number of singular values satisfying `σ_k / σ_1 > τ`.
+5. Detect model order `n` from the singular-value gaps. Let `σ_1 ≥ σ_2 ≥ … ≥ σ_m` be the singular values (`m = r·min(n_y, n_u)`).
+
+   a. **Noise floor.** A singular value is *resolvable* iff `σ_k > σ_1·√m·ε` (`ε` = machine epsilon); values at or below this floor are numerical zeros. Let `L` be the number of resolvable singular values.
+   b. **Search range.** `K = min(L − 1, floor(m/2))`, with `K ≥ 1`.
+      - The `L − 1` bound **excludes** the resolvable→floor cliff ratio `σ_L / σ_{L+1}` (dividing a resolvable value by a numerical zero), so the gap search ranges only over resolvable modes.
+      - The `floor(m/2)` cap bounds `n` when the singular values decay without a clear cliff (noise-dominated data, e.g. no underlying system).
+      - For `L ≤ 1` (a rank-≤1 system, `σ_1` resolvable at most) the `K ≥ 1` clamp leaves a single candidate `k = 1` and `n = 1` by construction. This is the sole case where the clamp admits the cliff ratio; it is not license to include the cliff when `L ≥ 2`.
+   c. **Order.**
+      ```
+      n = argmax_k  σ_k / σ_{k+1}       for k = 1, ..., K
+      ```
+
+   `L` and `K` are defined on singular-value **magnitudes**, not array indices, so the MATLAB and Python implementations return identical `n` for identical `Σ`.
+
+   Alternatively, when a threshold `τ` is specified, `n` is the number of singular values satisfying `σ_k / σ_1 > τ` (rank-count semantics, independent of the gap search above).
+
+   **Rationale for the floor, cliff exclusion, and cap:** the gap method uses a *machine-epsilon* floor rather than a larger data-aware floor because the lag-1 impulse-response reconstruction (step 2) already suppresses finite-grid/DC artifacts to near-`ε` magnitudes; a larger relative floor would instead cut genuine weak modes and collapse exact low-order plants (users needing an explicit magnitude cutoff use `'Threshold'`). The search **excludes** the resolvable→floor cliff so the gap method stays a gap detector rather than a rank counter (which `'Threshold'` already provides); including it made the two ports disagree on low-order plants. The `floor(m/2)` cap is retained — not lifted — because the floor cannot bound the *no-cliff* regime (noise-dominated data has a slowly decaying tail with no resolvable/floor boundary, and an uncapped search drifts to `n ≈ m`). See [ADR-0004](../docs/decisions/ADR-0004-model-order-gap-convention.md).
 
 **Inputs:**
 
@@ -1657,6 +1765,13 @@ Given partial I/O data `(Y, U)` and observation matrix `H`, estimate constant LT
    B_r = Σ_n^{1/2} V_n(1:q, :)^T                   (n × q)
    ```
 
+   If the requested order `n` exceeds the **numerical rank** of `H₀` — i.e.
+   `σ_n ≤ σ_1 · tol` with `tol = max(r·p_y, r·q)·eps` — then `Σ_n^{-1/2}` is not
+   well defined and the realization is singular. The solver **raises an error**
+   with the stable identifier `sid:orderExceedsRank` (code `order_exceeds_rank`);
+   it must not form `1/√σ_n → ∞`, which silently propagates `inf`/`NaN`. Request
+   an order at or below the resolvable rank (see `sidModelOrder`, §8.12.12).
+
 5. **H-basis transform.** Find `T` such that `C_r T⁻¹ = H`:
 
    ```
@@ -1666,7 +1781,13 @@ Given partial I/O data `(Y, U)` and observation matrix `H`, estimate constant LT
 
    The `pinv` handles any `p_y ≤ n` or `p_y > n`. If `T⁻¹` is ill-conditioned (`rcond < 10³ eps`), a warning is issued and the raw realization `(A_r, B_r)` is returned.
 
-6. **Stabilization.** Eigenvalues of `A₀` with `|λ| > 1` are reflected inside the unit circle: `λ ← 1/λ̄`.
+6. **Stabilization.** Eigenvalues of `A₀` with `|λ| > 1` are reflected inside the unit circle (`λ ← 1/λ̄`), and any eigenvalue whose magnitude still exceeds `MaxStabilize` (§8.13.2, default `0.999`) is then clamped to that radius (`λ ← MaxStabilize · λ/|λ|`). Both operations change only the **modulus** of each eigenvalue, never its argument.
+
+   The rescaled spectrum is reimposed **in real Schur form**, never by eigenvector inversion. Factor `A₀ = Q T Qᵀ` (real Schur: `Q` orthogonal, `T` block-upper-triangular with 1×1 real and 2×2 complex-conjugate-pair blocks on its diagonal). For each diagonal block, multiply the block by the scalar `s = |λ_target| / |λ_current|` that maps its eigenvalue modulus to the reflected/clamped target — this preserves the argument of a 2×2 complex pair and the sign of a 1×1 real eigenvalue, and leaves the strictly-upper-triangular part of `T` (hence `Q`) untouched. Reconstruct `A₀ ← Q T' Qᵀ`.
+
+   Because `Q` is orthogonal (`cond(Q) = 1`), this is numerically stable even when `A₀` is **defective** or has repeated eigenvalues. The eigenvector form `A₀ = V diag(λ) V⁻¹` must **not** be used: `V` is singular for defective `A₀` — e.g. an integrator chain (repeated eigenvalue, defective), which reaches this step because `|λ| = 1 > MaxStabilize` triggers the clamp — and `V⁻¹` then produces a spurious blow-up (entries `~10¹⁴`) rather than a stabilized matrix.
+
+   **Diagnostic (normative).** When stabilization actually fires — one or more eigenvalues reflected or clamped — the solver issues a warning (`sid:stabilized`) reporting how many eigenvalues were moved. The identified model's stability has been altered relative to the raw realization, which the caller should know. No warning is issued when every eigenvalue already satisfies `|λ| ≤ MaxStabilize` (`A₀` returned unchanged).
 
 #### 8.13.2 Inputs
 
@@ -1695,7 +1816,25 @@ The following are out of scope for v1.0:
 - **Time-varying observation matrix:** `H(k)` with smoothness prior; requires separate treatment.
 - **GCV lambda selection.**
 - **Parametric identification:** ARX, ARMAX, state-space subspace methods (`sidTfARX`, `sidSsN4SID`, etc.).
-- **LPV identification:** Structured parameter-varying models via direct least-squares or post-hoc regression on COSMIC output. See `spec/lpv_extension_theory.md` for design notes.
+- **LPV identification:** Structured parameter-varying models via direct least-squares or post-hoc regression on COSMIC output.
+
+**Verified by:**
+
+- Core COSMIC — data matrices, cost, closed-form solve, `1/√N` scaling (§8.1–8.8) — `cross-vector` (`reference_ltv_cosmic`, `reference_cosmic_internals`, `reference_test_msd`; all uniform-horizon), `unit(M)` `test_sidLTVdisc.m` / `test_util_msd_ltv.m`, `unit(Py)` `test_ltv_disc.py`.
+- Variable-length trajectories (§8.8) — `cross-vector` (`reference_ltv_cosmic_varlen`, #145d: unequal-length cell trajectories, ragged round-trip), `unit(M)` `test_sidLTVdiscVarLen.m` (dense-LSQ oracle), `unit(Py)` `test_ltv_disc.py` var-len cases.
+- §8.4.2 L-curve auto-λ corner selection — `unit(M)` `test_sidLTVdisc.m` (Test 21), `unit(Py)` `test_ltv_disc.py` (`test_auto_lambda_selects_interior_corner`): asserts the selected λ is an **interior** grid point (a real curvature corner, not a degenerate endpoint) and recovers the system (#120).
+- §8.3.4 ill-conditioning warning (`sid:singularLbd`) — `unit(M)` `test_sidLTVcosmicSolve.m`, `unit(Py)` `test_ltv_cosmic_solve.py`: a near-singular forward-pass block warns while still returning a finite result (#120). It is a defensive diagnostic not reachable from normal public-API inputs, so it is driven directly through the private solver (on the path via `runAllTests`' `private_test_shim`).
+- §8.9 Bayesian uncertainty — posterior `P(k) = P_scaled/N`, DoF hat-trace (issue #137) — `cross-vector` (`reference_cosmic_internals`, **`P` field only**), `unit(M)` `test_sidLTVdiscUncertainty.m` (Test 15 exact-Hessian oracle), `unit(Py)` `test_ltv_uncertainty_calibration.py` (exact-Hessian + `P=P_scaled/N` oracles + fixed-seed mid-`λ` Monte-Carlo calibration).
+- §8.9 reported `AStd` / `BStd` / `Σ̂` / `ν` — `cross-vector` (`reference_cosmic_uncertainty`, #145d/#121: pins `AStd`/`BStd`/`NoiseCov`/`NoiseVariance`/`DegreesOfFreedom` across ports), `unit(Py)` MC calibration (checks `AStd` against the empirical spread).
+- §8.10 online/recursive COSMIC — `deferred` (v2, per the implementation-status banner).
+- §8.11 frozen transfer function (`sidLTVdiscFrozen`) — `cross-vector` (`reference_ltv_frozen`, `H = I`; and `reference_frozen_of_io`, #145d: the **output** contract `H(e^{jω}I − A)⁻¹B` at `p_y = 2 < n = 3` piped from an `sidLTVdiscIO` result), `unit(M)` `test_sidLTVdiscFrozen.m`, `unit(Py)` `test_ltv_disc_frozen.py`, plus `unit(M/Py)` `test_frozen_of_io*` (asserts `p_y×q` shape and equality to `H·(state response)`). The `H = I` collapse keeps `reference_ltv_frozen` byte-identical.
+- §8.11 lambda tuning (`sidLTVdiscTune`) — `cross-vector` (`reference_ltv_tune`, #145d: validation-mode `BestLambda` + per-λ `AllLosses` over a fixed grid), `unit(M)` `test_sidLTVdiscTune.m`, `unit(Py)` `test_ltv_disc_tune.py`.
+- §8.12 Output-COSMIC (`sidLTVdiscIO`) — RTS state step, COSMIC step, `N·λ` reported cost (issue #137) — `cross-vector` (`reference_ltv_io`, `A`/`B`/`Cost`), `unit(M)` `test_sidLTVdiscIO.m`, `unit(Py)` `test_ltv_disc_io.py`.
+- §8.12.4 two-level trust-region schedule (issue #138) — `unit(M)` `test_sidLTVdiscIO.m` (Test 11: TR markedly lowers the cost vs off on a hard partial-obs case — a revert-check against the pre-#138 fused loop, which left TR ~two decades *worse* than off; the μ-schedule advances past the initial stage and terminates within the normative `MaxIter × (⌈log₂(1/ε_μ)⌉ + 2)` budget; Test 30: `MaxIter = 0` rejected), `unit(Py)` `test_ltv_disc_io.py` (`test_trust_region_helps_on_hard_case`, `test_trust_region_mu_advances_and_terminates`, `test_max_iter_rejects_non_positive`). **`none` for `cross-vector`** — no stored vector exercises `TrustRegion` (the `reference_ltv_io` case runs `μ = 0`); the benefit is threshold-dependent so a pinned vector would be brittle. The guarded final `μ = 0` refinement and best-iterate-per-stage semantics are `manual` (SPEC §8.12.4).
+- §8.12.12 model-order selection (`sidModelOrder`) — `cross-vector` (`reference_model_order`), `unit(M)` `test_sidModelOrder.m`, `unit(Py)` `test_model_order.py`.
+- §8.12.13 batch LTV state estimation (`sidLTVStateEst`) — `cross-vector` (`reference_ltv_state_est`; and `reference_ltv_state_est_varlen`, #145d: unequal-length cell trajectories, ragged `X_hat` compared via `flatten`), `unit(M)` `test_sidLTVStateEst.m`, `unit(Py)` `test_ltv_state_est.py`.
+- §8.13 LTI realization from I/O frequency response (`sidLTIfreqIO`) — `cross-vector` (`reference_lti_freq_io`, at `H = I`), `unit(M)` `test_sidLTIfreqIO.m`, `unit(Py)` `test_lti_freq_io.py`. The three #144 gaps are now closed by `unit(M/Py)`: real-Schur stabilization of a **defective** matrix stays bounded (`test_stabilize_defective_is_bounded` / integrator revert-check; the pre-#144 eigenvector form gave `~10¹⁴`), the `sid:stabilized` warning fires when it fires, order-above-rank raises `sid:orderExceedsRank` instead of `inf`/`NaN`, and accuracy at `H ≠ I` (`p_y < n`) is verified beyond shape. The `H ≠ I` realization is also pinned across ports by `cross-vector` `reference_lti_freq_io_partial` (#145d: `p_y = 2 < n = 3`).
+- §8.14 deferred extensions — `deferred`.
 
 ---
 
@@ -1726,6 +1865,8 @@ All `sidFreq*` functions return a struct with these fields:
 
 **Time series mode:** `Response` and `ResponseStd` are empty (`[]`). `Coherence` is empty. `NoiseSpectrum` contains `Φ̂_y(ω)`.
 
+**Verified by:** the output-struct schema (field names, shapes, time-series-mode empties) is exercised field-by-field by the frequency-domain `unit(M)`/`unit(Py)` tests of §2–§7 (which assert on each field) and pinned across ports by their `cross-vector`s. The `.Method` string and metadata fields are `manual`.
+
 ---
 
 ## 10. Edge Cases and Validation
@@ -1748,17 +1889,35 @@ All `sidFreq*` functions return a struct with these fields:
 | Condition | Action |
 |-----------|--------|
 | `Φ̂_u(ω_k) ≈ 0` | Set `Ĝ(ω_k) = NaN`, `σ_G(ω_k) = Inf`, issue warning |
-| `Φ̂_v(ω_k) < 0` | Clamp to 0 |
+| `Φ̂_v(ω_k) < 0` (finite) | Clamp to 0 (preserve `NaN`, §2.7) |
 | `γ̂²(ω_k) > 1` (numerical error) | Clamp to 1 |
 | `γ̂²(ω_k) < 0` (numerical error) | Clamp to 0 |
 
+The `Φ̂_u(ω_k) ≈ 0` test is the **per-frequency** relative floor of §2.6 (`|Φ̂_u(ω_k)| < ε·max|Φ̂_u|` for SISO; `cond(Φ̂_u(ω_k)) > 1/ε` for MIMO). It catches individual dead frequencies but, being relative to the input's own spectral maximum, it **cannot** catch a whole-signal constant input — that case is handled by the input-excitation check of §10.3.
+
 ### 10.3 Degenerate Inputs
+
+**Input-excitation check (applied before estimation).** Under the biased-covariance convention (no mean removal), a constant input `u = c` has `R̂_u(τ) = c²(N−|τ|)/N ≠ 0`, so `Φ̂_u(ω)` is nonzero at every frequency and the *relative* per-frequency floor of §10.2 never fires — yet a constant input excites no dynamics on the `(0, π]` grid, so `Ĝ` is unidentifiable everywhere. Estimators therefore apply an **absolute input-excitation check** to `u` before estimating. Let `s²_u` be the per-channel sample variance of `u` about its own mean and `p_u` the per-channel mean square. If
+
+```
+max_ch(s²_u) ≤ ε · max_ch(p_u)      (u is constant to relative tolerance ε = 1e-10),
+   or  max_ch(p_u) ≤ realmin        (u is identically zero),
+```
+
+then the input carries no usable excitation: set `Ĝ(ω) = NaN` for all `ω`, `σ_G(ω) = Inf` for all `ω`, and issue a warning. This makes the constant-input contract enforceable independently of the (nonzero) per-frequency `Φ̂_u` values.
 
 | Condition | Action |
 |-----------|--------|
-| `u` is constant (zero variance) | Same as `Φ̂_u ≈ 0` at all frequencies; `Ĝ = NaN` everywhere, with warning |
+| `u` constant (zero AC variance) or identically zero | Input-excitation check fires: `Ĝ = NaN` everywhere, `σ_G = Inf`, warning |
 | `y` is constant | Valid; `Φ̂_y ≈ 0` at all frequencies |
 | `u = y` (perfect coherence) | Valid; `γ̂² ≈ 1`, `Φ̂_v ≈ 0`, very small `σ_G` |
+| Collinear MIMO inputs (rank-deficient `u`) | Per-frequency `cond(Φ̂_u) > 1/ε` fires at every frequency: `Ĝ = NaN`, `σ_G = Inf`, warning (§2.6) |
+| One input channel constant while others are active (partial degeneracy) | The whole-signal check passes (a healthy channel dominates `max_ch`) and `cond(Φ̂_u)` may stay below `1/ε`, so the estimate proceeds; that channel's column of `Ĝ` is unidentifiable. A **per-channel warning** names the constant channel(s); the healthy channels are estimated normally (their columns are *not* NaN'd). |
+
+**Verified by:**
+
+- Input validation — NaN/Inf, complex data, too-short, shape errors (§10.1) — `unit(M)` `test_sidValidate.m`, `unit(Py)` `test_validate.py`.
+- Degenerate excitation §10.2–10.3 (near-singular `Φ̂_u`, whole-signal constant/zero, partial degeneracy) — verified by the degenerate test classes cited under §2/§4/§5/§6 (`TestFreqBTDegenerate` etc. and their MATLAB counterparts). **`none` for `cross-vector`** — degenerate inputs are not stored.
 
 ---
 
@@ -1795,6 +1954,8 @@ Both plotting functions accept name-value options:
 | `'LineWidth'` | `1.5` | Line width |
 | `'Axes'` | `[]` | Axes handle (creates new figure if empty) |
 
+**Verified by:** plotting functions (`sidBodePlot`, `sidSpectrumPlot`, `sidMapPlot`, `sidSpectrogramPlot`, …) — `unit(M)` `test_sidPlotting.m` / `test_sidMapPlot.m` / `test_sidSpectrogramPlot.m`, `unit(Py)` `test_plotting.py`. The confidence-band **formulas** (§11.1 Bode magnitude `20·log10(|Ĝ|±p·σ_G)` + phase `±p·σ_G/|Ĝ|·180/π`; §11.2 spectrum `10·log10(Φ̂_v±p·σ_Φv)`) are asserted against the plotted band edges by `test_sidPlotting.m` (Tests 16–17) / `test_plotting.py` (`test_confidence_band_math`) — #123. Visual appearance remains `manual`.
+
 ---
 
 ## 12. References
@@ -1829,6 +1990,8 @@ Both plotting functions accept name-value options:
 12. Harris, F.J. "On the use of windows for harmonic analysis with the discrete Fourier transform." Proc. IEEE, 66(1):51–83, 1978. (Effective DOF for Welch estimator with overlap.)
 
 13. Priestley, M.B. *Spectral Analysis and Time Series*. Academic Press, 1981. (Ch. 14: Non-stationary processes and time-dependent spectral analysis.)
+
+**Verified by:** `manual` — bibliographic references; no automated verifier applies.
 
 ---
 
@@ -1893,6 +2056,8 @@ y_ds = sidDetrend(y, 'SegmentLength', 1000);
 [u_dt] = sidDetrend(u);
 result = sidFreqBT(y_dt, u_dt);
 ```
+
+**Verified by:** `cross-vector` (`reference_detrend`), `unit(M)` `test_sidDetrend.m`, `unit(Py)` `test_detrend.py`.
 
 ---
 
@@ -2005,6 +2170,8 @@ resid = sidResidual(ltv, X, U);
 sidResidual(result, y, u, 'Plot', true);
 ```
 
+**Verified by:** `cross-vector` (`reference_residual`), `unit(M)` `test_sidResidual.m`, `unit(Py)` `test_residual.py`.
+
 ---
 
 ## 15. `sidCompare` — Model Output Comparison
@@ -2063,6 +2230,8 @@ For COSMIC multi-trajectory data, fit is computed per trajectory and averaged.
 | `Residual` | `(N × n_y)` | `y(t) - ŷ(t)` |
 | `Method` | char | Method of the source model |
 
+**Multi-trajectory data.** For multi-trajectory state-space input (`L` trajectories), `Predicted`, `Measured`, and `Residual` are returned **per trajectory** with shape `(N × n_y × L)` — *not* the ensemble mean, which would cancel independent per-trajectory errors (and is degenerate for mirror-image trajectories). `Fit` stays `(1 × n_y)`: the per-channel NRMSE is computed for each trajectory and averaged across trajectories, per §15.3. A trajectory whose measured channel is constant contributes `NaN` to that channel's average and is skipped; the channel's `Fit` is `NaN` only when every trajectory is degenerate. Single-trajectory input returns the `(N × n_y)` shapes above.
+
 ### 15.6 Plotting
 
 When called with `'Plot', true` or with no output arguments, `sidCompare` produces a figure with measured and predicted outputs overlaid, and the fit percentage displayed in the title or legend.
@@ -2084,3 +2253,5 @@ comp = sidCompare(ltv, X_val, U_val);
 % Plot comparison
 sidCompare(result, y, u, 'Plot', true);
 ```
+
+**Verified by:** `cross-vector` (`reference_compare`), `unit(M)` `test_sidCompare.m`, `unit(Py)` `test_compare.py`. Multi-trajectory output shapes (§15.5) — the `unit(M)`/`unit(Py)` multi-trajectory cases added with issues #140/#158. The frequency-domain simulation helper (§15.2) is `cross-vector` (`reference_freq_domain_sim`) and now also `unit(M/Py)` `test_sidFreqDomainSim.m` / `test_freq_domain_sim.py` (constant-gain oracle + out-of-grid zeroing, #124), closing the port-symmetry gap.

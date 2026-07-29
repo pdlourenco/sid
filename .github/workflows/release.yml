@@ -99,6 +99,10 @@ jobs:
         if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
+          # Resolve the repo explicitly rather than letting gh infer it from the
+          # checkout's git remote: works here (checkout runs above) but breaks the
+          # moment a future change drops the checkout step.
+          GH_REPO: ${{ github.repository }}
         run: |
           LANG="${{ steps.meta.outputs.language }}"
           TAG="${{ steps.meta.outputs.tag }}"

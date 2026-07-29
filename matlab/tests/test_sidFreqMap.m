@@ -302,4 +302,73 @@ assert(length(res_eq.Frequency) == 256, ...
 runner__nPassed = runner__nPassed + 1;
 fprintf('  Test 26 passed: Welch NFFT < SubSegmentLength rejected.\n');
 
+%% Test 27: Multi-output time-series (SPEC 6.1, both algorithms) (#135)
+% Previously the storage branch "ny == 1 || isTimeSeries" ravelled an
+% (nf x ny x ny) per-segment noise spectrum into an incompatible slice.
+rng(27);
+y_mots = randn(2000, 2);
+for alg = {'bt', 'welch'}
+    r_mots = sidFreqMap(y_mots, [], 'SegmentLength', 256, 'Algorithm', alg{1});
+    assert(ndims(r_mots.NoiseSpectrum) == 4, ...
+        'Multi-output TS (%s): NoiseSpectrum should be 4-D (nf x K x ny x ny)', alg{1});
+    assert(all(isfinite(r_mots.NoiseSpectrum(:))), ...
+        'Multi-output TS (%s): NoiseSpectrum has non-finite entries', alg{1});
+end
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 27 passed: multi-output time-series map (#135).\n');
+
+%% Test 28: Welch MIMO collinear inputs -> NaN, no "singular to precision" crash (#141)
+rng(28);
+N28 = 1024;
+u0 = randn(N28, 1);
+u28 = [u0, 2 * u0];                     % rank-deficient Phi_u
+y28 = [u0 + 0.1 * randn(N28, 1), u0 + 0.1 * randn(N28, 1)];
+ws = warning('off', 'all');
+r28 = sidFreqMap(y28, u28, 'Algorithm', 'welch', 'SegmentLength', 256);
+warning(ws);
+resp28 = r28.Response;
+if iscell(resp28)
+    resp28 = resp28{1};
+end
+assert(any(isnan(resp28(:))), 'Welch MIMO collinear -> some Response NaN (not Inf garbage)');
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 28 passed: Welch MIMO collinear -> NaN, no crash (#141).\n');
+
+%% Test 29: Welch SISO low-coherence sigma uses the Inf sentinel, never NaN
+rng(29);
+N29 = 1024;
+u29 = randn(N29, 1);
+y29 = randn(N29, 1);                    % pure noise -> low coherence bins
+ws = warning('off', 'all');
+r29 = sidFreqMap(y29, u29, 'Algorithm', 'welch', 'SegmentLength', 256);
+warning(ws);
+gs29 = r29.ResponseStd;
+if iscell(gs29)
+    gs29 = gs29{1};
+end
+assert(~any(isnan(gs29(:))), 'Welch SISO low-coherence sigma should be Inf, never NaN');
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 29 passed: Welch SISO low-coherence sigma is Inf, not NaN (SPEC 3.3).\n');
+
+%% Test 30: Welch one-sided scaling -- Nyquist bin NOT doubled (#142, SPEC 6.5)
+% A single rect sub-segment over the whole signal makes Welch == the raw
+% one-sided periodogram, so the scaling (incl. the Nyquist bin) is checkable
+% in closed form without scipy. Before the fix the Nyquist bin was 2x too large.
+rng(30);
+Nn = 512;
+yn = randn(Nn, 1);
+rn = sidFreqMap(yn, [], 'Algorithm', 'welch', 'SegmentLength', Nn, ...
+    'SubSegmentLength', Nn, 'SubOverlap', 0, 'Window', 'rect', 'NFFT', Nn);
+phin = rn.NoiseSpectrum(:);              % (Nn/2 x 1), sid grid = fft bins 2..Nn/2+1
+Xn = fft(yn);
+Pfull = abs(Xn).^2 / Nn;                 % S1 = Nn for a rect window
+expected = 2 * Pfull(2:Nn/2+1);          % one-sided doubling
+expected(end) = Pfull(Nn/2+1);           % Nyquist has no mirror -> factor 1
+assert(max(abs(phin - expected)) < 1e-9 * max(abs(expected)), ...
+    'Welch PSD must match the one-sided periodogram, incl. the Nyquist bin');
+assert(abs(phin(end) / Pfull(Nn/2+1) - 1) < 1e-9, ...
+    'Nyquist bin must NOT be doubled (ratio 1, was 2 before #142)');
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 30 passed: Welch Nyquist bin un-doubled (#142).\n');
+
 fprintf('test_sidFreqMap: %d/%d passed\n', runner__nPassed, runner__nPassed);

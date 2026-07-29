@@ -8,6 +8,14 @@ function generate_reference()
 %
 %   Usage:
 %     run('testdata/generate_reference.m')
+%
+%   Canonical environment: CI (the tests.yml MATLAB job, pinned to MATLAB R2025a)
+%   regenerates and commits the reference bytes on push to main. Regenerating under
+%   another MATLAB version or Octave produces sub-tolerance output drift (~1 ULP,
+%   surfaced as whole-file text churn by jsonencode's shortest-round-trip
+%   formatting): never commit that churn. A PR that changes reference semantics or
+%   adds a vector commits only the files it affects (ADR-0002 rules 3-4). See
+%   testdata/README.md.
 
 fprintf('=== Generating cross-language reference data ===\n\n');
 
@@ -53,7 +61,8 @@ ref1.output = struct( ...
     'Response_imag', imag(r1.Response), ...
     'NoiseSpectrum', r1.NoiseSpectrum, ...
     'Coherence', r1.Coherence);
-ref1.tolerance = struct('Response_rel', 1e-10, 'NoiseSpectrum_rel', 1e-10);
+ref1.tolerance = struct('Response_rel', 1e-10, 'NoiseSpectrum_rel', 1e-10, ...
+    'Frequency_rel', 1e-12, 'Coherence_rel', 1e-10);
 
 writeJSON(fullfile(thisDir, 'reference_siso_bt.json'), ref1);
 
@@ -83,7 +92,8 @@ ref1_lm.output = struct( ...
     'Response_imag', imag(r1_lm.Response), ...
     'NoiseSpectrum', r1_lm.NoiseSpectrum, ...
     'Coherence', r1_lm.Coherence);
-ref1_lm.tolerance = struct('Response_rel', 1e-10, 'NoiseSpectrum_rel', 1e-10);
+ref1_lm.tolerance = struct('Response_rel', 1e-10, 'NoiseSpectrum_rel', 1e-10, ...
+    'Frequency_rel', 1e-12, 'Coherence_rel', 1e-10);
 
 writeJSON(fullfile(thisDir, 'reference_siso_bt_large_M.json'), ref1_lm);
 
@@ -102,7 +112,8 @@ ref1b.output = struct( ...
     'Frequency', r1b.Frequency, ...
     'NoiseSpectrum', r1b.NoiseSpectrum, ...
     'NoiseSpectrumStd', r1b.NoiseSpectrumStd);
-ref1b.tolerance = struct('NoiseSpectrum_rel', 1e-10);
+ref1b.tolerance = struct('NoiseSpectrum_rel', 1e-10, ...
+    'NoiseSpectrumStd_rel', 1e-10);
 
 writeJSON(fullfile(thisDir, 'reference_timeseries_bt.json'), ref1b);
 
@@ -239,7 +250,8 @@ ref_sp.output = struct( ...
     'Time', r_sp.Time, ...
     'Frequency', r_sp.Frequency, ...
     'Power', r_sp.Power);
-ref_sp.tolerance = struct('Time_rel', 1e-12, 'Power_rel', 1e-10);
+ref_sp.tolerance = struct('Time_rel', 1e-12, 'Power_rel', 1e-10, ...
+    'Frequency_rel', 1e-12);
 
 writeJSON(fullfile(thisDir, 'reference_spectrogram.json'), ref_sp);
 
@@ -264,7 +276,8 @@ ref_fm.output = struct( ...
     'Response_imag', imag(r_fm.Response), ...
     'NoiseSpectrum', r_fm.NoiseSpectrum, ...
     'Coherence', r_fm.Coherence);
-ref_fm.tolerance = struct('Response_rel', 1e-10, 'NoiseSpectrum_rel', 1e-10);
+ref_fm.tolerance = struct('Response_rel', 1e-10, 'NoiseSpectrum_rel', 1e-10, ...
+    'Coherence_rel', 1e-10, 'Time_rel', 1e-12);
 
 writeJSON(fullfile(thisDir, 'reference_freqmap_bt.json'), ref_fm);
 
@@ -291,7 +304,8 @@ ref5.output = struct( ...
     'A', r5.A, ...
     'B', r5.B, ...
     'Cost', r5.Cost);
-ref5.tolerance = struct('A_rel', 1e-6, 'B_rel', 1e-6, 'Cost_rel', 1e-6);
+ref5.tolerance = struct('A_rel', 1e-6, 'B_rel', 1e-6, 'Cost_rel', 1e-6, ...
+    'A_atol', 1e-10, 'B_atol', 1e-10, 'Cost_atol', 1e-10);
 
 writeJSON(fullfile(thisDir, 'reference_ltv_cosmic.json'), ref5);
 
@@ -312,21 +326,32 @@ ref6.tolerance = struct('x_detrended_rel', 1e-10, 'trend_rel', 1e-10);
 
 writeJSON(fullfile(thisDir, 'reference_detrend.json'), ref6);
 
-% ---- Test case 7: sidModelOrder ----
+% ---- Test case 7: sidModelOrder (strictly-proper finite-zero plant) ----
+% Analytic G(z) = (z + 0.5) / (z^2 - 1.2728 z + 0.81) on the (0, pi] grid
+% (true n = 2, zero at -0.5). An exact response is the meaningful cross-language
+% exemplar for the gap method: the resolvable set is small so the floor(m/2) cap
+% does not bind, which exercises the cliff-exclusion rule (pre-ADR-0004 the MATLAB
+% gap method returned n = 3 here while Python returned 2). Replaces the earlier
+% biproper BT-estimated plant, which was outside the strictly-proper model class
+% and gap-ambiguous (retires the #157 test-case-7 note). See ADR-0004, SPEC §8.12.12.
+% The SV tail is numerical noise (~1e-15), so the tolerance carries an absolute
+% floor (SingularValues_atol) alongside the relative one, per ADR-0002.
 fprintf('Generating reference_model_order.json...\n');
-rng(51);
-N_mo = 500;
-u_mo = randn(N_mo, 1);
-y_mo = filter([1 0.5], [1 -0.8 0.2], u_mo) + 0.05 * randn(N_mo, 1);
-r_mo_bt = sidFreqBT(y_mo, u_mo, 'WindowSize', 40);
-[n_mo, sv_mo] = sidModelOrder(r_mo_bt, 'Horizon', 30);
+nf_mo = 128;
+w_mo = (1:nf_mo)' * pi / nf_mo;
+z_mo = exp(1j * w_mo);
+G_mo = (z_mo + 0.5) ./ (z_mo.^2 - 1.2728 * z_mo + 0.81);
+res_mo = struct('Frequency', w_mo, 'Response', reshape(G_mo, nf_mo, 1, 1), ...
+    'Method', 'analytic');
+[n_mo, sv_mo] = sidModelOrder(res_mo);   % default gap method
 
 ref7 = struct();
 ref7.function_name = 'sidModelOrder';
-ref7.params = struct('Horizon', 30, 'bt_WindowSize', 40);
-ref7.input = struct('y', y_mo, 'u', u_mo);
+ref7.params = struct();
+ref7.input = struct('Frequency', w_mo, ...
+    'Response_real', real(G_mo), 'Response_imag', imag(G_mo));
 ref7.output = struct('n', n_mo, 'SingularValues', sv_mo.SingularValues);
-ref7.tolerance = struct('SingularValues_rel', 1e-8);
+ref7.tolerance = struct('SingularValues_rel', 1e-8, 'SingularValues_atol', 1e-9);
 
 writeJSON(fullfile(thisDir, 'reference_model_order.json'), ref7);
 
@@ -352,7 +377,8 @@ ref8.function_name = 'sidCompare';
 ref8.params = struct('Lambda', 1e5, 'Precondition', false);
 ref8.input = struct('X', X_cmp, 'U', U_cmp);
 ref8.output = struct('Predicted', comp.Predicted, 'Fit', comp.Fit);
-ref8.tolerance = struct('Predicted_rel', 1e-6, 'Fit_rel', 1e-6);
+ref8.tolerance = struct('Predicted_rel', 1e-6, 'Fit_rel', 1e-6, ...
+    'Predicted_atol', 1e-10, 'Fit_atol', 1e-10);
 
 writeJSON(fullfile(thisDir, 'reference_compare.json'), ref8);
 
@@ -376,7 +402,10 @@ ref9.output = struct( ...
 ref9.tolerance = struct( ...
     'Residual_rel', 1e-6, ...
     'AutoCorr_rel', 1e-6, ...
-    'CrossCorr_rel', 1e-6);
+    'CrossCorr_rel', 1e-6, ...
+    'Residual_atol', 1e-10, ...
+    'AutoCorr_atol', 1e-10, ...
+    'CrossCorr_atol', 1e-10);
 
 writeJSON(fullfile(thisDir, 'reference_residual.json'), ref9);
 
@@ -444,7 +473,8 @@ ref12.output = struct( ...
     'Frequency', frozen.Frequency, ...
     'Response_real', real(frozen.Response), ...
     'Response_imag', imag(frozen.Response));
-ref12.tolerance = struct('Frequency_rel', 1e-12, 'Response_rel', 1e-6);
+ref12.tolerance = struct('Frequency_rel', 1e-12, 'Response_rel', 1e-6, ...
+    'Response_atol', 1e-10);
 
 writeJSON(fullfile(thisDir, 'reference_ltv_frozen.json'), ref12);
 
@@ -485,9 +515,12 @@ end
 [cost_ci, fid_ci, reg_ci] = sidLTVevaluateCost( ...
     A_est_ci, B_est_ci, D_ci, Xl_ci, lambda_ci, N_ci, p_ci, q_ci);
 
-% Uncertainty backward pass
-S_scaled_ci = S_ci / N_ci;
-P_ci = sidLTVuncertaintyBackwardPass(S_scaled_ci, lambda_ci, N_ci, d_ci);
+% Uncertainty backward pass. Pass S directly, exactly as production
+% (sidLTVdisc.m:200): S from sidLTVbuildBlockTerms already carries the
+% 1/sqrt(N) data normalization (SPEC §8.3.2), so the backward pass
+% reconstructs the unscaled Hessian internally. Dividing by N here again
+% would feed it a doubly-scaled S and store a P matching no implementation.
+P_ci = sidLTVuncertaintyBackwardPass(S_ci, lambda_ci, N_ci, d_ci);
 
 ref13 = struct();
 ref13.function_name = 'cosmic_internals';
@@ -561,7 +594,7 @@ ref15.function_name = 'sidLTVStateEst';
 ref15.params = struct();
 ref15.input = struct('Y', Y_se, 'U', U_se, 'A', A_se, 'B', B_se, 'H', H_se);
 ref15.output = struct('X_hat', X_hat_se);
-ref15.tolerance = struct('X_hat_rel', 1e-6);
+ref15.tolerance = struct('X_hat_rel', 1e-6, 'X_hat_atol', 1e-10);
 
 writeJSON(fullfile(thisDir, 'reference_ltv_state_est.json'), ref15);
 
@@ -587,7 +620,8 @@ ref16.function_name = 'sidLTIfreqIO';
 ref16.params = struct();
 ref16.input = struct('Y', Y_lti, 'U', U_lti, 'H', H_lti);
 ref16.output = struct('A0', A0_est, 'B0', B0_est);
-ref16.tolerance = struct('A0_rel', 1e-6, 'B0_rel', 1e-6);
+ref16.tolerance = struct('A0_rel', 1e-6, 'B0_rel', 1e-6, ...
+    'A0_atol', 1e-8, 'B0_atol', 1e-8);
 
 writeJSON(fullfile(thisDir, 'reference_lti_freq_io.json'), ref16);
 
@@ -613,6 +647,289 @@ ref17.tolerance = struct('Ad_rel', 1e-10, 'Bd_rel', 1e-10, 'Bd_atol', 1e-14);
 
 writeJSON(fullfile(thisDir, 'reference_test_msd.json'), ref17);
 
+% ---- #145d Batch A: frequency-domain coverage vectors ----
+
+fprintf('Generating reference_multitraj_bt.json...\n');
+rng(3101);
+N_mt = 800; L_mt = 4; a_mt = 0.85;
+y_mt = zeros(N_mt, 1, L_mt); u_mt = zeros(N_mt, 1, L_mt);
+for l = 1:L_mt
+    ul = randn(N_mt, 1);
+    y_mt(:, 1, l) = filter(1, [1 -a_mt], ul) + 0.1 * randn(N_mt, 1);
+    u_mt(:, 1, l) = ul;
+end
+r_mt = sidFreqBT(y_mt, u_mt, 'WindowSize', 30);
+
+ref_mt = struct();
+ref_mt.function_name = 'sidFreqBT';
+ref_mt.params = struct('WindowSize', 30, 'SampleTime', 1.0);
+% Store the full 3D (N x ny x L) input so both validators dispatch it as
+% multi-trajectory unambiguously (ndims == 3), not MIMO.
+ref_mt.input = struct('y', y_mt, 'u', u_mt);
+ref_mt.output = struct( ...
+    'Frequency', r_mt.Frequency, ...
+    'Response_real', real(r_mt.Response), ...
+    'Response_imag', imag(r_mt.Response), ...
+    'NoiseSpectrum', r_mt.NoiseSpectrum, ...
+    'Coherence', r_mt.Coherence, ...
+    'ResponseStd', r_mt.ResponseStd);
+ref_mt.tolerance = struct('Response_rel', 1e-10, 'Response_atol', 1e-12, ...
+    'NoiseSpectrum_rel', 1e-10, 'Frequency_rel', 1e-12, ...
+    'Coherence_rel', 1e-10, 'ResponseStd_rel', 1e-10);
+
+writeJSON(fullfile(thisDir, 'reference_multitraj_bt.json'), ref_mt);
+
+fprintf('Generating reference_timeseries_etfe.json...\n');
+rng(3102);
+N_te = 500;
+y_te = filter([1 0.5], [1 -0.85 0.1], randn(N_te, 1)) + 0.05 * randn(N_te, 1);
+r_te = sidFreqETFE(y_te, []);   % time-series mode -> periodogram, empty Response
+
+ref_te = struct();
+ref_te.function_name = 'sidFreqETFE';
+ref_te.params = struct('SampleTime', 1.0);
+ref_te.input = struct('y', y_te);   % no u: time-series
+ref_te.output = struct( ...
+    'Frequency', r_te.Frequency, ...
+    'NoiseSpectrum', r_te.NoiseSpectrum);
+ref_te.tolerance = struct('NoiseSpectrum_rel', 1e-10, 'NoiseSpectrum_atol', 1e-12, ...
+    'Frequency_rel', 1e-12);
+
+writeJSON(fullfile(thisDir, 'reference_timeseries_etfe.json'), ref_te);
+
+fprintf('Generating reference_freqmap_welch.json...\n');
+rng(3103);
+N_fw = 4000;
+u_fw = randn(N_fw, 1);
+y_fw = filter([1], [1 -0.9], u_fw) + 0.1 * randn(N_fw, 1);
+r_fw = sidFreqMap(y_fw, u_fw, 'Algorithm', 'welch', ...
+                  'SegmentLength', 512, 'Overlap', 256);
+
+ref_fw = struct();
+ref_fw.function_name = 'sidFreqMap';
+ref_fw.params = struct('SegmentLength', 512, 'Overlap', 256, ...
+                       'SampleTime', 1.0, 'Algorithm', 'welch');
+ref_fw.input = struct('y', y_fw, 'u', u_fw);
+ref_fw.output = struct( ...
+    'Time', r_fw.Time, ...
+    'Frequency', r_fw.Frequency, ...
+    'Response_real', real(r_fw.Response), ...
+    'Response_imag', imag(r_fw.Response), ...
+    'NoiseSpectrum', r_fw.NoiseSpectrum, ...
+    'Coherence', r_fw.Coherence);
+ref_fw.tolerance = struct('Response_rel', 1e-10, 'Response_atol', 1e-12, ...
+    'NoiseSpectrum_rel', 1e-10, 'Coherence_rel', 1e-10, ...
+    'Time_rel', 1e-12, 'Frequency_rel', 1e-12);
+
+writeJSON(fullfile(thisDir, 'reference_freqmap_welch.json'), ref_fw);
+
+fprintf('Generating reference_btfdr_vecres.json...\n');
+rng(3104);
+N_bv = 1000;
+u_bv = randn(N_bv, 1);
+y_bv = filter([1], [1 -0.9], u_bv) + 0.1 * randn(N_bv, 1);
+% Per-frequency resolution vector: length must match the default freq grid.
+r_bv0 = sidFreqBTFDR(y_bv, u_bv);
+nf_bv = length(r_bv0.Frequency);
+R_vec = linspace(0.3, 2.0, nf_bv)';
+r_bv = sidFreqBTFDR(y_bv, u_bv, 'Resolution', R_vec);
+
+ref_bv = struct();
+ref_bv.function_name = 'sidFreqBTFDR';
+% Resolution lives in params so the generic validator passes it as a
+% name-value arg (Resolution is a parameter, not signal data).
+ref_bv.params = struct('SampleTime', 1.0, 'Resolution', R_vec);
+ref_bv.input = struct('y', y_bv, 'u', u_bv);
+ref_bv.output = struct( ...
+    'Frequency', r_bv.Frequency, ...
+    'Response_real', real(r_bv.Response), ...
+    'Response_imag', imag(r_bv.Response), ...
+    'NoiseSpectrum', r_bv.NoiseSpectrum, ...
+    'Coherence', r_bv.Coherence, ...
+    'WindowSize', r_bv.WindowSize);
+ref_bv.tolerance = struct('Response_rel', 1e-10, 'Response_atol', 1e-12, ...
+    'NoiseSpectrum_rel', 1e-10, 'NoiseSpectrum_atol', 1e-12, ...
+    'Coherence_rel', 1e-10, 'Frequency_rel', 1e-12, 'WindowSize_rel', 1e-12);
+
+writeJSON(fullfile(thisDir, 'reference_btfdr_vecres.json'), ref_bv);
+
+% ---- #145d Batch B: LTV/COSMIC coverage vectors ----
+
+fprintf('Generating reference_cosmic_uncertainty.json...\n');
+rng(3201);
+N_cu = 40; p_cu = 2; q_cu = 1;
+A_cu = [0.9 0.1; -0.1 0.85]; B_cu = [0.5; 0.3];
+X_cu = zeros(N_cu + 1, p_cu); U_cu = randn(N_cu, q_cu);
+X_cu(1, :) = randn(1, p_cu);
+for k = 1:N_cu
+    X_cu(k+1, :) = (A_cu * X_cu(k, :)' + B_cu * U_cu(k, :)')' ...
+                    + 0.02 * randn(1, p_cu);
+end
+r_cu = sidLTVdisc(X_cu, U_cu, 'Lambda', 1e3, 'Uncertainty', true);
+
+ref_cu = struct();
+ref_cu.function_name = 'sidLTVdisc';
+ref_cu.params = struct('Lambda', 1e3, 'Uncertainty', true);
+ref_cu.input = struct('X', X_cu, 'U', U_cu);
+ref_cu.output = struct( ...
+    'AStd', r_cu.AStd, 'BStd', r_cu.BStd, ...
+    'NoiseCov', r_cu.NoiseCov, ...
+    'NoiseVariance', r_cu.NoiseVariance, ...
+    'DegreesOfFreedom', r_cu.DegreesOfFreedom);
+ref_cu.tolerance = struct('AStd_rel', 1e-8, 'BStd_rel', 1e-8, ...
+    'NoiseCov_rel', 1e-8, 'NoiseCov_atol', 1e-12, ...
+    'NoiseVariance_rel', 1e-8, 'DegreesOfFreedom_rel', 1e-8);
+
+writeJSON(fullfile(thisDir, 'reference_cosmic_uncertainty.json'), ref_cu);
+
+fprintf('Generating reference_ltv_cosmic_varlen.json...\n');
+rng(3202);
+p_vc = 2; q_vc = 1; L_vc = 3;
+A_vc = [0.9 0.1; -0.1 0.85]; B_vc = [0.5; 0.3];
+Ns_vc = [25; 32; 28];   % unequal lengths -> ragged -> cell round-trip
+X_vc = cell(L_vc, 1); U_vc = cell(L_vc, 1);
+for l = 1:L_vc
+    Nl = Ns_vc(l);
+    U_vc{l} = randn(Nl, q_vc);
+    X_vc{l} = zeros(Nl + 1, p_vc); X_vc{l}(1, :) = randn(1, p_vc);
+    for k = 1:Nl
+        X_vc{l}(k+1, :) = (A_vc * X_vc{l}(k, :)' + B_vc * U_vc{l}(k, :)')' ...
+                           + 0.01 * randn(1, p_vc);
+    end
+end
+r_vc = sidLTVdisc(X_vc, U_vc, 'Lambda', 1e4);
+
+ref_vc = struct();
+ref_vc.function_name = 'sidLTVdisc';
+ref_vc.params = struct('Lambda', 1e4);
+% Wrap the cells ({...}) so struct() stores them as scalar-struct fields.
+ref_vc.input = struct('X', {X_vc}, 'U', {U_vc});
+ref_vc.output = struct('A', r_vc.A, 'B', r_vc.B, 'Cost', r_vc.Cost);
+ref_vc.tolerance = struct('A_rel', 1e-2, 'B_rel', 1e-2, ...
+    'Cost_rel', 1e-2, 'Cost_atol', 1e-12);
+
+writeJSON(fullfile(thisDir, 'reference_ltv_cosmic_varlen.json'), ref_vc);
+
+% ---- #145d Batch C: H != I realization vector (closes the #144 deferral) ----
+
+fprintf('Generating reference_lti_freq_io_partial.json...\n');
+rng(3301);
+N_lp = 400; p_lp = 3; q_lp = 1;
+A0p_true = [0.9 0.2 0.0; -0.15 0.85 0.1; 0.0 -0.1 0.8];
+B0p_true = [1.0; 0.5; 0.2];
+% p_y = 2 < n = 3 (partial observation). H is a genuine 2-D matrix so the JSON
+% round-trip preserves its (p_y x n) shape -- a 1xn row would collapse to a
+% column under MATLAB jsondecode and flip the observation orientation.
+H_lp = [1 0 0; 0 1 0];
+X_lp = zeros(N_lp + 1, p_lp); U_lp = randn(N_lp, q_lp);
+X_lp(1, :) = randn(1, p_lp);
+for k = 1:N_lp
+    X_lp(k+1, :) = (A0p_true * X_lp(k, :)' + B0p_true * U_lp(k, :)')';  % noiseless
+end
+Y_lp = (H_lp * X_lp')';
+[A0_lp, B0_lp] = sidLTIfreqIO(Y_lp, U_lp, H_lp);
+
+ref_lp = struct();
+ref_lp.function_name = 'sidLTIfreqIO';
+ref_lp.params = struct();
+ref_lp.input = struct('Y', Y_lp, 'U', U_lp, 'H', H_lp);
+ref_lp.output = struct('A0', A0_lp, 'B0', B0_lp);
+ref_lp.tolerance = struct('A0_rel', 1e-6, 'B0_rel', 1e-6, ...
+    'A0_atol', 1e-8, 'B0_atol', 1e-8);
+
+writeJSON(fullfile(thisDir, 'reference_lti_freq_io_partial.json'), ref_lp);
+
+% ---- #145d trio: validator-infrastructure cross-vectors ----
+
+fprintf('Generating reference_ltv_state_est_varlen.json...\n');
+rng(3401);
+p_vs = 2; q_vs = 1; py_vs = 2; L_vs = 3;
+A0_vs = [0.9 0.1; -0.1 0.85]; B0_vs = [1; 0.5]; H_vs = eye(p_vs);
+Ns_vs = [22; 30; 26]; Nmax_vs = max(Ns_vs);
+A_vs = repmat(A0_vs, [1 1 Nmax_vs]); B_vs = repmat(B0_vs, [1 1 Nmax_vs]);
+Y_vs = cell(L_vs, 1); U_vs = cell(L_vs, 1);
+for l = 1:L_vs
+    Nl = Ns_vs(l);
+    U_vs{l} = randn(Nl, q_vs);
+    Xl = zeros(Nl + 1, p_vs); Xl(1, :) = randn(1, p_vs);
+    for k = 1:Nl
+        Xl(k+1, :) = (A0_vs * Xl(k, :)' + B0_vs * U_vs{l}(k, :)')' ...
+            + 0.01 * randn(1, p_vs);
+    end
+    Y_vs{l} = (H_vs * Xl')' + 0.05 * randn(Nl + 1, py_vs);
+end
+Xhat_vs = sidLTVStateEst(Y_vs, U_vs, A_vs, B_vs, H_vs);
+
+ref_vs = struct();
+ref_vs.function_name = 'sidLTVStateEst';
+ref_vs.params = struct();
+% Wrap the cells; X_hat is a ragged cell — compareOutputs' flatten() handles it.
+ref_vs.input = struct('Y', {Y_vs}, 'U', {U_vs}, 'A', A_vs, 'B', B_vs, 'H', H_vs);
+ref_vs.output = struct('X_hat', {Xhat_vs});
+ref_vs.tolerance = struct('X_hat_rel', 1e-6, 'X_hat_atol', 1e-10);
+
+writeJSON(fullfile(thisDir, 'reference_ltv_state_est_varlen.json'), ref_vs);
+
+fprintf('Generating reference_ltv_tune.json...\n');
+rng(3402);
+p_tn = 2; q_tn = 1; N_tn = 40; L_tn = 4;
+A_tn = [0.9 0.1; -0.1 0.8]; B_tn = [0.5; 0.3];
+% 3-D (multi-trajectory) train/val — both ports' validation RMSE expect this
+% layout (Python's per-trajectory RMSE indexes the 3rd dim).
+Xtr = zeros(N_tn + 1, p_tn, L_tn); Utr = randn(N_tn, q_tn, L_tn);
+Xva = zeros(N_tn + 1, p_tn, L_tn); Uva = randn(N_tn, q_tn, L_tn);
+for l = 1:L_tn
+    Xtr(1, :, l) = randn(1, p_tn); Xva(1, :, l) = randn(1, p_tn);
+    for k = 1:N_tn
+        Xtr(k+1, :, l) = (A_tn * Xtr(k, :, l)' + B_tn * Utr(k, :, l)')' ...
+            + 0.02 * randn(1, p_tn);
+        Xva(k+1, :, l) = (A_tn * Xva(k, :, l)' + B_tn * Uva(k, :, l)')' ...
+            + 0.02 * randn(1, p_tn);
+    end
+end
+grid_tn = logspace(-2, 8, 20)';
+[~, bestLambda_tn, allLosses_tn] = sidLTVdiscTune( ...
+    Xtr, Utr, Xva, Uva, 'LambdaGrid', grid_tn);
+
+ref_tn = struct();
+ref_tn.function_name = 'sidLTVdiscTune';
+ref_tn.params = struct('LambdaGrid', grid_tn);
+ref_tn.input = struct('X_train', Xtr, 'U_train', Utr, 'X_val', Xva, 'U_val', Uva);
+ref_tn.output = struct('BestLambda', bestLambda_tn, 'AllLosses', allLosses_tn(:));
+ref_tn.tolerance = struct('BestLambda_rel', 1e-6, ...
+    'AllLosses_rel', 1e-6, 'AllLosses_atol', 1e-10);
+
+writeJSON(fullfile(thisDir, 'reference_ltv_tune.json'), ref_tn);
+
+fprintf('Generating reference_frozen_of_io.json...\n');
+rng(3403);
+n_fi = 3; q_fi = 1; py_fi = 2; N_fi = 50; L_fi = 8;
+A_fi = [0.9 0.2 0.0; -0.15 0.85 0.1; 0.0 -0.1 0.8];
+B_fi = [1.0; 0.5; 0.2];
+H_fi = [1 0 0; 0 1 0];   % p_y = 2 < n = 3; genuine 2-D (no row-collapse)
+U_fi = randn(N_fi, q_fi, L_fi);
+Y_fi = zeros(N_fi + 1, py_fi, L_fi); X_fi = zeros(N_fi + 1, n_fi, L_fi);
+for l = 1:L_fi
+    X_fi(1, :, l) = randn(1, n_fi); Y_fi(1, :, l) = (H_fi * X_fi(1, :, l)')';
+    for k = 1:N_fi
+        X_fi(k+1, :, l) = (A_fi * X_fi(k, :, l)' + B_fi * U_fi(k, :, l)')';
+        Y_fi(k+1, :, l) = (H_fi * X_fi(k+1, :, l)')';
+    end
+end
+r_io_fi = sidLTVdiscIO(Y_fi, U_fi, H_fi, 'Lambda', 1e3);
+frz_fi = sidLTVdiscFrozen(r_io_fi, 'TimeSteps', 10);
+
+ref_fi = struct();
+ref_fi.function_name = 'frozen_of_io';   % synthetic dispatch key (validator)
+ref_fi.params = struct('Lambda', 1e3, 'frozen_TimeSteps', 10);
+ref_fi.input = struct('Y', Y_fi, 'U', U_fi, 'H', H_fi);
+ref_fi.output = struct( ...
+    'Response_real', real(frz_fi.Response), ...
+    'Response_imag', imag(frz_fi.Response));
+ref_fi.tolerance = struct('Response_rel', 1e-2, 'Response_atol', 1e-8);
+
+writeJSON(fullfile(thisDir, 'reference_frozen_of_io.json'), ref_fi);
+
 fprintf('\n=== All reference data generated ===\n');
 
 end
@@ -628,7 +945,8 @@ end
 
 
 function writeJSON(filepath, data)
-%WRITEJSON Write struct to JSON file.
+%WRITEJSON Write struct to JSON file, stamping generator provenance (#172).
+    data.provenance = getProvenance();
     json = jsonencode(data);
     fid = fopen(filepath, 'w');
     if fid == -1
@@ -636,4 +954,46 @@ function writeJSON(filepath, data)
     end
     fwrite(fid, json);
     fclose(fid);
+end
+
+
+function prov = getProvenance()
+%GETPROVENANCE Provenance block stamped into every vector (ADR-0002, #172).
+%   Records which commit's generate_reference.m produced the payload so a
+%   reviewer/gate can spot a stale or hand-edited vector. Uses the commit SHA
+%   and *commit* date (not wall-clock) so re-running the same commit reproduces
+%   identical bytes — provenance changes only when the generating commit does.
+    persistent cached;
+    if isempty(cached)
+        thisDir = fileparts(mfilename('fullpath'));
+        cached = struct( ...
+            'generator', 'testdata/generate_reference.m', ...
+            'git_sha', gitField(thisDir, 'rev-parse --short HEAD'), ...
+            'git_date', gitField(thisDir, 'show -s --format=%cd --date=short HEAD'));
+    end
+    prov = cached;
+end
+
+
+function out = gitField(dir, gitArgs)
+%GITFIELD Run a git command in DIR, returning trimmed stdout or 'unknown'.
+%   `--no-pager` and the null-stdin redirect are load-bearing on CI, not
+%   cosmetic. `git show` is a pager command (`git rev-parse` is not), and a
+%   pager -- or any other prompt -- inheriting a live stdin blocks forever
+%   under system(), with no output and no timeout. That hung the CI
+%   "Generate cross-language reference data" step for hours on end, always
+%   at this call, the first and only one getProvenance() makes (see #194).
+%   Neither flag changes the bytes returned, so provenance values -- and
+%   therefore the stored vectors -- are unaffected.
+    if ispc
+        nullIn = ' < NUL';
+    else
+        nullIn = ' < /dev/null';
+    end
+    [st, o] = system(sprintf('git -C "%s" --no-pager %s%s', dir, gitArgs, nullIn));
+    if st ~= 0
+        out = 'unknown';
+    else
+        out = strtrim(o);
+    end
 end

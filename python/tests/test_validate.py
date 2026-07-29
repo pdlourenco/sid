@@ -49,6 +49,19 @@ class TestValidateData:
             validate_data(np.array([1 + 1j, 2, 3]), None)
         assert exc.value.code == "complex_data"
 
+    def test_error_complex_u(self) -> None:
+        """Complex u raises SidError with code 'complex_data' (issue #136).
+
+        Regression guard: previously ``np.asarray(u, dtype=np.float64)`` ran
+        before the check and silently discarded the imaginary part, so the
+        SPEC §10.1 error was never raised.
+        """
+        y = np.arange(5.0)
+        u = np.array([1 + 1j, 2, 3, 4, 5])
+        with pytest.raises(SidError) as exc:
+            validate_data(y, u)
+        assert exc.value.code == "complex_data"
+
     def test_error_nan(self) -> None:
         """NaN in y raises SidError with code 'non_finite'."""
         with pytest.raises(SidError) as exc:

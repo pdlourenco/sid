@@ -1,14 +1,14 @@
 """Rewrite broken relative `*.md` links in included content to GitHub URLs.
 
 The `include-markdown` plugin pulls in README / SPEC / CONTRIBUTING etc.
-from outside `docs/`. Those source files contain relative markdown links
+from outside `docsite/`. Those source files contain relative markdown links
 that resolve against the SOURCE file's location, not the docs page they
 get embedded in — so once included, the links no longer resolve.
 
 This hook knows which docs pages are "includes" of which repo files, and
 rewrites any relative `*.md` link on those pages to a `github.com/.../blob/main/...`
 URL pointing at the equivalent repo path. Links that resolve cleanly to a
-file inside `docs/` are left alone; HTTP(S), mailto, and anchor-only
+file inside `docsite/` are left alone; HTTP(S), mailto, and anchor-only
 links are left alone.
 """
 
@@ -18,11 +18,22 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-GITHUB_PREFIX = "https://github.com/pdlourenco/sid/blob/main"
+
+# Fallback only. The real prefix is derived per-build from mkdocs.yml's `repo_url`
+# (see `_github_prefix`) so the repo location is declared in exactly one place.
+DEFAULT_GITHUB_PREFIX = "https://github.com/pdlourenco/sid/blob/main"
+
+
+def _github_prefix(config) -> str:
+    """`<repo_url>/blob/main`, taken from mkdocs config when available."""
+    repo_url = (config or {}).get("repo_url") or ""
+    if not repo_url:
+        return DEFAULT_GITHUB_PREFIX
+    return repo_url.rstrip("/") + "/blob/main"
 
 # Docs page → original repo file it was included from.
 INCLUDE_SOURCES: dict[str, str] = {
-    "about/changelog.md": "python/RELEASE_NOTES.md",
+    "about/changelog.md": "CHANGELOG.md",
     "about/contributing.md": "CONTRIBUTING.md",
     "spec/index.md": "spec/SPEC.md",
     "spec/examples-spec.md": "spec/EXAMPLES.md",
@@ -41,6 +52,7 @@ def on_page_markdown(markdown, page, config, files):
     if source is None:
         return markdown
     source_dir = Path(source).parent
+    github_prefix = _github_prefix(config)
 
     def replace(match: re.Match[str]) -> str:
         label, target = match.group(1), match.group(2)
@@ -59,6 +71,6 @@ def on_page_markdown(markdown, page, config, files):
             return match.group(0)
         if not repo_path.exists():
             return match.group(0)
-        return f"{label}({GITHUB_PREFIX}/{rel_to_repo}{anchor})"
+        return f"{label}({github_prefix}/{rel_to_repo}{anchor})"
 
     return LINK_RE.sub(replace, markdown)

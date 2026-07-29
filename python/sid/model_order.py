@@ -144,6 +144,11 @@ def model_order(
     # 2. Extract frequency response
     # ------------------------------------------------------------------
     if is_time_series:
+        # Time-series fallback (heuristic, not defined by SPEC §8.12.12):
+        # with no input-output response available, use the noise spectrum in
+        # place of G and report the rank of its Hankel. This estimates the
+        # order of a spectral factor of the output, not of a plant transfer
+        # function; interpret with care.
         G = np.asarray(result.noise_spectrum)  # type: ignore[union-attr]
     else:
         G = np.asarray(result.response)  # type: ignore[union-attr]
@@ -179,16 +184,26 @@ def model_order(
 
             # Build conjugate-symmetric full-circle spectrum
             Gfull = np.zeros(Nfft, dtype=complex)
-            Gfull[0] = np.real(Gvec[0])  # DC approximation
+            # DC bin: linearly extrapolate from the first two grid points
+            # (must be real), matching lti_freq_io so both IFFT consumers share
+            # one DC convention (issue #139; SPEC §8.12.12).
+            if nf >= 2:
+                Gfull[0] = np.real(2 * Gvec[0] - Gvec[1])
+            else:
+                Gfull[0] = np.real(Gvec[0])
             Gfull[1:nf] = Gvec[0 : nf - 1]  # w1 to w_{nf-1}
             Gfull[nf] = np.real(Gvec[nf - 1])  # Nyquist (real)
             Gfull[nf + 1 :] = np.conj(Gvec[nf - 2 :: -1])  # mirror
 
             g_all[:, iy, iu] = np.real(np.fft.ifft(Gfull))
 
-    # Use causal part (first half) as impulse response coefficients
-    N_imp = nf
-    g = g_all[:N_imp, :, :]
+    # Markov parameters g(k) = H A^{k-1} B start at lag 1. g_all[0] is the
+    # direct feedthrough (lag 0), ~0 for the library's strictly proper model
+    # class. Drop it (aligning with lti_freq_io): keeping lag 0 builds the
+    # Hankel of z^{-1}G(z), whose McMillan degree is n+1 for a strictly proper
+    # plant with a nonzero finite zero — overestimating the order (issue #139).
+    N_imp = nf - 1
+    g = g_all[1:nf, :, :]
 
     # ------------------------------------------------------------------
     # 4. Determine horizon
@@ -258,12 +273,18 @@ def model_order(
                     stacklevel=2,
                 )
         else:
-            # Only consider ratios among singular values above a noise
-            # floor to avoid spurious gaps in the numerical tail.
+            # Search the singular-value gaps over resolvable modes only.
+            # L = number of singular values above the machine-eps floor; the
+            # ratio search runs k = 1..min(L-1, n_sigma // 2). The L-1 bound
+            # EXCLUDES the resolvable->floor cliff sigma_L / sigma_{L+1} (a value
+            # over a numerical zero); the n_sigma // 2 cap bounds n when the
+            # spectrum decays without a clear cliff (noise-dominated data).
+            # Defined on the count L (not a 0-based index) so Python and MATLAB
+            # agree. See ADR-0004 and SPEC §8.12.12.
             noise_floor = sigmas[0] * np.sqrt(n_sigma) * np.finfo(float).eps
-            last_sig = np.where(sigmas > noise_floor)[0]
-            last_sig = last_sig[-1] if len(last_sig) > 0 else 0
-            max_k = min(last_sig, n_sigma // 2)
+            n_resolvable = int(np.sum(sigmas > noise_floor))  # L
+            max_k = min(n_resolvable - 1, n_sigma // 2)
+            # L <= 1: single candidate k = 1 -> n = 1 (SPEC 8.12.12 step 5b).
             max_k = max(max_k, 1)
 
             ratios = sigmas[:max_k] / sigmas[1 : max_k + 1]

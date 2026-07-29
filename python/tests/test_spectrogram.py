@@ -308,3 +308,38 @@ class TestSpectrogram:
             f"DC ({dc_val:.4f}) should be < interior mean ({interior_mean:.4f}) "
             "due to one-sided doubling"
         )
+
+        # Bit-exact against scipy across the whole one-sided axis, so DC AND the
+        # Nyquist bin (both un-doubled) are pinned, not just DC (issue #142).
+        from scipy.signal import periodogram
+
+        _, pxx = periodogram(
+            y,
+            fs=1.0,
+            window="boxcar",
+            nfft=N,
+            detrend=False,
+            scaling="density",
+            return_onesided=True,
+        )
+        np.testing.assert_allclose(result.power[:, 0], pxx, rtol=1e-10, atol=1e-12)
+
+
+class TestSpectrogramInputShapes:
+    """Documented input shapes that previously crashed (issue #135)."""
+
+    def test_single_trajectory_3d(self) -> None:
+        """3-D single-trajectory input (N, ch, 1) matches the 2-D result
+        instead of failing the n_traj>1 branch."""
+        rng = np.random.default_rng(0)
+        x = rng.standard_normal((1000, 1, 1))
+        result = spectrogram(x, window_length=128)
+        ref = spectrogram(x[:, :, 0], window_length=128)
+        np.testing.assert_allclose(result.power, ref.power, rtol=1e-12)
+
+    def test_degenerate_window_raises(self) -> None:
+        """A window of length <= 2 (zero energy) errors instead of returning
+        silent all-NaN."""
+        rng = np.random.default_rng(1)
+        with pytest.raises(SidError):
+            spectrogram(rng.standard_normal(500), window_length=2)

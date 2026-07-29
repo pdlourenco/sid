@@ -1,24 +1,30 @@
 name: Docs
 
+# The build runs on every PR so a change that breaks the docs is caught before
+# merge, not after. Deploy is a separate job gated on main, so a PR build never
+# publishes. Least privilege: the workflow grants nothing by default and the
+# deploy job asks for exactly what gh-pages needs.
 on:
   push:
     branches:
       - main
-      - claude/plan-sid-docs-website-vFMRn
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pages: write
-  id-token: write
+permissions: {}
 
 concurrency:
   group: docs-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  build:
+    name: Build site (strict)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -37,13 +43,35 @@ jobs:
       - name: Install docs dependencies
         run: pip install -r requirements-docs.txt
 
+      # --strict turns link warnings into failures. Without it the build stays
+      # green while internal links rot -- the site's only structural gate.
       - name: Build site
         env:
           DISABLE_MKDOCS_2_WARNING: 'true'
-        run: mkdocs build
+        run: mkdocs build --strict
 
-      - name: Deploy to GitHub Pages
-        if: github.ref == 'refs/heads/main'
+      - name: Upload site artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: site/
+          retention-days: 7
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download site artefact
+        uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: site
+
+      - name: Publish
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}

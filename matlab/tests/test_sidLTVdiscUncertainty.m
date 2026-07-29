@@ -382,4 +382,46 @@ runner__nPassed = runner__nPassed + 1;
 fprintf(['  Test 14 passed: degrees of freedom is reasonable' ...
     ' (dof=%.1f).\n'], result.DegreesOfFreedom);
 
+%% Test 15: backward pass = inverse-diagonal of the ESTIMATOR Hessian (#137)
+% P(k) must equal [A_est^{-1}]_kk with A_est = V'V + N*lambda*F'F (the posterior
+% of the returned estimator, effective prior weight N*lambda from the 1/sqrt(N)
+% scaling). The old V'V + lambda F'F reconstruction fails this by up to N.
+% Engine-independent (brute-force block-tridiagonal inverse).
+rng(137);
+n = 6; d = 3;
+lam = 0.5 + 4.5 * rand(n-1, 1);
+S_scaled = zeros(d, d, n);
+for k = 1:n
+    Ds = randn(5, d);
+    if k == 1
+        reg = lam(1);
+    elseif k == n
+        reg = lam(n-1);
+    else
+        reg = lam(k-1) + lam(k);
+    end
+    S_scaled(:, :, k) = Ds' * Ds + reg * eye(d);
+end
+% A_est = N * A_scaled: diagonal N*S_scaled, off-diagonal -N*lam_k I.
+Aest = zeros(n*d, n*d);
+for k = 1:n
+    Aest((k-1)*d+1:k*d, (k-1)*d+1:k*d) = n * S_scaled(:, :, k);
+end
+for k = 1:n-1
+    off = -n * lam(k) * eye(d);
+    Aest((k-1)*d+1:k*d, k*d+1:(k+1)*d) = off;
+    Aest(k*d+1:(k+1)*d, (k-1)*d+1:k*d) = off;
+end
+AinvT15 = inv(Aest);
+P15 = sidLTVuncertaintyBackwardPass(S_scaled, lam, n, d);
+maxErr15 = 0;
+for k = 1:n
+    Pbrute = AinvT15((k-1)*d+1:k*d, (k-1)*d+1:k*d);
+    maxErr15 = max(maxErr15, max(max(abs(P15(:, :, k) - Pbrute))));
+end
+assert(maxErr15 < 1e-9, ...
+    'P(k) must equal [A_est^{-1}]_kk (max err %.2e); old formula off by up to N', maxErr15);
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 15 passed: backward pass = estimator-Hessian inverse diagonal (#137).\n');
+
 fprintf('test_sidLTVdiscUncertainty: %d/%d passed\n', runner__nPassed, runner__nPassed);

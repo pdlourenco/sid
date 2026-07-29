@@ -240,4 +240,36 @@ end
 runner__nPassed = runner__nPassed + 1;
 fprintf('  Test 17 passed: large WindowSize (FFT-path regression).\n');
 
+%% Test 18: Constant input -> all NaN + Inf sigma with warning (SPEC 10.3)
+% The relative per-frequency floor cannot see a constant input (nonzero Phi_u
+% under the biased-covariance convention); the whole-signal 10.3 check does.
+rng(18);
+N18 = 400;
+y18 = filter(1, [1 -0.8], randn(N18, 1));
+% Warnings stay ENABLED so lastwarn captures the id: on older Octave releases a
+% disabled warning never reaches lastwarn, so this portable idiom is version-proof
+% (the extra runner output is tolerated, matching test_sidLTVdiscTune.m).
+lastwarn('');
+r18 = sidFreqBT(y18, ones(N18, 1));
+[~, id18] = lastwarn();
+assert(all(isnan(r18.Response)), 'Constant input -> Response all NaN');
+assert(all(isinf(r18.ResponseStd)), 'Constant input -> sigma_G all Inf');
+assert(strcmp(id18, 'sid:constantInput'), 'Constant input should warn sid:constantInput');
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 18 passed: constant input -> all NaN + Inf sigma (SPEC 10.3).\n');
+
+%% Test 19: Partial degeneracy -- one dead channel warns without failing the fit
+rng(19);
+N19 = 500;
+u19 = [randn(N19, 1), ones(N19, 1)];       % channel 2 constant
+y19 = [u19(:, 1) + 0.1 * randn(N19, 1), u19(:, 1) + 0.1 * randn(N19, 1)];
+lastwarn('');
+r19 = sidFreqBT(y19, u19);
+[~, id19] = lastwarn();
+assert(strcmp(id19, 'sid:deadInputChannel'), 'Dead channel should warn sid:deadInputChannel');
+healthyCol = isfinite(r19.Response(:, :, 1));
+assert(all(healthyCol(:)), 'Healthy channel-1 columns stay finite');
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 19 passed: partial degeneracy warns, healthy columns finite.\n');
+
 fprintf('test_sidFreqBT: %d/%d passed\n', runner__nPassed, runner__nPassed);

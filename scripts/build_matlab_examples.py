@@ -13,6 +13,25 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES_DIR = REPO_ROOT / "matlab" / "examples"
 
+# Fallback only. `repo_source_prefix` prefers mkdocs.yml's `repo_url` so the repo
+# location is declared once, in the site config.
+DEFAULT_REPO_PREFIX = "https://github.com/pdlourenco/sid/blob/main"
+
+
+def repo_source_prefix() -> str:
+    """`<repo_url>/blob/main`, from the mkdocs config when reachable."""
+    try:
+        import mkdocs_gen_files
+
+        repo_url = (mkdocs_gen_files.config or {}).get("repo_url")
+    except (ImportError, AttributeError):
+        # ImportError: running standalone, outside a mkdocs build.
+        # AttributeError: mkdocs-gen-files too old to expose `config`.
+        repo_url = None
+    if not repo_url:
+        return DEFAULT_REPO_PREFIX
+    return str(repo_url).rstrip("/") + "/blob/main"
+
 SKIP_PREFIXES = ("util_", "runAllExamples", "example_template")
 
 
@@ -47,14 +66,16 @@ def discover_examples() -> list[Path]:
     return [p for p in paths if not p.stem.startswith(SKIP_PREFIXES)]
 
 
-def render_page(path: Path) -> str:
+def render_page(path: Path, repo_prefix: str | None = None) -> str:
+    repo_prefix = repo_prefix or DEFAULT_REPO_PREFIX
     text = path.read_text(encoding="utf-8", errors="replace")
     title, intro = extract_intro(text)
     heading = title or path.stem
     parts = [f"# {heading}", ""]
     if intro:
         parts.extend([intro, ""])
-    parts.append(f"Source: [`matlab/examples/{path.name}`](https://github.com/pdlourenco/sid/blob/main/matlab/examples/{path.name})")
+    src_url = f"{repo_prefix}/matlab/examples/{path.name}"
+    parts.append(f"Source: [`matlab/examples/{path.name}`]({src_url})")
     parts.append("")
     parts.append("```matlab")
     parts.append(text.rstrip())
@@ -96,11 +117,12 @@ def first_sentence(intro: str) -> str:
 
 def _build(write):
     paths = discover_examples()
+    repo_prefix = repo_source_prefix()
     catalog: list[tuple[str, str, str]] = []
     for path in paths:
         text = path.read_text(encoding="utf-8", errors="replace")
         title, intro = extract_intro(text)
-        write(f"examples/matlab/{path.stem}.md", render_page(path))
+        write(f"examples/matlab/{path.stem}.md", render_page(path, repo_prefix))
         catalog.append((path.stem, title, first_sentence(intro)))
     write("examples/matlab/index.md", render_index(catalog))
     write("examples/matlab/SUMMARY.md", render_summary(catalog))

@@ -1,12 +1,21 @@
-# sid v0.1.0 — python — Release Notes
+# sid v0.2.0 — python — Release Notes
 
-**Release date:** 2026-04-11
+**Release date:** 2026-07-26
 **License:** MIT
+
+## Changes in this release
+
+v0.2.0 is the correctness-and-verification release: it remediates every finding
+of the 2026-07-12 repo-wide review, closes the cross-language verification gaps,
+and hardens the contract-artifact machinery. Several fixes change numerical
+outputs — notably the COSMIC posterior covariance / `AStd` rescaling (#137), the
+Output-COSMIC trust-region rewrite (#138), and the `ltv_disc_frozen`-of-IO
+output response (#144). See [`../CHANGELOG.md`](../CHANGELOG.md) for the full,
+grouped list. The `v0.2.0-python` and `v0.2.0-matlab` tags move together.
 
 ## Overview
 
-sid is a free, open-source system identification toolbox. This release is
-the first public release of the **Python** port. It is numerically
+sid is a free, open-source system identification toolbox. It is numerically
 equivalent to the MATLAB/Octave reference implementation to within
 floating-point tolerance, and every public function is cross-validated in
 CI against JSON reference vectors produced by the MATLAB port.
@@ -26,7 +35,7 @@ notebooks.
 ## Release Contents
 
 ```
-sid-v0.1.0-python/
+sid-v0.2.0-python/
 ├── README.md                              # Overview, features, references
 ├── LICENSE                                # MIT License
 ├── spec/
@@ -38,9 +47,9 @@ sid-v0.1.0-python/
 │   └── postBuild                          # pip install -e ./python[plot]
 └── python/
     ├── README.md                          # Installation, quick start, function reference
-    ├── pyproject.toml                     # Packaging metadata (sid-toolbox 0.1.0)
+    ├── pyproject.toml                     # Packaging metadata (sid-toolbox 0.2.0)
     ├── sid/                               # Public API
-    │   ├── __init__.py                    # Public re-exports, __version__ = "0.1.0"
+    │   ├── __init__.py                    # Public re-exports, __version__ = "0.2.0"
     │   ├── _exceptions.py                 # SidError exception class
     │   ├── _results.py                    # Frozen dataclasses for result types
     │   ├── freq_bt.py                     # Blackman-Tukey spectral estimation
@@ -286,7 +295,7 @@ tab-completable fields accessed via dot notation (`result.response`,
 - Unknown or time-varying observation matrix H
 - Alternative regularisation norms
 - MATLAB/Octave and Julia implementations — MATLAB/Octave ships as a
-  separate v0.1.0 release (`v0.1-matlab`); Julia is planned for a later
+  separate v0.2.0 release (`v0.2.0-matlab`); Julia is planned for a later
   version.
 
 ## References

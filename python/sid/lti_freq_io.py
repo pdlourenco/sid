@@ -12,6 +12,7 @@ from __future__ import annotations
 import warnings
 
 import numpy as np
+from scipy.linalg import schur
 
 from sid._exceptions import SidError
 from sid.freq_bt import freq_bt
@@ -489,6 +490,18 @@ def _ho_kalman(
             f"Hankel SVD has only {len(sigmas_full)} singular values but n={n} requested.",
         )
 
+    # Order must not exceed the numerical rank of H0 (SPEC §8.13.1 step 4):
+    # a near-zero sigma_n makes 1/sqrt(sigma_n) blow up to inf/NaN.
+    tol = max(H0.shape) * np.finfo(float).eps
+    if sigmas_full[n - 1] <= sigmas_full[0] * tol:
+        raise SidError(
+            "order_exceeds_rank",
+            f"Requested order n={n} exceeds the numerical rank of the Hankel "
+            f"matrix (sigma_{n}={sigmas_full[n - 1]:.3e} <= sigma_1*tol, "
+            f"sigma_1={sigmas_full[0]:.3e}). Request an order at or below the "
+            f"resolvable rank (see sidModelOrder).",
+        )
+
     # Truncate to order n
     U_n = U_svd[:, :n]
     V_n = Vt_svd[:n, :].T  # numpy svd returns V^T; V_n is (r*q, n)
@@ -555,10 +568,17 @@ def _transform_to_h_basis(
 
 
 def _stabilize(A: np.ndarray, max_stab: float) -> np.ndarray:
-    """Reflect unstable eigenvalues inside the unit circle.
+    """Reflect/clamp unstable eigenvalues via real Schur form (SPEC §8.13.1 step 6).
 
-    Eigenvalues with |lambda| > 1 are reflected: lambda <- 1/conj(lambda).
-    The result is then clamped so that |lambda| <= max_stab.
+    Eigenvalues with ``|lambda| > 1`` are reflected (``lambda <- 1/conj(lambda)``);
+    any eigenvalue still exceeding ``max_stab`` is clamped to that radius. Both
+    operations change only the eigenvalue **modulus**, never its argument.
+
+    The rescaled spectrum is reimposed in **real Schur form** ``A = Q T Qᵀ`` (``Q``
+    orthogonal, ``T`` block-upper-triangular) by scaling each diagonal block in
+    place — never via ``V diag(lambda) V⁻¹``, whose ``V`` is singular for defective
+    ``A`` (e.g. integrator chains) and produces a spurious blow-up. A warning is
+    issued when stabilization actually fires.
 
     Parameters
     ----------
@@ -570,23 +590,44 @@ def _stabilize(A: np.ndarray, max_stab: float) -> np.ndarray:
     Returns
     -------
     A : ndarray, shape ``(n, n)``
-        Stabilized dynamics matrix.
+        Stabilized dynamics matrix (the original ``A`` unchanged when every
+        eigenvalue already satisfies ``|lambda| <= max_stab``).
     """
-    n = A.shape[0]
-    eigvals, V = np.linalg.eig(A)
-    mags = np.abs(eigvals)
-
-    if np.max(mags) <= max_stab:
+    if np.max(np.abs(np.linalg.eigvals(A))) <= max_stab:
         return A
 
-    # Step 1: Reflect eigenvalues outside the unit circle
-    outside = mags > 1
-    eigvals[outside] = 1.0 / np.conj(eigvals[outside])
-    mags[outside] = np.abs(eigvals[outside])
+    # Real Schur: A = Q T Qᵀ, T block-upper-triangular (1x1 real / 2x2
+    # complex-conjugate-pair diagonal blocks). cond(Q) = 1 -> no blow-up.
+    T, Q = schur(A, output="real")
+    n = A.shape[0]
+    n_moved = 0
+    i = 0
+    while i < n:
+        two_by_two = i < n - 1 and T[i + 1, i] != 0.0
+        if two_by_two:
+            # Complex-conjugate pair: both eigenvalues share this modulus.
+            r = abs(np.linalg.eigvals(T[i : i + 2, i : i + 2])[0])
+        else:
+            r = abs(T[i, i])
 
-    # Step 2: Clamp to max_stab radius
-    toolarge = mags > max_stab
-    eigvals[toolarge] = max_stab * eigvals[toolarge] / mags[toolarge]
+        target = 1.0 / r if r > 1.0 else r  # reflect
+        if target > max_stab:  # clamp
+            target = max_stab
 
-    A = np.real(V @ np.diag(eigvals) @ np.linalg.solve(V, np.eye(n)))
-    return A
+        if target != r:
+            s = target / r  # scaling the block scales its eigenvalue(s) by s
+            if two_by_two:
+                T[i : i + 2, i : i + 2] *= s
+                n_moved += 2
+            else:
+                T[i, i] *= s
+                n_moved += 1
+        i += 2 if two_by_two else 1
+
+    if n_moved > 0:
+        warnings.warn(
+            f"lti_freq_io: stabilized {n_moved} eigenvalue(s) "
+            f"(reflected/clamped to |lambda| <= {max_stab}).",
+            stacklevel=2,
+        )
+    return Q @ T @ Q.T

@@ -30,7 +30,7 @@ consistency.
 
 | Language | Status | Directory | README | Requirements |
 |----------|--------|-----------|--------|--------------|
-| MATLAB/Octave | Stable | [`matlab/`](matlab/) | [README](matlab/README.md) | MATLAB R2016b+ or GNU Octave 8.0+ |
+| MATLAB/Octave | Stable | [`matlab/`](matlab/) | [README](matlab/README.md) | MATLAB R2024a+ or GNU Octave 11+ |
 | Python | Stable | [`python/`](python/) | [README](python/README.md) | Python 3.10+, NumPy 1.22+, SciPy 1.8+ |
 | Julia | Planned | [`julia/`](julia/) | [README](julia/README.md) | TBD |
 
@@ -56,13 +56,14 @@ This downloads only the shared specification, test data, and your chosen impleme
 
 **State-space path.** The **COSMIC algorithm** (Carvalho et al., 2022) identifies discrete-time LTV models x(k+1) = A(k)x(k) + B(k)u(k) by solving a block-tridiagonal regularized least-squares problem in O(N) time. Multiple trajectories — including variable-length sequences — are pooled into the data matrices. When only outputs are observed, **Output-COSMIC** alternates between state estimation (RTS smoother) and dynamics identification, converging to a joint optimum. Bayesian uncertainty quantification propagates through to frozen transfer functions G(w,k) for direct comparison with non-parametric frequency estimates.
 
-See [SPEC.md](spec/SPEC.md) for the full mathematical derivation.
+See [SPEC.md](spec/SPEC.md) for the full mathematical derivation, and [DESIGN.md](docs/DESIGN.md) for *why* these methods and this architecture were chosen.
 
 ## Documentation
 
 - [**SPEC.md**](spec/SPEC.md) — Full algorithm specification with mathematical derivations
 - [**EXAMPLES.md**](spec/EXAMPLES.md) — Example-suite specification: binding plant catalog, helper API, and per-example structure that every language port must conform to
-- [**Roadmap**](docs/roadmap.md) — Development phases and planned features
+- [**DESIGN.md**](docs/DESIGN.md) — Architectural rationale: why the spec-as-contract polyglot structure, why these algorithms, the trade-offs accepted
+- [**Roadmap**](docs/roadmap.md) — Function catalogue, naming convention, and planned features
 - [**COSMIC uncertainty derivation**](spec/cosmic/uncertainty_derivation.md) — Bayesian posterior covariance for LTV identification
 - [**COSMIC online recursion**](spec/cosmic/online_recursion.md) — Recursive/streaming formulation of the COSMIC algorithm
 - [**COSMIC automatic tuning**](spec/cosmic/automatic_tuning.md) — Regularization parameter selection via validation and L-curve

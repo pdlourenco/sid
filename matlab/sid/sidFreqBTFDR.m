@@ -139,10 +139,23 @@ function result = sidFreqBTFDR(y, u, varargin)
     end
 
     % ---- Resolution to window size (SPEC.md §5.2) ----
-    % M_k = ceil(2*pi / R_k) — local window size at frequency k
-    Mk = ceil(2 * pi ./ R);
-    Mk = max(Mk, 2);                   % M >= 2
-    Mk = min(Mk, floor(N / 2));        % M <= N/2
+    % M_k = ceil(2*pi / R_k). Reaching a bound is reported, not silently
+    % clamped (SPEC.md §5.2): an error when the requested resolution implies
+    % M_k < 2, and a windowReduced warning when any M_k is reduced to
+    % floor(N/2). Mirrors the fixed-window sidFreqBT handling.
+    MkRaw = ceil(2 * pi ./ R);
+    if any(MkRaw < 2)
+        error('sid:badResolution', ...
+            ['Resolution too coarse: it implies a lag-window size M_k < 2. ' ...
+             'Decrease the resolution value.']);
+    end
+    Nhalf = floor(N / 2);
+    if any(MkRaw > Nhalf)
+        warning('sid:windowReduced', ...
+            ['Resolution finer than the data supports at some frequencies; ' ...
+             'window size reduced to N/2 = %d.'], Nhalf);
+    end
+    Mk = min(MkRaw, Nhalf);            % M <= N/2
 
     % ---- Pre-compute biased covariances up to max(M_k) (SPEC.md §2.3) ----
     Mmax = max(Mk);
@@ -187,103 +200,90 @@ function result = sidFreqBTFDR(y, u, varargin)
             PhiVStd = PhiVStd(:);
         end
 
-    elseif isSISO
-        G = zeros(nf, 1);
-        PhiV = zeros(nf, 1);
-        GStd = zeros(nf, 1);
-        PhiVStd = zeros(nf, 1);
-        Coh = zeros(nf, 1);
-        PhiUall = zeros(nf, 1);
-        epsReg = 1e-10;
-
-        % First pass: compute all spectral estimates
-        PhiYall = zeros(nf, 1);
-        PhiYUall = zeros(nf, 1);
-        Wstore = cell(nf, 1);
-        for kk = 1:nf
-            Mk_k = Mk(kk);
-            W = sidHannWin(Mk_k);
-            Wstore{kk} = W;
-
-            PhiYall(kk) = scalarSingleFreqDFT(Ryy(1:Mk_k+1), W, freqs(kk));
-            PhiUall(kk) = scalarSingleFreqDFT(Ruu(1:Mk_k+1), W, freqs(kk));
-            PhiYUall(kk) = scalarSingleFreqDFT(Ryu(1:Mk_k+1), W, freqs(kk), Ruy(1:Mk_k+1));
-        end
-
-        PhiUmax = max(abs(PhiUall));
-
-        % Second pass: form G, PhiV, uncertainty
-        for kk = 1:nf
-            W = Wstore{kk};
-            PhiY_k = PhiYall(kk);
-            PhiU_k = PhiUall(kk);
-            PhiYU_k = PhiYUall(kk);
-
-            % G(w_k) = Phi_yu(w_k) / Phi_u(w_k) (SPEC.md §5.2)
-            if abs(PhiU_k) < epsReg * PhiUmax
-                G(kk) = NaN + 1j*NaN;
-                PhiV(kk) = real(PhiY_k);
-                Coh(kk) = 0;
-                GStd(kk) = Inf;
-            else
-                G(kk) = PhiYU_k / PhiU_k;
-                PhiV(kk) = max(real(PhiY_k) - abs(PhiYU_k)^2 / real(PhiU_k), 0);
-                Coh(kk) = min(max(abs(PhiYU_k)^2 / (real(PhiY_k) * real(PhiU_k)), 0), 1);
-
-                % Uncertainty with local window norm (SPEC.md §5.3)
-                CW = W(1)^2 + 2 * sum(W(2:end).^2);
-                cohSafe = max(Coh(kk), epsReg);
-                GStd(kk) = sqrt((CW / Neff) * abs(G(kk))^2 * (1 - cohSafe) / cohSafe);
-            end
-
-            % Noise uncertainty
-            CW = W(1)^2 + 2 * sum(W(2:end).^2);
-            PhiVStd(kk) = sqrt(2 * CW / Neff) * abs(PhiV(kk));
-        end
-
     else
-        % MIMO: G(w_k) = Phi_yu(w_k) * Phi_u(w_k)^{-1} (SPEC.md §5.2)
-        G = zeros(nf, ny, nu);          % (nf x ny x nu) complex
-        PhiV = zeros(nf, ny, ny);       % (nf x ny x ny) noise spectrum
-        GStd = zeros(nf, ny, nu);
-        PhiVStd = zeros(nf, ny, ny);
-        Coh = [];
-        eps_floor = 1e-10;
-
+        % ---- Input/output path ----
+        % Assemble the per-frequency windowed spectra into stacked arrays, then
+        % apply the shared degenerate handling (SPEC.md §2.6/§2.7/§10.3) so BT
+        % and BTFDR cannot drift. #141: a singular Phi_u now yields NaN + Inf
+        % rather than the MATLAB "singular to working precision" Inf garbage.
+        Wstore = cell(nf, 1);
+        CWall = zeros(nf, 1);
         for kk = 1:nf
-            Mk_k = Mk(kk);
-            W = sidHannWin(Mk_k);
+            W = sidHannWin(Mk(kk));
+            Wstore{kk} = W;
+            CWall(kk) = W(1)^2 + 2 * sum(W(2:end).^2);
+        end
 
-            Ryy_k = truncateCov(Ryy, Mk_k, ny, ny);
-            Ruu_k = truncateCov(Ruu, Mk_k, nu, nu);
-            Ryu_k = truncateCov(Ryu, Mk_k, ny, nu);
-            Ruy_k = truncateCov(Ruy, Mk_k, nu, ny);
+        forceDegenerate = sidInputExcitationDegenerate(u);
+        if ~forceDegenerate
+            dead = sidDeadInputChannels(u);
+            if any(dead)
+                warning('sid:deadInputChannel', ...
+                    ['Input channel(s) %s are (near-)constant; their ' ...
+                     'frequency-response columns are unreliable ' ...
+                     '(SPEC.md 10.3).'], mat2str(find(dead)));
+            end
+        end
 
-            PhiY_k = singleFreqDFT(Ryy_k, W, freqs(kk), ny, ny);
-            PhiU_k = singleFreqDFT(Ruu_k, W, freqs(kk), nu, nu);
-            PhiYU_k = singleFreqDFT(Ryu_k, W, freqs(kk), ny, nu, Ruy_k);
+        if isSISO
+            PhiY = zeros(nf, 1);
+            PhiU = zeros(nf, 1);
+            PhiYU = zeros(nf, 1);
+            for kk = 1:nf
+                Mk_k = Mk(kk);
+                W = Wstore{kk};
+                PhiY(kk)  = scalarSingleFreqDFT(Ryy(1:Mk_k+1), W, freqs(kk));
+                PhiU(kk)  = scalarSingleFreqDFT(Ruu(1:Mk_k+1), W, freqs(kk));
+                PhiYU(kk) = scalarSingleFreqDFT(Ryu(1:Mk_k+1), W, freqs(kk), Ruy(1:Mk_k+1));
+            end
+        else
+            PhiY = zeros(nf, ny, ny);
+            PhiU = zeros(nf, nu, nu);
+            PhiYU = zeros(nf, ny, nu);
+            for kk = 1:nf
+                Mk_k = Mk(kk);
+                W = Wstore{kk};
+                PhiY(kk, :, :)  = singleFreqDFT( ...
+                    truncateCov(Ryy, Mk_k, ny, ny), W, freqs(kk), ny, ny);
+                PhiU(kk, :, :)  = singleFreqDFT( ...
+                    truncateCov(Ruu, Mk_k, nu, nu), W, freqs(kk), nu, nu);
+                PhiYU(kk, :, :) = singleFreqDFT( ...
+                    truncateCov(Ryu, Mk_k, ny, nu), W, freqs(kk), ny, nu, ...
+                    truncateCov(Ruy, Mk_k, nu, ny));
+            end
+        end
 
-            G(kk, :, :) = PhiYU_k / PhiU_k;
-            % Phi_v = Phi_y - Phi_yu * Phi_u^{-1} * Phi_uy
-            PhiV_k = PhiY_k - PhiYU_k / PhiU_k * PhiYU_k';
-            PhiV(kk, :, :) = real(PhiV_k);
+        [G, PhiV, Coh] = sidRegularizeResponse(PhiYU, PhiU, PhiY, ny, nu, forceDegenerate);
 
-            % Noise uncertainty (SPEC.md §5.3)
-            CW = W(1)^2 + 2 * sum(W(2:end).^2);
-            PhiVStd(kk, :, :) = sqrt(2 * CW / Neff) * abs(PhiV_k);
-
-            % Diagonal MIMO G uncertainty: Var{G_{ij}} ≈ C_W/Neff * Phi_v_{ii} / Phi_u_{jj}
-            for ii = 1:ny
-                for jj = 1:nu
-                    phiU_jj = real(PhiU_k(jj, jj));
+        % ---- Per-frequency asymptotic uncertainty (SPEC.md §5.3, §3.3) ----
+        eps_floor = 1e-10;
+        if isSISO
+            GVar = (CWall / Neff) .* abs(G).^2 .* (1 - Coh) ./ Coh;
+            GStd = sqrt(GVar);
+            % §3.3: sigma_G = Inf where the input carries no usable information.
+            GStd(Coh < eps_floor) = Inf;
+            PhiVStd = sqrt(2 * CWall / Neff) .* abs(PhiV);
+        else
+            GStd = zeros(nf, ny, nu);
+            PhiVStd = zeros(nf, ny, ny);
+            for kk = 1:nf
+                PhiV_k = reshape(PhiV(kk, :, :), ny, ny);
+                PhiU_k = reshape(PhiU(kk, :, :), nu, nu);
+                PhiVStd(kk, :, :) = sqrt(2 * CWall(kk) / Neff) * abs(PhiV_k);
+                for ii = 1:ny
                     phiV_ii = max(real(PhiV_k(ii, ii)), 0);
-                    if phiU_jj > eps_floor
-                        GStd(kk, ii, jj) = sqrt(CW / Neff * phiV_ii / phiU_jj);
-                    else
-                        GStd(kk, ii, jj) = Inf;
+                    for jj = 1:nu
+                        phiU_jj = real(PhiU_k(jj, jj));
+                        if phiU_jj > eps_floor
+                            GStd(kk, ii, jj) = sqrt(CWall(kk) / Neff * phiV_ii / phiU_jj);
+                        else
+                            GStd(kk, ii, jj) = Inf;
+                        end
                     end
                 end
             end
+            % §3.3 (equivalently): Inf where a singular Phi_u NaN'd the G slice.
+            GStd(isnan(G)) = Inf;
         end
     end
 

@@ -154,7 +154,7 @@ def ltv_state_est(
     K = N + 1
 
     # ------------------------------------------------------------------
-    # 3. Build block tridiagonal system (SPEC.md section 8.14)
+    # 3. Build block tridiagonal system (SPEC.md §8.12.13)
     # ------------------------------------------------------------------
     AtQinv = np.zeros((n, n, N))
     for j in range(N):
@@ -209,8 +209,22 @@ def ltv_state_est(
         # j=Kl-1 (spec k=Nl): Theta_Nl = H'R^{-1}y(Nl) + Q^{-1}b(Nl-1)
         Theta[Kl - 1] = HtRinv @ Yl[Nl, :] + Qinv @ b_curr
 
-        # Solve (slice shared blocks to trajectory horizon)
-        w, _ = blk_tri_solve(S_blk[:Kl], Uc_blk[:Nl], Theta)
+        # Solve (slice shared blocks to trajectory horizon).
+        #
+        # The diagonal blocks were built once for the maximal horizon N, so
+        # for a short trajectory (Nl < N) the sliced final block S_blk[Nl] is
+        # an *interior* block: it carries the dynamics residual
+        # A(Nl)'Q^{-1}A(Nl) of a transition Nl -> Nl+1 that does not exist for
+        # this trajectory. The terminal state has no such constraint, so its
+        # block must be H'R^{-1}H + Q^{-1} (spec/cosmic/output.md App. A.1) —
+        # exactly the precomputed terminal block S_blk[N]. Substituting it
+        # makes the solved system minimize J_state; leaving the interior block
+        # imposes a phantom constraint x(Nl+1)=0, u(Nl)=0 that biases x̂(Nl)
+        # toward null(A(Nl)) and contaminates interior states (issue #134).
+        diag_blocks = list(S_blk[:Kl])
+        if Nl < N:
+            diag_blocks[Kl - 1] = S_blk[N]
+        w, _ = blk_tri_solve(diag_blocks, Uc_blk[:Nl], Theta)
 
         # Extract states
         if is_var_len:
