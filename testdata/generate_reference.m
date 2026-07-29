@@ -977,7 +977,20 @@ end
 
 function out = gitField(dir, gitArgs)
 %GITFIELD Run a git command in DIR, returning trimmed stdout or 'unknown'.
-    [st, o] = system(sprintf('git -C "%s" %s', dir, gitArgs));
+%   `--no-pager` and the null-stdin redirect are load-bearing on CI, not
+%   cosmetic. `git show` is a pager command (`git rev-parse` is not), and a
+%   pager -- or any other prompt -- inheriting a live stdin blocks forever
+%   under system(), with no output and no timeout. That hung the CI
+%   "Generate cross-language reference data" step for hours on end, always
+%   at this call, the first and only one getProvenance() makes (see #194).
+%   Neither flag changes the bytes returned, so provenance values -- and
+%   therefore the stored vectors -- are unaffected.
+    if ispc
+        nullIn = ' < NUL';
+    else
+        nullIn = ' < /dev/null';
+    end
+    [st, o] = system(sprintf('git -C "%s" --no-pager %s%s', dir, gitArgs, nullIn));
     if st ~= 0
         out = 'unknown';
     else
