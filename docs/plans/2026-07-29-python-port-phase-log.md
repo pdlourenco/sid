@@ -1,204 +1,45 @@
-# sid — Python Port Roadmap
+# Python port — phase log (historical record)
 
-This document tracks all phases required to achieve feature parity with the
-MATLAB/Octave v1.0 implementation. The authoritative algorithm specification
-is `spec/SPEC.md`. The MATLAB code in `matlab/sid/` is the ground truth for
-numerical behaviour.
-
----
-
-## Naming Convention
-
-Python functions follow the same `sid` + `Domain` + `Method` pattern, translated
-to snake_case. Result field names are also snake_case.
-
-```
-sid.freq_bt(y, u, window_size=30)      # sidFreqBT(y, u, 'WindowSize', 30)
-result.response                         # result.Response
-result.noise_spectrum                   # result.NoiseSpectrum
-```
-
-### Function Catalog (v1.0 scope)
-
-| MATLAB function | Python function | Description | Status |
-|----------------|-----------------|-------------|--------|
-| **`sidFreqBT`** | `sid.freq_bt` | Frequency response via Blackman-Tukey | ✅ |
-| **`sidFreqBTFDR`** | `sid.freq_btfdr` | Blackman-Tukey, frequency-dependent resolution | ✅ |
-| **`sidFreqETFE`** | `sid.freq_etfe` | Empirical transfer function estimate | ✅ |
-| **`sidFreqMap`** | `sid.freq_map` | Time-varying frequency response map (BT or Welch) | ✅ |
-| **`sidSpectrogram`** | `sid.spectrogram` | Short-time FFT spectrogram | ✅ |
-| **`sidLTVdisc`** | `sid.ltv_disc` | Discrete LTV state-space identification (COSMIC) | ✅ |
-| **`sidLTVdiscTune`** | `sid.ltv_disc_tune` | Lambda tuning (validation-based and frequency-response) | ✅ |
-| **`sidLTVdiscFrozen`** | `sid.ltv_disc_frozen` | Frozen transfer function G(ω,k) from A(k), B(k) | ✅ |
-| **`sidLTVdiscIO`** | `sid.ltv_disc_io` | Partial-observation LTV identification (Output-COSMIC) | ✅ |
-| **`sidLTVStateEst`** | `sid.ltv_state_est` | Batch LTV state estimation (RTS smoother) | ✅ |
-| **`sidLTIfreqIO`** | `sid.lti_freq_io` | LTI realization from I/O frequency response (Ho-Kalman) | ✅ |
-| **`sidModelOrder`** | `sid.model_order` | Model order estimation (Hankel SVD) | ✅ |
-| **`sidDetrend`** | `sid.detrend` | Polynomial detrending (preprocessing) | ✅ |
-| **`sidResidual`** | `sid.residual` | Residual analysis (whiteness + independence tests) | ✅ |
-| **`sidCompare`** | `sid.compare` | Model output comparison with fit metric | ✅ |
-
-### Plotting Functions
-
-| MATLAB function | Python function | Description | Status |
-|----------------|-----------------|-------------|--------|
-| **`sidBodePlot`** | `sid.bode_plot` | Bode diagram with confidence bands | ✅ |
-| **`sidSpectrumPlot`** | `sid.spectrum_plot` | Power spectrum with confidence bands | ✅ |
-| **`sidMapPlot`** | `sid.map_plot` | Time-frequency color map | ✅ |
-| **`sidSpectrogramPlot`** | `sid.spectrogram_plot` | Spectrogram color map | ✅ |
-
-### Private Helper Functions
-
-| MATLAB function | Python module | Description |
-|----------------|---------------|-------------|
-| `sidValidateData` | `_internal/validate_data.py` | Data validation and orientation |
-| `sidHannWin` | `_internal/hann_win.py` | Hann lag window |
-| `sidCov` | `_internal/cov.py` | Biased cross-covariance estimation |
-| `sidDFT` | `_internal/dft.py` | DFT at arbitrary frequencies |
-| `sidIsDefaultFreqs` | `_internal/is_default_freqs.py` | Default frequency grid detection |
-| `sidWindowedDFT` | `_internal/windowed_dft.py` | Windowed Fourier transform (FFT + direct paths) |
-| `sidUncertainty` | `_internal/uncertainty.py` | Asymptotic variance formulas |
-| `sidParseOptions` | *(not needed — Python uses kwargs)* | — |
-| `util_msd` (+ `util_msd_ltv`, `util_msd_nl`) | `python/examples/util_msd.py` | Spring-mass-damper plant helpers. Live in `examples/` as sibling modules; tests import them via `sys.path` injection in `python/tests/conftest.py`. Replaced the legacy private `sidTestMSD` / `sid._internal.test_msd` in 2026-04. |
-| `sidLTVbuildDataMatrices` | `_internal/ltv_build_data_matrices.py` | COSMIC data matrix construction |
-| `sidLTVbuildDataMatricesVarLen` | `_internal/ltv_build_data_matrices.py` | Variable-length trajectory variant |
-| `sidLTVbuildBlockTerms` | `_internal/ltv_build_block_terms.py` | COSMIC block Hessian terms |
-| `sidLTVcosmicSolve` | `_internal/ltv_cosmic_solve.py` | COSMIC forward-backward solver |
-| `sidLTVevaluateCost` | `_internal/ltv_evaluate_cost.py` | COSMIC cost function evaluation |
-| `sidLTVblkTriSolve` | `_internal/ltv_blk_tri_solve.py` | Generic block-tridiagonal solver |
-| `sidLTVuncertaintyBackwardPass` | `_internal/ltv_uncertainty_backward_pass.py` | Posterior covariance recursion |
-| `sidEstimateNoiseCov` | `_internal/estimate_noise_cov.py` | Noise covariance from COSMIC residuals |
-| `sidExtractStd` | `_internal/extract_std.py` | Standard deviations of A(k), B(k) |
-| `sidFreqDomainSim` | `_internal/freq_domain_sim.py` | Frequency-domain simulation via IFFT |
+**Date archived:** 2026-07-29
+**Status:** executed (historical record)
+**Origin:** extracted verbatim from `docs/roadmap_python.md` when the roadmaps
+were restructured along the contract/implementation layers (issue #195,
+ADR-0006). That file no longer exists; its live content moved to
+[`docs/roadmap.md`](../roadmap.md) and
+[`python/CONTRIBUTING.md`](../../python/CONTRIBUTING.md).
 
 ---
 
-## Package Structure
-
-```
-python/
-├── pyproject.toml
-├── README.md
-├── CONTRIBUTING.md
-├── sid/
-│   ├── __init__.py                  # Public API re-exports
-│   ├── _results.py                  # Frozen dataclasses for result types
-│   ├── _exceptions.py               # SidError exception class
-│   ├── freq_bt.py
-│   ├── freq_etfe.py
-│   ├── freq_btfdr.py
-│   ├── freq_map.py
-│   ├── spectrogram.py
-│   ├── detrend.py
-│   ├── ltv_disc.py
-│   ├── ltv_disc_io.py
-│   ├── ltv_disc_frozen.py
-│   ├── ltv_disc_tune.py
-│   ├── lti_freq_io.py
-│   ├── ltv_state_est.py
-│   ├── residual.py
-│   ├── compare.py
-│   ├── model_order.py
-│   ├── bode_plot.py
-│   ├── spectrum_plot.py
-│   ├── map_plot.py
-│   ├── spectrogram_plot.py
-│   └── _internal/
-│       ├── __init__.py
-│       ├── validate_data.py
-│       ├── hann_win.py
-│       ├── cov.py
-│       ├── dft.py
-│       ├── is_default_freqs.py
-│       ├── windowed_dft.py
-│       ├── uncertainty.py
-│       ├── test_msd.py
-│       ├── ltv_build_data_matrices.py
-│       ├── ltv_build_block_terms.py
-│       ├── ltv_cosmic_solve.py
-│       ├── ltv_evaluate_cost.py
-│       ├── ltv_blk_tri_solve.py
-│       ├── ltv_uncertainty_backward_pass.py
-│       ├── estimate_noise_cov.py
-│       ├── extract_std.py
-│       └── freq_domain_sim.py
-├── examples/
-│   ├── README.md                    # Example index and descriptions
-│   ├── example_siso.ipynb           # Basic SISO frequency response
-│   ├── example_etfe.ipynb           # Empirical transfer function estimate
-│   ├── example_freq_dep_res.ipynb   # Frequency-dependent resolution
-│   ├── example_coherence.ipynb      # Coherence analysis
-│   ├── example_method_comparison.ipynb  # BT vs BTFDR vs ETFE
-│   ├── example_mimo.ipynb           # Multi-input multi-output
-│   ├── example_freq_map.ipynb       # Time-varying frequency response
-│   ├── example_spectrogram.ipynb    # Short-time FFT spectrogram
-│   ├── example_ltv_disc.ipynb       # LTV state-space (COSMIC)
-│   ├── example_multi_trajectory.ipynb   # Multi-trajectory ensemble averaging
-│   └── example_output_cosmic.ipynb  # Partial-observation Output-COSMIC
-└── tests/
-    ├── conftest.py
-    ├── test_hann_win.py
-    ├── test_cov.py
-    ├── test_dft.py
-    ├── test_windowed_dft.py
-    ├── test_uncertainty.py
-    ├── test_validate.py
-    ├── test_freq_bt.py
-    ├── test_freq_etfe.py
-    ├── test_freq_btfdr.py
-    ├── test_freq_map.py
-    ├── test_spectrogram.py
-    ├── test_detrend.py
-    ├── test_ltv_disc.py
-    ├── test_ltv_disc_tune.py
-    ├── test_ltv_disc_var_len.py
-    ├── test_ltv_disc_uncertainty.py
-    ├── test_ltv_disc_frozen.py
-    ├── test_ltv_disc_io.py
-    ├── test_ltv_state_est.py
-    ├── test_lti_freq_io.py
-    ├── test_model_order.py
-    ├── test_residual.py
-    ├── test_compare.py
-    ├── test_plotting.py
-    ├── test_multi_trajectory.py
-    └── test_cross_validation.py
-```
+> **Historical document — do not treat as current guidance.**
+>
+> This is the execution log of the Python port, preserved for the decision
+> trail. Two aspects of it are **contradicted by current project doctrine** and
+> are reproduced here only because the record is archived rather than rewritten:
+>
+> - **"The MATLAB code in `matlab/sid/` is the ground truth for numerical
+>   behaviour"** (in the preamble below) is **wrong under current doctrine.** It
+>   predates [ADR-0001](../decisions/ADR-0001-spec-is-the-contract.md).
+>   [`spec/SPEC.md`](../../spec/SPEC.md) is the sole contract; implementations
+>   conform to the spec, **not to each other**. If MATLAB and the spec disagree,
+>   MATLAB is wrong. Cross-language numerical agreement is a *consequence* of
+>   each port independently satisfying the spec, never a goal pursued by copying
+>   one port into another. See also `CLAUDE.md` §3.
+> - **The "Porting Workflow"** below ("read MATLAB source, write Python") is the
+>   copy-by-copy-porting pattern that
+>   [`docs/REVIEW_CONTEXT.md`](../REVIEW_CONTEXT.md) now flags as a red flag: it
+>   propagates MATLAB's bugs into Python and makes cross-validation agree for the
+>   wrong reason. New work implements from the spec.
+>
+> Preserved verbatim below, disclaimed rather than edited.
 
 ---
 
-## Result Types
+## Original preamble (verbatim)
 
-Every public function returns a typed, frozen dataclass from `sid._results`.
-All are immutable and support tab-completion in IPython/Jupyter.
-
-| Result type | Returned by | Key fields |
-|---|---|---|
-| `FreqResult` | `freq_bt`, `freq_etfe`, `freq_btfdr` | `response`, `noise_spectrum`, `coherence`, `frequency` |
-| `FreqMapResult` | `freq_map` | `response`, `noise_spectrum`, `coherence`, `time`, `frequency` |
-| `SpectrogramResult` | `spectrogram` | `power`, `power_db`, `complex_stft`, `time`, `frequency` |
-| `LTVResult` | `ltv_disc` | `a`, `b`, `a_std`, `b_std`, `lambda_`, `cost` |
-| `LTVIOResult` | `ltv_disc_io` | `a`, `b`, `x`, `cost`, `iterations` |
-| `FrozenResult` | `ltv_disc_frozen` | `response`, `response_std`, `time_steps`, `frequency` |
-| `ResidualResult` | `residual` | `residual`, `auto_corr`, `whiteness_pass`, `independence_pass` |
-| `CompareResult` | `compare` | `predicted`, `measured`, `fit`, `residual` |
-
-### FreqResult fields (example)
-
-```python
-result.frequency          # (nf,) rad/sample
-result.frequency_hz       # (nf,) Hz
-result.response           # (nf,) or (nf, ny, nu) complex; None for time-series
-result.response_std       # same shape, real; NaN for ETFE
-result.noise_spectrum     # (nf,) or (nf, ny, ny) real
-result.noise_spectrum_std # same shape
-result.coherence          # (nf,) squared coherence (SISO only; None for MIMO)
-result.sample_time        # scalar (seconds)
-result.window_size        # scalar integer (or array for BTFDR)
-result.data_length        # N (number of samples used)
-result.num_trajectories   # scalar (number of trajectories)
-result.method             # 'freq_bt', 'freq_btfdr', 'freq_etfe'
-```
+> This document tracks all phases required to achieve feature parity with the
+> MATLAB/Octave v1.0 implementation. The authoritative algorithm specification
+> is `spec/SPEC.md`. The MATLAB code in `matlab/sid/` is the ground truth for
+> numerical behaviour.
 
 ---
 
@@ -468,24 +309,3 @@ P1 (scaffolding)
 | P10a | Examples (Jupyter notebooks) | P10, varies per notebook | ✅ |
 | P11 | Cross-validation + CI | all | ✅ |
 
----
-
-## Technical Notes
-
-- **FFT convention:** `np.fft.fft` matches MATLAB `fft` (no scaling on forward)
-- **1-indexing → 0-indexing:** SPEC formulas are 1-indexed; adjust bin extraction
-- **Data layout:** `(N, ny)` same in both; 3D arrays `(N, ny, L)` also match
-- **`\` operator:** MATLAB `A\b` → `np.linalg.solve(A, b)`
-- **RNG:** MATLAB `rng(42)` differs from `np.random.default_rng(42)` — cross-validation uses stored JSON data, not seeds
-- **Plotting:** lazy-import matplotlib; return `dict` of handles; accept `ax=` kwarg
-- **Reserved word:** MATLAB `Lambda` → Python `lambda_` (PEP 8 trailing underscore)
-
----
-
-## Out of Scope (v1.0)
-
-- Online/recursive COSMIC (Phase 8c in MATLAB roadmap — deferred to v2)
-- Parametric identification: ARX, ARMAX, N4SID (v2)
-- LPV identification (v2)
-- Frequency-domain input data
-- Continuous-time models

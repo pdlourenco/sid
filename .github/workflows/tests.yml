@@ -7,7 +7,7 @@ name: MATLAB/Octave tests
 # an unrelated PR. Instead the job always starts — so the required check
 # always reports — and a per-job "Detect MATLAB-relevant change" step skips
 # the expensive engine steps when the PR touches nothing this suite exercises
-# (matlab/, testdata/, or this workflow). See docs/roadmap.md / issue #145e.
+# (matlab/, testdata/, or this workflow). See issue #145e.
 on:
   workflow_dispatch:
   push:
