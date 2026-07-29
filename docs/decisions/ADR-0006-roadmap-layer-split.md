@@ -72,6 +72,15 @@ logs are archived under `docs/plans/` as historical records.
   (#196). Until then, a Python contributor is still pointed at MATLAB rather
   than the spec — this ADR narrows the contradiction, it does not eliminate it.
 
+  **Update 2026-07-29 (#196) — discharged.** That section is now
+  §"Implementation Workflow" and is spec-first; the unit-test guidance derives
+  assertions from the spec rather than from MATLAB's output; the notebook
+  checklist derives from `spec/EXAMPLES.md` §3 rather than from
+  `matlab/examples/*.m`; and the residual MATLAB↔Python private-helper mapping
+  table (which this ADR recorded as dropped, but which survived in the Python
+  guide) is gone. The decision recorded above is unchanged — only its open
+  consequence is closed.
+
 ## Alternatives considered
 
 - **Leave both files, fix only the ground-truth sentence.** Delete the offending
