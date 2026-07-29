@@ -132,3 +132,9 @@ Before you finalize a number:
   contexts) and `.github/rulesets/main.json` + a dispatch/drift workflow require
   them, so a red lint gate blocks a normal merge (admin bypass retained,
   conscious); closes the #174/#178 admin-merge-outran-a-red-check class.
+- [ADR-0006](ADR-0006-roadmap-layer-split.md) — The roadmap is split along the
+  contract/implementation layers — **Accepted** — `docs/roadmap.md` becomes the
+  language-neutral catalogue + naming convention + forward-looking material,
+  per-language material moves to the language guides, executed phase logs are
+  archived under `docs/plans/`; removes the "MATLAB is ground truth" claim from
+  every living document (#195).

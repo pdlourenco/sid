@@ -186,6 +186,24 @@ path, and invisible to end users.
 
 See `.editorconfig` and `miss_hit.cfg` for automated enforcement.
 
+### Octave Compatibility
+
+Code must run unmodified on both supported engines (see [Testing](#testing) for
+the version floors). That rules out several MATLAB-only constructs; use the
+portable form instead:
+
+| Do not use | Use instead |
+|---|---|
+| `"string"` literals | `'char vectors'` |
+| `arguments` blocks | `inputParser` |
+| `tiledlayout` / `nexttile` | `subplot` |
+| `exportgraphics` | `print` |
+| `dictionary` | `struct` or `containers.Map` |
+
+CI runs the suite on both engines, so a MATLAB-only construct fails the Octave
+leg rather than reaching a user — but the check is cheap to run locally first
+(see the repository `CONTRIBUTING.md` for the local-CI runner).
+
 ### Inline Comments
 
 Code comments within function bodies should make the mathematical intent

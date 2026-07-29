@@ -177,5 +177,5 @@ run('matlab/examples/runAllExamples.m')
 
 - [Algorithm specification](../spec/SPEC.md)
 - [Examples guide](examples/README.md)
-- [Development roadmap](../docs/roadmap.md)
+- [Function catalogue and roadmap](../docs/roadmap.md)
 - [Contributing guide](CONTRIBUTING.md)

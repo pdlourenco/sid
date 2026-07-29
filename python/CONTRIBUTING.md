@@ -246,6 +246,32 @@ underscore convention for reserved words).
 | Type hints | Required on all public function signatures |
 | Imports | No star imports; group: stdlib, third-party, local |
 
+### Translating spec notation to NumPy
+
+[`spec/SPEC.md`](../spec/SPEC.md) states formulas in mathematical notation with
+1-based indices. These are the recurring translation gotchas:
+
+| Concern | Rule |
+|---|---|
+| Indexing | Spec formulas are **1-indexed**; NumPy is 0-indexed. Adjust bin/step extraction rather than transcribing indices literally. |
+| FFT convention | `np.fft.fft` matches the spec's unscaled forward transform (no `1/N` on the forward direction). |
+| Linear solves | A spec `A⁻¹b` (MATLAB `A\b`) is `np.linalg.solve(A, b)` — never `inv(A) @ b`. |
+| Data layout | `(N, ny)` for signals and `(N, ny, L)` for multi-trajectory, matching the spec's stated shapes. |
+
+Reserved-word escaping (`Lambda` -> `lambda_`) is covered under
+[Reserved word handling](#reserved-word-handling); RNG incompatibility is
+covered under [Test categories](#test-categories).
+
+### Plotting conventions
+
+Plotting functions must not make matplotlib a hard dependency of the package:
+
+- **Lazy-import matplotlib** inside the function body, not at module scope —
+  `import sid` must work without matplotlib installed.
+- **Accept an optional `ax=` keyword** so a caller can embed the plot in a
+  figure they created.
+- **Return a `dict` of handles** rather than bare figure/axes objects.
+
 ### Inline Comments
 
 Code comments within function bodies should make the mathematical intent
