@@ -2,11 +2,18 @@
 
 **Date archived:** 2026-07-29
 **Status:** executed (historical record)
-**Origin:** extracted verbatim from `docs/roadmap_python.md` when the roadmaps
-were restructured along the contract/implementation layers (issue #195,
-ADR-0006). That file no longer exists; its live content moved to
-[`docs/roadmap.md`](../roadmap.md) and
-[`python/CONTRIBUTING.md`](../../python/CONTRIBUTING.md).
+**Origin:** the "Porting Workflow", "Phased Roadmap", "Dependency Graph" and
+"Timeline" sections of `docs/roadmap_python.md`, reproduced **verbatim** below,
+extracted when the roadmaps were restructured along the contract/implementation
+layers (issue #195, ADR-0006). This is the phase log only — the former file was
+491 lines, of which these are ~266. Its other sections were relocated (naming
+convention and catalogue merged into [`docs/roadmap.md`](../roadmap.md);
+"Technical Notes" merged into
+[`python/CONTRIBUTING.md`](../../python/CONTRIBUTING.md); out-of-scope items
+merged into the roadmap's list) or deliberately deleted ("Result Types" and the
+`FreqResult` field list, which duplicated the spec and `sid/_results.py`; the
+MATLAB↔Python private-helper mapping, which was already drifting and is the
+port-to-port correspondence ADR-0001 rejects). That file no longer exists.
 
 ---
 
