@@ -60,6 +60,40 @@ sections:
 The "Alternatives considered" section is what makes an ADR useful six months
 later. An ADR without it is a decision-log entry, not an ADR.
 
+## Editing a merged ADR
+
+A merged ADR is a durable record of what was decided and what was known at the
+time. **Do not rewrite accepted text** — not Context, not Decision, not
+Consequences, not Alternatives. If the decision itself changes, that is a *new*
+ADR that supersedes this one (see [Numbering](#numbering-and-filenames)); the old
+one keeps its reasoning intact so the trail survives.
+
+Two edits are sanctioned:
+
+1. **Superseding** — the newer ADR references the old one in its Status section,
+   and the old one's Status flips to `Superseded by ADR-NNNN`.
+2. **Discharging an open consequence** — when a Consequences bullet records
+   something as deferred or not-yet-closed and a later PR closes it, leave the
+   original bullet **byte-untouched** and append a dated, issue-referenced note
+   beneath it:
+
+   ```markdown
+   - **Not closed by this ADR:** …original wording, unchanged…
+
+     **Update YYYY-MM-DD (#NNN) — discharged.** <what actually changed>.
+     The decision recorded above is unchanged — only its open consequence is closed.
+   ```
+
+   Append-only, so a reader sees both what was true when the ADR was accepted
+   and what has since changed. Rewriting the bullet in place would erase the fact
+   that the gap was ever knowingly left open — which is exactly the honesty the
+   bullet existed to provide. First instance:
+   [ADR-0006](ADR-0006-roadmap-layer-split.md) (discharged by #196).
+
+Describe only what actually shipped. A consequence is discharged when the
+practice has changed, not when a PR intends to change it — an ADR asserting a
+closure that has not happened is worse than the open consequence it replaced.
+
 ## Numbering and filenames
 
 - Filenames: `ADR-NNNN-kebab-case-title.md`, `NNNN` zero-padded.
