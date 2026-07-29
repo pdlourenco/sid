@@ -13,6 +13,34 @@ mathematical specification:
 - [`matlab/`](matlab/) — MATLAB/Octave implementation (stable)
 - [`python/`](python/) — Python implementation (stable)
 - [`julia/`](julia/) — Julia implementation (planned)
+- [`docs/`](docs/) — **internal** engineering documents: ADRs
+  ([`docs/decisions/`](docs/decisions/)), analyses, plans, `DESIGN.md`,
+  `REVIEW_CONTEXT.md`, and the function catalogue
+  ([`docs/roadmap.md`](docs/roadmap.md)). Not published.
+- `docsite/` — source for the **public** documentation site (MkDocs)
+
+### `docs/` and `docsite/` are deliberately separate
+
+`docs/` is internal, `docsite/` is what gets published. The site's `docs_dir` is
+`docsite`, so a new file under `docs/` can neither leak onto the public site nor
+break its build — which is exactly what happened when the two shared a directory
+(the internal docs' relative links failed the strict build). Keep the split:
+
+- Add internal engineering documents to `docs/`. No site changes needed.
+- Publishing anything from `docs/` is a **deliberate decision**, made by adding
+  it to the `nav` in `mkdocs.yml` — never a side effect of the build config.
+- The site regenerates from source (API references, spec includes, executed
+  notebooks), so most content changes need no `docsite/` edit at all.
+
+Build it locally before changing anything under `docsite/`, `mkdocs.yml`, or
+`scripts/build_matlab_*.py`:
+
+```bash
+pip install -r requirements-docs.txt && mkdocs build --strict
+```
+
+`--strict` is what CI runs; it turns link warnings into failures. The docs
+workflow runs on every pull request, so a broken build blocks before merge.
 
 ## Specification as Source of Truth
 

@@ -1,5 +1,3 @@
-# Changelog
-
 The cumulative history for both language ports lives in
 [`CHANGELOG.md`](https://github.com/pdlourenco/sid/blob/main/CHANGELOG.md) and is
 mirrored below. Per-release notes accompany each port:

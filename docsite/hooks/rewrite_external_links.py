@@ -71,6 +71,10 @@ def on_page_markdown(markdown, page, config, files):
             return match.group(0)
         if not repo_path.exists():
             return match.group(0)
-        return f"{label}({github_prefix}/{rel_to_repo}{anchor})"
+        # as_posix(): rel_to_repo is a Path, so interpolating it directly emits
+        # the host separator -- on Windows that produced URLs like
+        # ".../blob/main/docs\DESIGN.md", which 404 on GitHub. CI builds on Linux
+        # so the deployed site was unaffected, but local previews were broken.
+        return f"{label}({github_prefix}/{rel_to_repo.as_posix()}{anchor})"
 
     return LINK_RE.sub(replace, markdown)

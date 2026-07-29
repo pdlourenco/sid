@@ -24,9 +24,12 @@ def repo_source_prefix() -> str:
         import mkdocs_gen_files
 
         repo_url = (mkdocs_gen_files.config or {}).get("repo_url")
-    except (ImportError, AttributeError):
-        # ImportError: running standalone, outside a mkdocs build.
-        # AttributeError: mkdocs-gen-files too old to expose `config`.
+    except Exception:  # noqa: BLE001 - best-effort lookup; the fallback is correct
+        # Deliberately broad. Outside a mkdocs build `mkdocs_gen_files.config`
+        # reaches for the active build context and loads mkdocs.yml, which raises
+        # ConfigurationError when the cwd is not the project root -- not just
+        # ImportError/AttributeError. This script must stay runnable standalone
+        # from any directory, so any failure here falls back to the constant.
         repo_url = None
     if not repo_url:
         return DEFAULT_REPO_PREFIX

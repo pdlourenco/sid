@@ -16,38 +16,43 @@ Standalone: `python scripts/check_python_api_pages.py` (exit 1 on mismatch).
 
 from __future__ import annotations
 
+import inspect
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 API_DIR = REPO_ROOT / "docsite" / "api" / "python"
 SUMMARY = API_DIR / "SUMMARY.md"
-
-# Exported names that are deliberately not one-page-per-name: the version string,
-# and the result dataclasses + exception which share `results.md`.
-NON_FUNCTION_EXPORTS = {
-    "__version__",
-    "CompareResult",
-    "FreqMapResult",
-    "FreqResult",
-    "FrozenResult",
-    "LTVIOResult",
-    "LTVResult",
-    "ResidualResult",
-    "SidError",
-    "SpectrogramResult",
-}
+RESULTS_PAGE = API_DIR / "results.md"
+FUNCTION_INDEX = REPO_ROOT / "docsite" / "api" / "index.md"
+PYTHON_OVERVIEW = API_DIR / "index.md"
 
 # Pages that exist for reasons other than a single exported function.
 NON_FUNCTION_PAGES = {"index", "results", "SUMMARY"}
 
 
-def public_functions() -> set[str]:
-    """Names in `sid.__all__` that should each have their own API page."""
+def _sid():
     sys.path.insert(0, str(REPO_ROOT / "python"))
     import sid
 
-    return {name for name in sid.__all__ if name not in NON_FUNCTION_EXPORTS}
+    return sid
+
+
+def partition_exports() -> tuple[set[str], set[str]]:
+    """Split `sid.__all__` into (functions, everything else).
+
+    Determined by introspection, not a hand-kept list: a maintained list is the
+    same hardcoded-manifest failure mode this gate exists to remove -- adding a
+    result type to `__all__` would either break every docs build or silently
+    exempt itself, depending on whether someone remembered to update it.
+    """
+    sid = _sid()
+    functions, others = set(), set()
+    for name in sid.__all__:
+        if name.startswith("__"):
+            continue  # dunder metadata (e.g. __version__), not documentable
+        (functions if inspect.isfunction(getattr(sid, name)) else others).add(name)
+    return functions, others
 
 
 def existing_pages() -> set[str]:
@@ -56,7 +61,7 @@ def existing_pages() -> set[str]:
 
 def check() -> list[str]:
     """Return a list of problems; empty means the API reference is complete."""
-    expected = public_functions()
+    expected, others = partition_exports()
     actual = existing_pages()
     problems = []
 
@@ -83,6 +88,32 @@ def check() -> list[str]:
                 )
     else:
         problems.append(f"missing nav file: {SUMMARY}")
+
+    # Non-function exports (result dataclasses, SidError) share results.md.
+    if RESULTS_PAGE.exists():
+        results = RESULTS_PAGE.read_text(encoding="utf-8")
+        for name in sorted(others):
+            if name not in results:
+                problems.append(
+                    f"sid.{name} is exported in __all__ but is not documented in "
+                    f"docsite/api/python/results.md"
+                )
+    else:
+        problems.append(f"missing results page: {RESULTS_PAGE}")
+
+    # Hand-written index tables are manifests too: a stub can exist and be in the
+    # nav yet still be missing from these, and a missing table row is invisible to
+    # the strict build.
+    for page in (FUNCTION_INDEX, PYTHON_OVERVIEW):
+        if not page.exists():
+            problems.append(f"missing index page: {page}")
+            continue
+        text = page.read_text(encoding="utf-8")
+        for name in sorted(expected):
+            if name not in text:
+                problems.append(
+                    f"sid.{name} is missing from {page.relative_to(REPO_ROOT).as_posix()}"
+                )
 
     return problems
 
