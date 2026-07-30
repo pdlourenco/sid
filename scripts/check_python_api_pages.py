@@ -104,15 +104,22 @@ def check() -> list[str]:
     # Hand-written index tables are manifests too: a stub can exist and be in the
     # nav yet still be missing from these, and a missing table row is invisible to
     # the strict build.
-    for page in (FUNCTION_INDEX, PYTHON_OVERVIEW):
+    #
+    # Match each page's link form, not a bare name: the two indexes link with
+    # different prefixes, and a bare substring test is satisfied by a longer
+    # sibling -- a dropped `spectrogram` row would go unnoticed because
+    # `spectrogram_plot` contains it.
+    for page, link in ((FUNCTION_INDEX, "(python/{name}.md)"), (PYTHON_OVERVIEW, "({name}.md)")):
         if not page.exists():
             problems.append(f"missing index page: {page}")
             continue
         text = page.read_text(encoding="utf-8")
         for name in sorted(expected):
-            if name not in text:
+            if link.format(name=name) not in text:
                 problems.append(
-                    f"sid.{name} is missing from {page.relative_to(REPO_ROOT).as_posix()}"
+                    f"sid.{name} is missing from "
+                    f"{page.relative_to(REPO_ROOT).as_posix()} "
+                    f"(expected a link {link.format(name=name)})"
                 )
 
     return problems
