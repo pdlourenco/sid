@@ -1,0 +1,5199 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Open-source system identification for Python and MATLAB/Octave">
+      
+      
+      
+        <link rel="canonical" href="https://pdlourenco.github.io/sid/spec/cosmic/uncertainty-derivation/">
+      
+      
+        <link rel="prev" href="../output/">
+      
+      
+        <link rel="next" href="../../../about/contributing/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Uncertainty derivation - sid — System Identification Toolbox</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#bayesian-interpretation-of-cosmic-closed-form-optimal-data-driven-linear-time-varying-system-identification-derivation" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="sid — System Identification Toolbox" class="md-header__button md-logo" aria-label="sid — System Identification Toolbox" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            sid — System Identification Toolbox
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Uncertainty derivation
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/pdlourenco/sid" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    pdlourenco/sid
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../getting-started/install-python/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../concepts/overview/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../api/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  API reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../examples/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Specification
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../about/contributing/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  About
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="sid — System Identification Toolbox" class="md-nav__button md-logo" aria-label="sid — System Identification Toolbox" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    sid — System Identification Toolbox
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/pdlourenco/sid" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    pdlourenco/sid
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/install-python/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install (Python)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/install-matlab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install (MATLAB/Octave)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/frequency-domain/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frequency domain
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/cosmic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    COSMIC (LTV state-space)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../concepts/uncertainty/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../api/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../api/python/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Python
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/python/bode_plot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    bode_plot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/python/compare/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    compare
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/python/detrend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    detrend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/python/freq_bt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    freq_bt
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/python/freq_btfdr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    freq_btfdr
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/python/freq_etfe/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    freq_etfe
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/python/freq_map/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    freq_map
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/python/lti_freq_io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    lti_freq_io
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/python/ltv_disc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ltv_disc
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/python/ltv_disc_frozen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ltv_disc_frozen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/python/ltv_disc_io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ltv_disc_io
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/python/ltv_disc_tune/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ltv_disc_tune
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/python/ltv_state_est/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ltv_state_est
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/python/map_plot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    map_plot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/python/model_order/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    model_order
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/python/residual/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    residual
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/python/spectrogram/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    spectrogram
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/python/spectrogram_plot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    spectrogram_plot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/python/spectrum_plot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    spectrum_plot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/python/results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Result types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../api/matlab/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MATLAB/Octave
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    MATLAB/Octave
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/matlab/sidBodePlot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sidBodePlot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/matlab/sidCompare/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sidCompare
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/matlab/sidDetrend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sidDetrend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/matlab/sidFreqBT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sidFreqBT
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/matlab/sidFreqBTFDR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sidFreqBTFDR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/matlab/sidFreqETFE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sidFreqETFE
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/matlab/sidFreqMap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sidFreqMap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/matlab/sidLTIfreqIO/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sidLTIfreqIO
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/matlab/sidLTVStateEst/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sidLTVStateEst
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/matlab/sidLTVdisc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sidLTVdisc
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/matlab/sidLTVdiscFrozen/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sidLTVdiscFrozen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/matlab/sidLTVdiscIO/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sidLTVdiscIO
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/matlab/sidLTVdiscTune/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sidLTVdiscTune
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/matlab/sidMapPlot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sidMapPlot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/matlab/sidModelOrder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sidModelOrder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/matlab/sidResidual/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sidResidual
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/matlab/sidResultTypes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sidResultTypes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/matlab/sidSpectrogram/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sidSpectrogram
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/matlab/sidSpectrogramPlot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sidSpectrogramPlot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/matlab/sidSpectrumPlot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sidSpectrumPlot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../examples/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../examples/python/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python notebooks
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Python notebooks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/python/example_coherence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coherence with colored disturbance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/python/example_etfe/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Empirical transfer function estimate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/python/example_freq_dep_res/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frequency-dependent resolution (3-mass chain)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/python/example_freq_map/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Time-varying frequency map
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/python/example_ltv_disc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LTV state-space identification (COSMIC)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/python/example_method_comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    BT vs BTFDR vs ETFE
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/python/example_mimo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MIMO frequency response (2-mass chain)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/python/example_multi_trajectory/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-trajectory ensemble averaging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/python/example_output_cosmic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output-only COSMIC (partial observations)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/python/example_siso/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SISO frequency response (1-DoF SMD)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/python/example_spectrogram/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spectrogram of a chirp-driven SDOF
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../examples/matlab/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MATLAB scripts
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    MATLAB scripts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/matlab/exampleCoherence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    exampleCoherence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/matlab/exampleETFE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    exampleETFE
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/matlab/exampleFreqDepRes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    exampleFreqDepRes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/matlab/exampleFreqMap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    exampleFreqMap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/matlab/exampleLTVdisc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    exampleLTVdisc
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/matlab/exampleMIMO/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    exampleMIMO
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/matlab/exampleMethodComparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    exampleMethodComparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/matlab/exampleMultiTrajectory/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    exampleMultiTrajectory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/matlab/exampleOutputCOSMIC/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    exampleOutputCOSMIC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/matlab/exampleSISO/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    exampleSISO
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/matlab/exampleSpectrogram/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    exampleSpectrogram
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specification
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Specification
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples-spec/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples spec
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6_3" id="__nav_6_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    COSMIC notes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    COSMIC notes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../automatic-tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automatic tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../online-recursion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Online recursion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output-COSMIC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Uncertainty derivation
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Uncertainty derivation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-setup-and-notation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Setup and Notation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-the-probabilistic-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. The Probabilistic Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. The Probabilistic Model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-likelihood" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Likelihood
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-prior-gaussian-random-walk-on-ck" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Prior: Gaussian Random Walk on C(k)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-factoring-out-1-why-cosmic-doesnt-need-to-know" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Factoring out Σ⁻¹: Why COSMIC Doesn't Need to Know Σ
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-posterior-distribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Posterior Distribution
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Posterior Distribution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-matrix-normal-posterior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Matrix-Normal Posterior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-covariance-of-individual-entries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Covariance of Individual Entries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-connection-to-cosmic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Connection to COSMIC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-derivation-of-the-kronecker-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 Derivation of the Kronecker Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-why-this-is-not-the-frequentist-covariance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Why This is Not the Frequentist Covariance
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Why This is Not the Frequentist Covariance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-frequentist-bias" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Frequentist Bias
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-frequentist-variance-sandwich-form" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Frequentist Variance (Sandwich Form)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-frequentist-mse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Frequentist MSE
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-summary-of-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Summary of Comparison
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-why-the-sandwich-is-impractical-anyway" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 Why the Sandwich is Impractical Anyway
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-posterior-covariance-block-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Posterior Covariance: Block Structure
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Posterior Covariance: Block Structure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-structure-of-a" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Structure of A
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-diagonal-blocks-of-a1-via-backward-recursion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Diagonal Blocks of A⁻¹ via Backward Recursion
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-complexity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Complexity
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-estimating" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Estimating Σ
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Estimating Σ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-residual-based-estimate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Residual-Based Estimate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-degrees-of-freedom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 Degrees of Freedom
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-cross-validation-alternative" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Cross-Validation Alternative
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-diagonal-vs-full" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 Diagonal vs. Full Σ
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-complete-algorithm-for-posterior-covariance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Complete Algorithm for Posterior Covariance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-extracting-useful-uncertainties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Extracting Useful Uncertainties
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Extracting Useful Uncertainties">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-standard-deviation-of-individual-entries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 Standard Deviation of Individual Entries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-standard-deviation-of-ak-and-bk-entries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 Standard Deviation of A(k) and B(k) Entries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83-correlation-between-state-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 Correlation Between State Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-sanity-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Sanity Checks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. Sanity Checks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#91-no-regularization-limit-0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.1 No-Regularization Limit (λ → 0)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#92-large-regularization-limit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.2 Large-Regularization Limit (λ → ∞)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#93-single-time-step-n-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.3 Single Time Step (N = 1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#94-isotropic-noise-2i" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.4 Isotropic Noise (Σ = σ²I)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#95-time-step-with-no-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.5 Time Step with No Data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#96-diagonal-with-1-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.6 Diagonal Σ with σ₁ ≫ σ₂
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-what-the-uncertainty-means-and-doesnt-mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. What the Uncertainty Means (and Doesn't Mean)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. What the Uncertainty Means (and Doesn&#39;t Mean)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#101-correct-interpretation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.1 Correct Interpretation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#102-what-it-doesnt-cover" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.2 What It Doesn't Cover
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#103-honest-labeling-in-sid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.3 Honest Labeling in sid
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    About
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../about/contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../about/changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-setup-and-notation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Setup and Notation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-the-probabilistic-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. The Probabilistic Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. The Probabilistic Model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-likelihood" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Likelihood
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-prior-gaussian-random-walk-on-ck" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Prior: Gaussian Random Walk on C(k)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-factoring-out-1-why-cosmic-doesnt-need-to-know" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Factoring out Σ⁻¹: Why COSMIC Doesn't Need to Know Σ
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-posterior-distribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Posterior Distribution
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Posterior Distribution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-matrix-normal-posterior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Matrix-Normal Posterior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-covariance-of-individual-entries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Covariance of Individual Entries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-connection-to-cosmic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Connection to COSMIC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-derivation-of-the-kronecker-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 Derivation of the Kronecker Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-why-this-is-not-the-frequentist-covariance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Why This is Not the Frequentist Covariance
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Why This is Not the Frequentist Covariance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-frequentist-bias" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Frequentist Bias
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-frequentist-variance-sandwich-form" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Frequentist Variance (Sandwich Form)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-frequentist-mse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Frequentist MSE
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-summary-of-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Summary of Comparison
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-why-the-sandwich-is-impractical-anyway" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 Why the Sandwich is Impractical Anyway
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-posterior-covariance-block-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Posterior Covariance: Block Structure
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Posterior Covariance: Block Structure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-structure-of-a" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Structure of A
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-diagonal-blocks-of-a1-via-backward-recursion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Diagonal Blocks of A⁻¹ via Backward Recursion
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-complexity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Complexity
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-estimating" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Estimating Σ
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Estimating Σ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-residual-based-estimate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Residual-Based Estimate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-degrees-of-freedom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 Degrees of Freedom
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-cross-validation-alternative" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Cross-Validation Alternative
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-diagonal-vs-full" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 Diagonal vs. Full Σ
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-complete-algorithm-for-posterior-covariance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Complete Algorithm for Posterior Covariance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-extracting-useful-uncertainties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Extracting Useful Uncertainties
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Extracting Useful Uncertainties">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-standard-deviation-of-individual-entries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 Standard Deviation of Individual Entries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-standard-deviation-of-ak-and-bk-entries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 Standard Deviation of A(k) and B(k) Entries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83-correlation-between-state-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 Correlation Between State Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-sanity-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Sanity Checks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. Sanity Checks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#91-no-regularization-limit-0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.1 No-Regularization Limit (λ → 0)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#92-large-regularization-limit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.2 Large-Regularization Limit (λ → ∞)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#93-single-time-step-n-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.3 Single Time Step (N = 1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#94-isotropic-noise-2i" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.4 Isotropic Noise (Σ = σ²I)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#95-time-step-with-no-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.5 Time Step with No Data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#96-diagonal-with-1-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.6 Diagonal Σ with σ₁ ≫ σ₂
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-what-the-uncertainty-means-and-doesnt-mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. What the Uncertainty Means (and Doesn't Mean)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. What the Uncertainty Means (and Doesn&#39;t Mean)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#101-correct-interpretation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.1 Correct Interpretation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#102-what-it-doesnt-cover" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.2 What It Doesn't Cover
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#103-honest-labeling-in-sid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.3 Honest Labeling in sid
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/pdlourenco/sid/edit/main/docsite/spec/cosmic/uncertainty-derivation.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="bayesian-interpretation-of-cosmic-closed-form-optimal-data-driven-linear-time-varying-system-identification-derivation">Bayesian Interpretation of COSMIC (Closed-form Optimal data-driven linear time-varying SysteM IdentifiCation): Derivation<a class="headerlink" href="#bayesian-interpretation-of-cosmic-closed-form-optimal-data-driven-linear-time-varying-system-identification-derivation" title="Permanent link">&para;</a></h1>
+<p><strong>Purpose:</strong> Justify the posterior covariance of the COSMIC estimator under a
+general (non-isotropic) noise model, and clarify the bias/variance tradeoffs.</p>
+<hr />
+<h2 id="1-setup-and-notation">1. Setup and Notation<a class="headerlink" href="#1-setup-and-notation" title="Permanent link">&para;</a></h2>
+<p>The discrete linear time-varying (LTV) system with noise is:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>x_ℓ(k+1) = A(k) x_ℓ(k) + B(k) u_ℓ(k) + w_ℓ(k)
+</code></pre></div>
+<p>for trajectory ℓ = 1,...,L and time step k = 0,...,N-1, where w_ℓ(k) ∈ ℝᵖ is
+noise (measurement error, process disturbance, or both).</p>
+<p>Define the parameter matrix at time k:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>C(k) = [A(k)ᵀ; B(k)ᵀ] ∈ ℝ^{(p+q)×p}
+</code></pre></div>
+<p>and the data vector for trajectory ℓ at time k:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>d_ℓ(k) = [x_ℓ(k); u_ℓ(k)] ∈ ℝ^{p+q}
+</code></pre></div>
+<p>The model becomes:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>x_ℓ(k+1)ᵀ = d_ℓ(k)ᵀ C(k) + w_ℓ(k)ᵀ
+</code></pre></div>
+<p>Stacking all L trajectories at time k into D(k) ∈ ℝ^{L×(p+q)} and X'(k) ∈ ℝ^{p×L}:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>X&#39;(k)ᵀ = D(k) C(k) + W(k)       (*)
+</code></pre></div>
+<p>where row ℓ of W(k) is w_ℓ(k)ᵀ.</p>
+<h2 id="2-the-probabilistic-model">2. The Probabilistic Model<a class="headerlink" href="#2-the-probabilistic-model" title="Permanent link">&para;</a></h2>
+<p>We state the two components of the Bayesian model explicitly.</p>
+<h3 id="21-likelihood">2.1 Likelihood<a class="headerlink" href="#21-likelihood" title="Permanent link">&para;</a></h3>
+<p>Each noise vector is independent and Gaussian with a general p × p covariance:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>w_ℓ(k) ~ N(0, Σ)     i.i.d. across ℓ and k
+</code></pre></div>
+<p>where Σ ∈ ℝ^{p×p} is symmetric positive definite. This allows different noise
+levels per state component and cross-correlations between them. For example, in
+a spring-mass-damper system, position might be measured with much less noise
+than velocity, giving Σ = diag(σ_pos², σ_vel²) with σ_pos ≪ σ_vel.</p>
+<p>The log-likelihood for all data, given C = {C(0),...,C(N-1)} and Σ, is:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>log p(data | C, Σ) = -(1/2) Σ_{k=0}^{N-1} Σ_{ℓ=1}^{L}
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>                      (x_ℓ(k+1) - C(k)ᵀ d_ℓ(k))ᵀ Σ⁻¹ (x_ℓ(k+1) - C(k)ᵀ d_ℓ(k))
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>                      + const
+</code></pre></div>
+<p>where the constant absorbs -(NL/2) log|2πΣ|.</p>
+<p>Using the trace identity ||M||²_{Σ⁻¹} = tr(Σ⁻¹ MᵀM), this becomes:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>log p(data | C, Σ) = -(1/2) Σ_{k=0}^{N-1} tr(Σ⁻¹ E(k)ᵀ E(k)) + const
+</code></pre></div>
+<p>where E(k) = X'(k)ᵀ - D(k)C(k) ∈ ℝ^{L×p} is the residual matrix at time k.</p>
+<h3 id="22-prior-gaussian-random-walk-on-ck">2.2 Prior: Gaussian Random Walk on C(k)<a class="headerlink" href="#22-prior-gaussian-random-walk-on-ck" title="Permanent link">&para;</a></h3>
+<p>The COSMIC regularization penalizes ||C(k) - C(k-1)||²_F. The natural Bayesian
+interpretation that preserves the structure of the problem is a Gaussian random
+walk prior whose covariance scales with the noise covariance:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>vec(C(k) - C(k-1)) ~ N(0, (1/λ_k) Σ ⊗ I_{p+q})    for k = 1,...,N-1
+</code></pre></div>
+<p>Equivalently, the columns of the matrix increment are:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>[C(k) - C(k-1)][:,j] ~ N(0, (Σ_{jj}/λ_k) I_{p+q})
+</code></pre></div>
+<p>and cross-column correlations follow Σ.</p>
+<p><strong>Why scale the prior with Σ?</strong> This choice means that the regularization
+strength λ_k operates in noise-normalized units: a state component with 10×
+more measurement noise is automatically allowed 10× more apparent variation in
+its corresponding column of C(k). Without this scaling, the regularization
+would over-smooth noisy components and under-smooth clean ones.</p>
+<p>The prior log-density is:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>log p(C | Σ) = -(1/2) Σ_{k=1}^{N-1} λ_k tr(Σ⁻¹ (C(k) - C(k-1))ᵀ (C(k) - C(k-1))) + const
+</code></pre></div>
+<p><strong>Note on C(0):</strong> The random walk prior constrains only differences. There is no
+prior on the absolute value of C(0). This is an improper (flat) prior on C(0),
+which is acceptable: the posterior will be proper as long as the data at k=0
+provides sufficient information, i.e., D(0)ᵀD(0) ≻ 0.</p>
+<h3 id="23-factoring-out-1-why-cosmic-doesnt-need-to-know">2.3 Factoring out Σ⁻¹: Why COSMIC Doesn't Need to Know Σ<a class="headerlink" href="#23-factoring-out-1-why-cosmic-doesnt-need-to-know" title="Permanent link">&para;</a></h3>
+<p>The negative log-posterior is proportional to:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>-log p(C | data, Σ) ∝ (1/2) Σ_k tr(Σ⁻¹ E(k)ᵀ E(k))
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>                     + (1/2) Σ_k λ_k tr(Σ⁻¹ ΔC(k)ᵀ ΔC(k))
+</code></pre></div>
+<p>where ΔC(k) = C(k) - C(k-1). Both terms have the form tr(Σ⁻¹ × ···), and the
+factor Σ⁻¹ is common. Taking the gradient with respect to C(k):</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>∇_{C(k)} [-log p] = D(k)ᵀ E(k) Σ⁻¹ + λ_k ΔC(k) Σ⁻¹ - λ_{k+1} ΔC(k+1) Σ⁻¹
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>                   = [D(k)ᵀ E(k) + λ_k ΔC(k) - λ_{k+1} ΔC(k+1)] Σ⁻¹
+</code></pre></div>
+<p>Setting this to zero and right-multiplying by Σ (which is invertible):</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>D(k)ᵀ E(k) + λ_k ΔC(k) - λ_{k+1} ΔC(k+1) = 0
+</code></pre></div>
+<p><strong>The normal equations are identical to the isotropic (σ²I) case.</strong> The matrix Σ
+cancels entirely. Therefore:</p>
+<ul>
+<li>The COSMIC algorithm (forward/backward pass) is unchanged.</li>
+<li>The MAP estimate Ĉ does not depend on Σ.</li>
+<li>The implementation does not need to know or estimate Σ to compute Ĉ.</li>
+</ul>
+<p>Σ enters only through the posterior covariance (§3) and must be estimated from
+the residuals (§6).</p>
+<h2 id="3-posterior-distribution">3. Posterior Distribution<a class="headerlink" href="#3-posterior-distribution" title="Permanent link">&para;</a></h2>
+<h3 id="31-matrix-normal-posterior">3.1 Matrix-Normal Posterior<a class="headerlink" href="#31-matrix-normal-posterior" title="Permanent link">&para;</a></h3>
+<p>Because Σ⁻¹ factors out of the entire problem, and the cost is quadratic in C,
+the posterior distribution of C(k) is <strong>matrix-normal</strong>:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>C(k) | data, Σ  ~  MN(Ĉ(k),  P(k),  Σ)
+</code></pre></div>
+<p>where:
+- Ĉ(k) is the COSMIC solution (the MAP estimate / posterior mean)
+- P(k) ∈ ℝ^{(p+q)×(p+q)} is the "row covariance" (same for all columns)
+- Σ ∈ ℝ^{p×p} is the "column covariance" (the noise covariance)</p>
+<p>The matrix-normal MN(M, U, V) means that vec(X) ~ N(vec(M), V ⊗ U). So:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>Cov(vec(C(k))) = Σ ⊗ P(k)
+</code></pre></div>
+<p>This Kronecker structure has a clean interpretation:
+- P(k) governs how much uncertainty there is in each row of C(k) — i.e.,
+  uncertainty in the (p+q)-dimensional parameter vector — and is determined by
+  the data geometry (how informative the data is at time k) and the
+  regularization (how much neighboring time steps contribute).
+- Σ governs how the p columns of C(k) are correlated — i.e., cross-correlation
+  between state components — and is determined by the noise structure.</p>
+<h3 id="32-covariance-of-individual-entries">3.2 Covariance of Individual Entries<a class="headerlink" href="#32-covariance-of-individual-entries" title="Permanent link">&para;</a></h3>
+<p>From the Kronecker structure, the covariance between any two entries of C(k) is:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>Cov(C(k)_{ab}, C(k)_{cd}) = Σ_{bd} × P(k)_{ac}
+</code></pre></div>
+<p>where a,c index rows (1,...,p+q) and b,d index columns (1,...,p).</p>
+<p><strong>Special cases:</strong>
+- Same column (b = d): Cov(C(k)<em cb="cb">{ab}, C(k)</em> × P(k)}) = Σ_{bb<em jj="jj">{ac}.
+  This is just the b-th diagonal of Σ scaling the row covariance P(k).
+- Diagonal Σ: columns become uncorrelated, and column j has
+  Cov(c_j(k)) = Σ</em> × P(k).
+- Isotropic Σ = σ²I: all columns have the same covariance σ² P(k),
+  recovering the isotropic case.</p>
+<h3 id="33-connection-to-cosmic">3.3 Connection to COSMIC<a class="headerlink" href="#33-connection-to-cosmic" title="Permanent link">&para;</a></h3>
+<p>The posterior mean is the COSMIC solution:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>Ĉ_COSMIC = A⁻¹ Vᵀ X&#39;ᵀ = posterior mean
+</code></pre></div>
+<p>This is identical to the MAP estimate. For a Gaussian posterior, the MAP and the
+mean coincide, so there is no distinction.</p>
+<p>The posterior covariance of the stacked parameter vector is:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>Cov(vec(C)) = Σ ⊗ A⁻¹
+</code></pre></div>
+<p>and the per-timestep marginal is:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>Cov(vec(C(k))) = Σ ⊗ P(k)     where P(k) = [A⁻¹]_{kk}
+</code></pre></div>
+<p><strong>This is not a frequentist statement.</strong> It does not say that E[Ĉ] = C_true.
+Rather, it says: given the data and the probabilistic model (Gaussian noise with
+covariance Σ + Gaussian random walk prior scaled by Σ), the posterior belief
+about C is matrix-normal with the above parameters.</p>
+<h3 id="34-derivation-of-the-kronecker-structure">3.4 Derivation of the Kronecker Structure<a class="headerlink" href="#34-derivation-of-the-kronecker-structure" title="Permanent link">&para;</a></h3>
+<p>For completeness, we derive the posterior covariance from first principles.</p>
+<p>Stack all time steps for column j into c_j = [c_j(0); ...; c_j(N-1)] ∈ ℝ^{N(p+q)},
+where c_j(k) is column j of C(k). The full stacked parameter is
+c = [c_1; ...; c_p] ∈ ℝ^{Np(p+q)}.</p>
+<p>The stacked likelihood for all p columns at time k is:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>X&#39;(k)ᵀ = D(k) C(k) + W(k)
+</code></pre></div>
+<p>where W(k) has i.i.d. rows ~ N(0, Σ). Vectorizing:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>vec(X&#39;(k)ᵀ) = (Iₚ ⊗ D(k)) vec(C(k)) + vec(W(k))
+</code></pre></div>
+<p>with vec(W(k)) ~ N(0, Σ ⊗ I_L).</p>
+<p>Stacking over all k:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>x&#39; = (Iₚ ⊗ V) c + w,     w ~ N(0, Σ ⊗ I_{NL})
+</code></pre></div>
+<p>The precision of the likelihood contribution is:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>(Σ ⊗ I_{NL})⁻¹ = Σ⁻¹ ⊗ I_{NL}
+</code></pre></div>
+<p>so the likelihood precision in the c parameterization is:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>(Iₚ ⊗ V)ᵀ (Σ⁻¹ ⊗ I) (Iₚ ⊗ V) = Σ⁻¹ ⊗ VᵀV
+</code></pre></div>
+<p>The prior on c has precision:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>Σ⁻¹ ⊗ (FᵀΛF)
+</code></pre></div>
+<p>(from the prior covariance (1/λ_k) Σ ⊗ I on the differences).</p>
+<p>The posterior precision is the sum:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>Σ⁻¹ ⊗ VᵀV + Σ⁻¹ ⊗ FᵀΛF = Σ⁻¹ ⊗ (VᵀV + FᵀΛF) = Σ⁻¹ ⊗ A
+</code></pre></div>
+<p>Inverting:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>Cov(c | data, Σ) = (Σ⁻¹ ⊗ A)⁻¹ = Σ ⊗ A⁻¹     ∎
+</code></pre></div>
+<p>This confirms the Kronecker structure and shows that P(k) = [A⁻¹]_{kk} is
+independent of Σ. The matrix A depends only on the data geometry (DᵀD) and the
+regularization (λ_k), not on the noise covariance.</p>
+<p><strong>Note on the prior weight <code>Υ</code>.</strong> The <code>A = VᵀV + FᵀΛF</code> assembled here is the
+Hessian of the <em>scaled</em> problem (scaled data, prior weight <code>λ</code>). The posterior
+that must be <em>reported</em> is that of the returned estimator, whose effective prior
+weight is <code>Υ = N·λ</code> (a consequence of the <code>1/√N</code> data scaling, §8.3.2). See the
+scaling note in §5.1: <code>A_est = VᵀV + FᵀΥF = N·A_scaled</code>, so
+<code>P(k) = P_scaled(k)/N</code>.</p>
+<h2 id="4-why-this-is-not-the-frequentist-covariance">4. Why This is Not the Frequentist Covariance<a class="headerlink" href="#4-why-this-is-not-the-frequentist-covariance" title="Permanent link">&para;</a></h2>
+<h3 id="41-frequentist-bias">4.1 Frequentist Bias<a class="headerlink" href="#41-frequentist-bias" title="Permanent link">&para;</a></h3>
+<p>If we instead ask: "For a fixed, deterministic C_true, what is E[Ĉ]?", the
+MAP/COSMIC estimate satisfies:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>E[Ĉ] = A⁻¹ VᵀV C_true = (VᵀV + FᵀΛF)⁻¹ VᵀV C_true
+</code></pre></div>
+<p>(The expectation is over the noise w, which enters only through X'. Since
+E[X'ᵀ] = V C_true, the result follows from the linearity of the COSMIC solution
+in X'.)</p>
+<p>This equals C_true only when FᵀΛF = 0 (no regularization) or F C_true = 0
+(the true system is LTI). Otherwise the estimator is biased:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>Bias = E[Ĉ] - C_true = -A⁻¹ FᵀΛF C_true
+</code></pre></div>
+<p>The regularization pulls the estimate toward smoothness, introducing systematic
+error wherever the true system genuinely varies.</p>
+<h3 id="42-frequentist-variance-sandwich-form">4.2 Frequentist Variance (Sandwich Form)<a class="headerlink" href="#42-frequentist-variance-sandwich-form" title="Permanent link">&para;</a></h3>
+<p>The frequentist covariance of vec(Ĉ), conditional on a fixed C_true, is:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>Cov_freq(vec(Ĉ)) = E[(vec(Ĉ) - E[vec(Ĉ)])(vec(Ĉ) - E[vec(Ĉ)])ᵀ]
+</code></pre></div>
+<p>Since Ĉ = A⁻¹ Vᵀ X'ᵀ and the randomness is in X' = V C_true + noise:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>Ĉ - E[Ĉ] = A⁻¹ Vᵀ W_stacked
+</code></pre></div>
+<p>where W_stacked has covariance Σ ⊗ I_{NL} when vectorized. Therefore:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>Cov_freq(vec(Ĉ)) = (Iₚ ⊗ A⁻¹)(Iₚ ⊗ Vᵀ)(Σ ⊗ I)(Iₚ ⊗ V)(Iₚ ⊗ A⁻¹)
+<a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>                   = Σ ⊗ (A⁻¹ VᵀV A⁻¹)
+</code></pre></div>
+<p>This is the "sandwich" form. It differs from Σ ⊗ A⁻¹ because VᵀV ≠ A.
+Specifically, in the positive semidefinite ordering:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a>Σ ⊗ (A⁻¹ VᵀV A⁻¹)  ≼  Σ ⊗ A⁻¹
+</code></pre></div>
+<p>with equality only when FᵀΛF = 0.</p>
+<p><strong>Note:</strong> The Kronecker structure is preserved in the frequentist case too — the
+same Σ appears, only the "row" factor changes from A⁻¹ (Bayesian) to
+A⁻¹ VᵀV A⁻¹ (frequentist).</p>
+<p><strong>Interpretation:</strong> The Bayesian posterior variance Σ ⊗ A⁻¹ is larger than the
+frequentist variance. It accounts for both estimation uncertainty (from noise)
+and prior uncertainty (from not knowing C a priori). The frequentist variance
+captures only estimation uncertainty, while ignoring the bias entirely.</p>
+<h3 id="43-frequentist-mse">4.3 Frequentist MSE<a class="headerlink" href="#43-frequentist-mse" title="Permanent link">&para;</a></h3>
+<p>The mean squared error combines both:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a>MSE = Cov_freq(vec(Ĉ)) + vec(Bias) vec(Bias)ᵀ
+<a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a>    = Σ ⊗ (A⁻¹ VᵀV A⁻¹) + vec(A⁻¹ FᵀΛF C_true) vec(...)ᵀ
+</code></pre></div>
+<p>This depends on the unknown C_true and therefore cannot be computed from data
+alone.</p>
+<h3 id="44-summary-of-comparison">4.4 Summary of Comparison<a class="headerlink" href="#44-summary-of-comparison" title="Permanent link">&para;</a></h3>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a>                          Accounts for   Accounts for    Computable
+<a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a>                          noise?         regularization? from data?
+<a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a>
+<a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a>Bayesian  Σ ⊗ A⁻¹         Yes            Yes (as prior)  Yes
+<a id="__codelineno-35-5" name="__codelineno-35-5" href="#__codelineno-35-5"></a>Freq. sandwich             Yes            No (ignores     Yes
+<a id="__codelineno-35-6" name="__codelineno-35-6" href="#__codelineno-35-6"></a>  Σ ⊗ A⁻¹VᵀVA⁻¹                         bias)
+<a id="__codelineno-35-7" name="__codelineno-35-7" href="#__codelineno-35-7"></a>Freq. MSE                  Yes            Yes             No (needs
+<a id="__codelineno-35-8" name="__codelineno-35-8" href="#__codelineno-35-8"></a>                                                          C_true)
+</code></pre></div>
+<p>The Bayesian posterior covariance Σ ⊗ A⁻¹ is the only option that is both
+computable and accounts for the role of regularization. The tradeoff is that it
+requires accepting the Bayesian framing.</p>
+<h3 id="45-why-the-sandwich-is-impractical-anyway">4.5 Why the Sandwich is Impractical Anyway<a class="headerlink" href="#45-why-the-sandwich-is-impractical-anyway" title="Permanent link">&para;</a></h3>
+<p>Even if we wanted the frequentist sandwich, computing the diagonal blocks of
+A⁻¹ VᵀV A⁻¹ requires the full k-th block row of A⁻¹:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a>[A⁻¹ VᵀV A⁻¹]_{kk} = Σ_j [A⁻¹]_{kj} (Dⱼᵀ Dⱼ) [A⁻¹]_{jk}
+</code></pre></div>
+<p>The inverse of a block tridiagonal matrix is generally full, so this sum runs
+over all N blocks. Extracting the diagonal blocks costs O(N²(p+q)³), destroying
+the linear-in-N complexity that makes COSMIC efficient.</p>
+<h2 id="5-posterior-covariance-block-structure">5. Posterior Covariance: Block Structure<a class="headerlink" href="#5-posterior-covariance-block-structure" title="Permanent link">&para;</a></h2>
+<h3 id="51-structure-of-a">5.1 Structure of A<a class="headerlink" href="#51-structure-of-a" title="Permanent link">&para;</a></h3>
+<p>The matrix A = VᵀV + FᵀΛF is N(p+q) × N(p+q) with block tridiagonal structure.
+Its (p+q) × (p+q) blocks are:</p>
+<p><strong>Diagonal blocks:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a>A_{00}     = D(0)ᵀD(0) + λ₁ I
+<a id="__codelineno-37-2" name="__codelineno-37-2" href="#__codelineno-37-2"></a>A_{kk}     = D(k)ᵀD(k) + (λ_k + λ_{k+1}) I     for k = 1,...,N-2
+<a id="__codelineno-37-3" name="__codelineno-37-3" href="#__codelineno-37-3"></a>A_{N-1,N-1} = D(N-1)ᵀD(N-1) + λ_{N-1} I
+</code></pre></div>
+<p><strong>Off-diagonal blocks:</strong></p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a>A_{k,k+1} = A_{k+1,k} = -λ_{k+1} I
+</code></pre></div>
+<p><strong>All other blocks are zero.</strong></p>
+<blockquote>
+<p><strong>Scaling note — <code>Υ</code> must match the estimator (SPEC §8.9.2).</strong> The <code>D(k)</code> above are the <strong>scaled</strong> data blocks <code>D_s(k) = [X(k)ᵀ U(k)ᵀ]/√N</code> of §8.3.2, and <code>Λ = diag(λ_k)</code>, so the <code>A</code> written here is the <em>scaled</em> Hessian <code>A_scaled = V_sᵀV_s + Fᵀ diag(λ_k) F</code>. That is <strong>not</strong> the Hessian of the estimator whose mean is returned: the <code>1/√N</code> scaling makes the returned MAP the minimiser of <code>‖unscaled residuals‖² + N·λ·Σ‖ΔC‖²</code>, whose Hessian is</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a>A_est = VᵀV + Fᵀ Υ F,     with unscaled data V and Υ = diag(N·λ_k)  =  N · A_scaled.
+</code></pre></div>
+<p>The prior weight <code>Υ</code> in <code>A</code> must be the estimator's effective weight <code>N·λ</code>, not <code>λ</code>. Because <code>A_est = N·A_scaled</code>, the reported posterior blocks are <code>P(k) = [A_est⁻¹]_{kk} = [A_scaled⁻¹]_{kk} / N = P_scaled(k)/N</code>. The §8.9.2 recursion realises this by reconstructing <code>S(k) = N·S_scaled(k)</code> with off-diagonal couplings <code>(N·λ_k)²</code>. Using <code>A_scaled</code> (weight <code>λ</code>) instead overstates every <code>P(k)</code> by up to a factor <code>N</code> — the bug fixed in the companion PR to issue #137.</p>
+</blockquote>
+<p>Note that A does not depend on Σ. The noise covariance affects the posterior
+only through the Kronecker product Σ ⊗ A⁻¹.</p>
+<h3 id="52-diagonal-blocks-of-a1-via-backward-recursion">5.2 Diagonal Blocks of A⁻¹ via Backward Recursion<a class="headerlink" href="#52-diagonal-blocks-of-a1-via-backward-recursion" title="Permanent link">&para;</a></h3>
+<p>The forward pass of COSMIC computes the Schur complements from the left:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a>Λ₀ = A_{00}
+<a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a>
+<a id="__codelineno-40-3" name="__codelineno-40-3" href="#__codelineno-40-3"></a>Λ_k = A_{kk} - λ_k² Λ_{k-1}⁻¹     for k = 1,...,N-1
+</code></pre></div>
+<p>These are the pivots of the block LU factorization. Denote their inverses as
+Λ_k⁻¹ (already computed and stored during the forward pass).</p>
+<p><strong>Claim:</strong> The diagonal blocks P(k) = [A⁻¹]_{kk} satisfy:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a>P(N-1) = Λ_{N-1}⁻¹
+<a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a>
+<a id="__codelineno-41-3" name="__codelineno-41-3" href="#__codelineno-41-3"></a>P(k) = (Λ_k - λ_{k+1}² P(k+1))⁻¹     for k = N-2,...,0
+</code></pre></div>
+<blockquote>
+<p>This lemma is stated for the abstract block-tridiagonal <code>A</code> with off-diagonal
+blocks <code>-λ_{k+1} I</code> (the <em>scaled</em> Hessian <code>A_scaled</code>), so it yields
+<code>P_scaled(k)</code>. Applied to the estimator Hessian <code>A_est = N·A_scaled</code> (§5.1
+scaling note), whose off-diagonal blocks are <code>-N·λ_{k+1} I</code>, the couplings
+become <code>(N·λ_{k+1})²</code> and it yields the reported <code>P(k) = P_scaled(k)/N</code>
+directly. Both are used interchangeably in SPEC §8.9.2.</p>
+</blockquote>
+<p><strong>Proof by induction:</strong></p>
+<p><strong>Base case (k = N-1):</strong> The matrix A restricted to the last block is
+A_{N-1,N-1} = Λ_{N-1} (the forward Schur complement at the last step has no
+further correction). So [A⁻¹]<em N-1="N-1">{N-1,N-1} = Λ</em>⁻¹. ✓</p>
+<p><strong>Inductive step:</strong> Assume P(k+1) = [A⁻¹]_{k+1,k+1} is correct. Partition
+A at the boundary between blocks k and k+1:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a>A = | A_≤k    B    |     where B has a single nonzero block:
+<a id="__codelineno-42-2" name="__codelineno-42-2" href="#__codelineno-42-2"></a>    | Bᵀ      A_≥k+1|        B_{k,k+1} = -λ_{k+1} I
+</code></pre></div>
+<p>By the block matrix inversion formula, the (k,k) block of A⁻¹ is the (k,k)
+block of:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a>(A_≤k - B A_≥k+1⁻¹ Bᵀ)⁻¹
+</code></pre></div>
+<p>Since B has nonzero entries only in block-row k and block-column k+1:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a>[B A_≥k+1⁻¹ Bᵀ]_{kk} = λ_{k+1}² [A_≥k+1⁻¹]_{k+1,k+1} = λ_{k+1}² P(k+1)
+</code></pre></div>
+<p>The (k,k) element of A_≤k, after accounting for the Schur complement from
+blocks 0,...,k-1, is exactly Λ_k (this is what the forward pass computes).
+Therefore:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a>P(k) = (Λ_k - λ_{k+1}² P(k+1))⁻¹     ∎
+</code></pre></div>
+<h3 id="53-complexity">5.3 Complexity<a class="headerlink" href="#53-complexity" title="Permanent link">&para;</a></h3>
+<p>The backward recursion for P(k) requires:
+- One (p+q) × (p+q) matrix subtraction per time step
+- One (p+q) × (p+q) matrix inversion per time step</p>
+<p>Total: O(N (p+q)³), identical to the forward pass. The Λ_k values from the
+forward pass must be stored (N matrices of size (p+q) × (p+q)).</p>
+<p><strong>Important:</strong> The recursion computes P(k) = [A⁻¹]_{kk}, which is independent
+of Σ. The full posterior covariance Σ ⊗ P(k) is formed only at the end, once Σ
+has been estimated.</p>
+<h2 id="6-estimating">6. Estimating Σ<a class="headerlink" href="#6-estimating" title="Permanent link">&para;</a></h2>
+<p>The noise covariance Σ is generally unknown and must be estimated from the
+residuals.</p>
+<h3 id="61-residual-based-estimate">6.1 Residual-Based Estimate<a class="headerlink" href="#61-residual-based-estimate" title="Permanent link">&para;</a></h3>
+<p>Given the COSMIC solution Ĉ, the residuals at time step k are:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a>E(k) = X&#39;(k)ᵀ - D(k) Ĉ(k) ∈ ℝ^{|L(k)| × p}
+</code></pre></div>
+<p>Each row of E(k) is a sample of w_ℓ(k)ᵀ (plus the effect of estimation error
+in Ĉ). The sample covariance is:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a>Σ̂ = (1/ν) Σ_{k=0}^{N-1} E(k)ᵀ E(k)
+</code></pre></div>
+<p>where ν is the effective degrees of freedom.</p>
+<p>This yields a p × p symmetric positive (semi)definite estimate. For diagonal Σ,
+only the diagonal elements are needed:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a>Σ̂_{jj} = (1/ν) Σ_{k=0}^{N-1} Σ_{ℓ ∈ L(k)} e_ℓj(k)²
+</code></pre></div>
+<p>where e_ℓj(k) is the residual for trajectory ℓ, state component j, time step k.</p>
+<h3 id="62-degrees-of-freedom">6.2 Degrees of Freedom<a class="headerlink" href="#62-degrees-of-freedom" title="Permanent link">&para;</a></h3>
+<p>The exact degrees of freedom for the regularized estimator are:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a>ν = Σ_k |L(k)| - trace(VᵀV A⁻¹)
+</code></pre></div>
+<p>where trace(VᵀV A⁻¹) is the effective number of parameters (analogous to the
+hat matrix trace in ridge regression). This satisfies:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-50-1" name="__codelineno-50-1" href="#__codelineno-50-1"></a>0 &lt; trace(VᵀV A⁻¹) &lt; N(p+q)
+</code></pre></div>
+<p>with the lower bound approached as λ → ∞ and the upper bound as λ → 0.</p>
+<p>Since VᵀV is block diagonal with blocks D(k)ᵀD(k), and A⁻¹ has diagonal blocks
+P(k), the trace decomposes as:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-51-1" name="__codelineno-51-1" href="#__codelineno-51-1"></a>trace(VᵀV A⁻¹) = Σ_{k=0}^{N-1} trace(D(k)ᵀD(k) × P(k))
+</code></pre></div>
+<p>This is O(N(p+q)²) and can be computed after the backward recursion for P(k),
+so the exact degrees of freedom are available at modest cost.</p>
+<p><strong>Simpler conservative approximation:</strong> Use the nominal parameter count:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-52-1" name="__codelineno-52-1" href="#__codelineno-52-1"></a>ν_approx = Σ_k |L(k)| - N(p+q)
+</code></pre></div>
+<p>This overestimates the effective parameters (since regularization reduces them),
+which underestimates ν, which overestimates Σ̂, which gives conservative
+(wider) uncertainty intervals.</p>
+<h3 id="63-cross-validation-alternative">6.3 Cross-Validation Alternative<a class="headerlink" href="#63-cross-validation-alternative" title="Permanent link">&para;</a></h3>
+<p>An alternative that avoids estimating ν: use the validation loss from the
+hyperparameter selection procedure. If λ was chosen by minimizing prediction
+error on held-out trajectories, the validation prediction error provides a
+direct estimate of Σ that is independent of the degrees-of-freedom calculation.</p>
+<h3 id="64-diagonal-vs-full">6.4 Diagonal vs. Full Σ<a class="headerlink" href="#64-diagonal-vs-full" title="Permanent link">&para;</a></h3>
+<p>The implementation should support three modes:</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Estimate</th>
+<th>When to use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Full</td>
+<td>Σ̂ = (1/ν) Σ_k E(k)ᵀ E(k)</td>
+<td>Default. Captures cross-correlations between state components.</td>
+</tr>
+<tr>
+<td>Diagonal</td>
+<td>Σ̂ = diag(σ̂₁², ..., σ̂ₚ²)</td>
+<td>When p is large relative to the number of observations, or when off-diagonal terms are not of interest.</td>
+</tr>
+<tr>
+<td>Isotropic</td>
+<td>Σ̂ = σ̂² Iₚ</td>
+<td>Simplest. Equivalent to original COSMIC paper's assumption.</td>
+</tr>
+</tbody>
+</table>
+<p>The choice affects only the final posterior covariance Σ̂ ⊗ P(k), not the
+COSMIC algorithm or the P(k) recursion.</p>
+<h2 id="7-complete-algorithm-for-posterior-covariance">7. Complete Algorithm for Posterior Covariance<a class="headerlink" href="#7-complete-algorithm-for-posterior-covariance" title="Permanent link">&para;</a></h2>
+<p><strong>Inputs:</strong>
+- Λ_k for k = 0,...,N-1 (from COSMIC forward pass)
+- λ_k for k = 1,...,N-1 (regularization parameters)
+- Residuals E(k) for k = 0,...,N-1
+- Covariance mode: 'full', 'diagonal', or 'isotropic'</p>
+<p><strong>Step 1: Backward recursion for P(k)</strong>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-53-1" name="__codelineno-53-1" href="#__codelineno-53-1"></a>P(N-1) = Λ_{N-1}⁻¹
+<a id="__codelineno-53-2" name="__codelineno-53-2" href="#__codelineno-53-2"></a>
+<a id="__codelineno-53-3" name="__codelineno-53-3" href="#__codelineno-53-3"></a>For k = N-2, ..., 0:
+<a id="__codelineno-53-4" name="__codelineno-53-4" href="#__codelineno-53-4"></a>    P(k) = (Λ_k - λ_{k+1}² P(k+1))⁻¹
+</code></pre></div></p>
+<p><strong>Step 2: Compute degrees of freedom (exact)</strong>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-54-1" name="__codelineno-54-1" href="#__codelineno-54-1"></a>ν = Σ_k |L(k)| - Σ_k trace(D(k)ᵀD(k) P(k))
+</code></pre></div></p>
+<p><strong>Step 3: Estimate Σ</strong>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-55-1" name="__codelineno-55-1" href="#__codelineno-55-1"></a>Σ̂ = (1/ν) Σ_{k=0}^{N-1} E(k)ᵀ E(k)
+</code></pre></div>
+(apply diagonal or isotropic restriction if requested)</p>
+<p><strong>Step 4: Form posterior covariance at each time step</strong>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-56-1" name="__codelineno-56-1" href="#__codelineno-56-1"></a>Cov(vec(C(k))) = Σ̂ ⊗ P(k)
+</code></pre></div></p>
+<p><strong>Outputs:</strong>
+- P(k) ∈ ℝ^{(p+q)×(p+q)} for each k — row covariance (data/regularization structure)
+- Σ̂ ∈ ℝ^{p×p} — estimated noise covariance (column covariance)
+- ν — effective degrees of freedom</p>
+<p><strong>Cost:</strong> O(N(p+q)³) for the recursion + O(N(p+q)²) for the trace + O(NLp²) for
+the covariance estimate. The dominant cost is the recursion, which matches the
+cost of COSMIC itself.</p>
+<h2 id="8-extracting-useful-uncertainties">8. Extracting Useful Uncertainties<a class="headerlink" href="#8-extracting-useful-uncertainties" title="Permanent link">&para;</a></h2>
+<h3 id="81-standard-deviation-of-individual-entries">8.1 Standard Deviation of Individual Entries<a class="headerlink" href="#81-standard-deviation-of-individual-entries" title="Permanent link">&para;</a></h3>
+<p>The variance of entry (a, b) of C(k) — the coupling from the a-th component
+of [x; u] to the b-th state equation — is:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-57-1" name="__codelineno-57-1" href="#__codelineno-57-1"></a>Var(C(k)_{ab}) = Σ̂_{bb} × P(k)_{aa}
+</code></pre></div>
+<p>For a diagonal Σ̂, this is simply σ̂<em aa="aa">b² × P(k)</em>: the noise level of state
+component b times the estimation precision in the a-th parameter direction.</p>
+<h3 id="82-standard-deviation-of-ak-and-bk-entries">8.2 Standard Deviation of A(k) and B(k) Entries<a class="headerlink" href="#82-standard-deviation-of-ak-and-bk-entries" title="Permanent link">&para;</a></h3>
+<p>Since C(k) = [A(k)ᵀ; B(k)ᵀ], the entries of A(k)ᵀ occupy rows 1,...,p and
+the entries of B(k)ᵀ occupy rows p+1,...,p+q. Therefore:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-58-1" name="__codelineno-58-1" href="#__codelineno-58-1"></a>Var(A(k)_{ba}) = Σ̂_{bb} × P(k)_{aa}        for a = 1,...,p
+<a id="__codelineno-58-2" name="__codelineno-58-2" href="#__codelineno-58-2"></a>Var(B(k)_{ba}) = Σ̂_{bb} × P(k)_{p+a,p+a}   for a = 1,...,q
+</code></pre></div>
+<p>(Here (b,a) indexes A(k) because C(k) stores A(k)ᵀ.)</p>
+<h3 id="83-correlation-between-state-components">8.3 Correlation Between State Components<a class="headerlink" href="#83-correlation-between-state-components" title="Permanent link">&para;</a></h3>
+<p>If Σ̂ is not diagonal, the off-diagonal elements give the correlation between
+estimation errors in different columns of C(k):</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-59-1" name="__codelineno-59-1" href="#__codelineno-59-1"></a>Corr(C(k)_{ab}, C(k)_{ad}) = Σ̂_{bd} / √(Σ̂_{bb} Σ̂_{dd})
+</code></pre></div>
+<p>This correlation is the same for all rows a and all time steps k — it reflects
+the noise structure, not the data geometry.</p>
+<h2 id="9-sanity-checks">9. Sanity Checks<a class="headerlink" href="#9-sanity-checks" title="Permanent link">&para;</a></h2>
+<h3 id="91-no-regularization-limit-0">9.1 No-Regularization Limit (λ → 0)<a class="headerlink" href="#91-no-regularization-limit-0" title="Permanent link">&para;</a></h3>
+<p>When λ_k = 0 for all k, the prior is flat, and:
+- A = VᵀV (block diagonal)
+- A⁻¹ is block diagonal with blocks (D(k)ᵀD(k))⁻¹
+- P(k) = (D(k)ᵀD(k))⁻¹
+- Cov(vec(C(k))) = Σ ⊗ (D(k)ᵀD(k))⁻¹</p>
+<p>This is the standard multivariate OLS covariance (matrix-normal posterior
+with known covariance Σ), independently at each time step. ✓</p>
+<h3 id="92-large-regularization-limit">9.2 Large-Regularization Limit (λ → ∞)<a class="headerlink" href="#92-large-regularization-limit" title="Permanent link">&para;</a></h3>
+<p>When λ is very large, the prior forces C(k) ≈ C(k-1) ≈ ... ≈ C(0), i.e., the
+system is effectively LTI. All P(k) converge to (Σ_k D(k)ᵀD(k))⁻¹, the
+covariance from pooling all data. The posterior covariance shrinks as the
+prior provides strong information. ✓</p>
+<h3 id="93-single-time-step-n-1">9.3 Single Time Step (N = 1)<a class="headerlink" href="#93-single-time-step-n-1" title="Permanent link">&para;</a></h3>
+<p>With N=1 there is no regularization (no F term), and:
+- A = D(0)ᵀD(0)
+- P(0) = (D(0)ᵀD(0))⁻¹
+- Cov(vec(C(0))) = Σ ⊗ (D(0)ᵀD(0))⁻¹</p>
+<p>This is ordinary multivariate least squares. ✓</p>
+<h3 id="94-isotropic-noise-2i">9.4 Isotropic Noise (Σ = σ²I)<a class="headerlink" href="#94-isotropic-noise-2i" title="Permanent link">&para;</a></h3>
+<p>Reduces to:
+- Cov(vec(C(k))) = σ² I ⊗ P(k) = σ² (I ⊗ P(k))
+- Columns of C(k) become uncorrelated with identical covariance σ² P(k)</p>
+<p>Recovers the isotropic derivation as a special case. ✓</p>
+<h3 id="95-time-step-with-no-data">9.5 Time Step with No Data<a class="headerlink" href="#95-time-step-with-no-data" title="Permanent link">&para;</a></h3>
+<p>If L(k) = ∅, then D(k)ᵀD(k) = 0, and:
+- A_{kk} = (λ_k + λ_{k+1}) I  (only prior information)
+- P(k) will be large, reflecting high uncertainty</p>
+<p>The posterior mean at k is determined by interpolation from neighbors (via the
+backward pass), and the posterior covariance is large. Correct behavior:
+no data → wide uncertainty. ✓</p>
+<h3 id="96-diagonal-with-1-2">9.6 Diagonal Σ with σ₁ ≫ σ₂<a class="headerlink" href="#96-diagonal-with-1-2" title="Permanent link">&para;</a></h3>
+<p>If state 1 is very noisy and state 2 is clean:
+- Σ̂ ≈ diag(σ₁², σ₂²) with σ₁ ≫ σ₂
+- Column 1 of C(k) (governing state-1 dynamics) has variance σ₁² P(k)<em aa="aa">{aa}
+- Column 2 of C(k) (governing state-2 dynamics) has variance σ₂² P(k)</em></p>
+<p>The uncertainty is correctly larger for the noisy state and smaller for the
+clean state, with the same spatial structure P(k) for both. ✓</p>
+<h2 id="10-what-the-uncertainty-means-and-doesnt-mean">10. What the Uncertainty Means (and Doesn't Mean)<a class="headerlink" href="#10-what-the-uncertainty-means-and-doesnt-mean" title="Permanent link">&para;</a></h2>
+<h3 id="101-correct-interpretation">10.1 Correct Interpretation<a class="headerlink" href="#101-correct-interpretation" title="Permanent link">&para;</a></h3>
+<p>The posterior is:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-60-1" name="__codelineno-60-1" href="#__codelineno-60-1"></a>C(k) | data, Σ̂  ~  MN(Ĉ(k), P(k), Σ̂)
+</code></pre></div>
+<p>Marginal credible intervals for entry (a,b) of C(k) are:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-61-1" name="__codelineno-61-1" href="#__codelineno-61-1"></a>Ĉ(k)_{ab} ± z_{α/2} × √(Σ̂_{bb} × P(k)_{aa})
+</code></pre></div>
+<p>These are <strong>Bayesian credible intervals</strong> under the model:
+- The noise is i.i.d. N(0, Σ) across trajectories and time steps
+- The system matrices follow a Gaussian random walk with covariance
+  (1/λ_k) Σ ⊗ I per step</p>
+<p>If these assumptions hold, the credible intervals have the stated coverage.</p>
+<h3 id="102-what-it-doesnt-cover">10.2 What It Doesn't Cover<a class="headerlink" href="#102-what-it-doesnt-cover" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Model misspecification:</strong> If the true system has nonlinear dynamics,
+  the intervals are not calibrated.</li>
+<li><strong>Wrong λ:</strong> If λ is much larger than the true rate of system variation,
+  the intervals will be too narrow (overconfident in smoothness). If λ is
+  too small, they will be too wide.</li>
+<li><strong>Non-Gaussian noise:</strong> The MAP estimate is still the best linear estimator
+  under the prior, but credible interval coverage may differ.</li>
+<li><strong>Correlated noise across trajectories:</strong> If w_ℓ(k) is correlated across ℓ
+  (e.g., shared external disturbances), the model is misspecified.</li>
+<li><strong>Correlated noise across time:</strong> If w_ℓ(k) is correlated across k for a
+  given ℓ (e.g., colored process noise), the model is misspecified.</li>
+</ul>
+<h3 id="103-honest-labeling-in-sid">10.3 Honest Labeling in sid<a class="headerlink" href="#103-honest-labeling-in-sid" title="Permanent link">&para;</a></h3>
+<p>When plotting confidence bands derived from the COSMIC posterior, sid should label
+them as:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-62-1" name="__codelineno-62-1" href="#__codelineno-62-1"></a>&quot;95% posterior credible interval (Bayesian, conditional on λ)&quot;
+</code></pre></div>
+<p>rather than "95% confidence interval," which has a specific frequentist meaning
+that is not satisfied here.</p>
+<p>In the <code>sidBodePlot</code> integration, a pragmatic compromise is to use the label
+"uncertainty band" without specifying the statistical framework, similar to how
+MathWorks labels the <code>spa</code> confidence regions.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 Pedro Lourenço — MIT License
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.indexes", "navigation.top", "content.code.copy", "content.action.edit", "search.suggest", "search.highlight", "toc.follow"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
