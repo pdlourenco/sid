@@ -13,3 +13,9 @@ build/
 
 # Claude Code (personal, machine-specific settings)
 .claude/settings.local.json
+
+# Docs build artefacts
+site/
+.cache/
+_matlab_api_out/
+_matlab_examples_out/

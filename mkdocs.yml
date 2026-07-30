@@ -1,0 +1,153 @@
+site_name: sid — System Identification Toolbox
+site_description: Open-source system identification for Python and MATLAB/Octave
+site_url: https://pdlourenco.github.io/sid/
+repo_url: https://github.com/pdlourenco/sid
+repo_name: pdlourenco/sid
+edit_uri: edit/main/docsite/
+copyright: Copyright &copy; 2026 Pedro Lourenço — MIT License
+
+docs_dir: docsite
+site_dir: site
+
+# `hooks/` is build machinery, not content. It lives under docs_dir because
+# mkdocs resolves `hooks:` paths from the project root and keeping it beside the
+# site source is where the review asked for it -- but without this exclusion
+# mkdocs copies the .py files (and their __pycache__/*.pyc) into the published
+# site as static assets.
+exclude_docs: |
+  hooks/
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - content.code.copy
+    - content.action.edit
+    - search.suggest
+    - search.highlight
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
+
+extra_css:
+  - stylesheets/extra.css
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+plugins:
+  - search
+  - include-markdown:
+      rewrite_relative_urls: false
+  - gen-files:
+      scripts:
+        - scripts/check_python_api_pages.py
+        - scripts/build_matlab_api.py
+        - scripts/build_matlab_examples.py
+        - scripts/link_notebook_examples.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [python]
+          options:
+            docstring_style: numpy
+            show_source: false
+            show_root_heading: true
+            show_root_full_path: false
+            heading_level: 2
+            members_order: source
+            separate_signature: true
+            show_signature_annotations: true
+            signature_crossrefs: true
+            merge_init_into_class: true
+            docstring_section_style: table
+            filters: ["!^_"]
+  - mkdocs-jupyter:
+      execute: true
+      allow_errors: false
+      include_source: true
+      ignore_h1_titles: true
+      ignore:
+        - "examples/python/util_msd.py"
+        - "hooks/*.py"
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.snippets:
+      base_path: ['.', 'docsite']
+      check_paths: true
+
+hooks:
+  - docsite/hooks/inject_binder_badge.py
+  - docsite/hooks/rewrite_external_links.py
+
+nav:
+  - Home: index.md
+  - Getting started:
+    - Install (Python): getting-started/install-python.md
+    - Install (MATLAB/Octave): getting-started/install-matlab.md
+    - Quick start: getting-started/quick-start.md
+  - Concepts:
+    - Overview: concepts/overview.md
+    - Frequency domain: concepts/frequency-domain.md
+    - COSMIC (LTV state-space): concepts/cosmic.md
+    - Uncertainty: concepts/uncertainty.md
+  - API reference:
+    - Function index: api/index.md
+    - Python: api/python/
+    - MATLAB/Octave: api/matlab/
+  - Examples:
+    - Overview: examples/index.md
+    - Python notebooks: examples/python/
+    - MATLAB scripts: examples/matlab/
+  - Specification:
+    - SPEC: spec/index.md
+    - Examples spec: spec/examples-spec.md
+    - COSMIC notes:
+      - Automatic tuning: spec/cosmic/automatic-tuning.md
+      - Online recursion: spec/cosmic/online-recursion.md
+      - Output-COSMIC: spec/cosmic/output.md
+      - Uncertainty derivation: spec/cosmic/uncertainty-derivation.md
+  # Internal engineering documents (docs/roadmap.md, docs/decisions/,
+  # docs/analyses/, docs/plans/, docs/DESIGN.md, docs/REVIEW_CONTEXT.md) are
+  # deliberately NOT published here. They live outside docs_dir so they can
+  # neither leak into the site nor break its build. Publishing any of them is a
+  # separate, deliberate decision — not a side effect of this config.
+  - About:
+    - Contributing: about/contributing.md
+    - Changelog: about/changelog.md
