@@ -149,3 +149,79 @@ G1 G2 → H
 ```
 
 Working method as in July: one branch + PR per numbered item, spec commit first inside the PR where a decision is involved, full `scripts/local-ci` before every PR, cross-vectors regenerated only where numerics legitimately change and flagged in the PR, every PR closes its issue, every deviation from this plan noted on the issue.
+
+---
+
+## 10. Execution environment — what a cloud session can do, what needs local MATLAB, what needs the maintainer
+
+Two environments are compared:
+
+- **CLOUD** — a Claude Code cloud session: Python (everything pip-installable: numpy/scipy/pytest/matplotlib/nbmake, ruff, MISS_HIT, mkdocs + plugins), git + GitHub via tools (push branches, open PRs, read checks), Chromium/Playwright, outbound HTTPS. **No MATLAB, no MathWorks toolboxes, no repo-admin token, no release secrets, no PyPI credentials.** Octave: the container image offers **GNU Octave 8.4 from apt** (no snap, no conda), i.e. *below* the project's 11+ floor; CI gets 11.x via snap.
+- **LOCAL** — the maintainer's machine: MATLAB R2024a with System Identification + Signal Processing toolboxes, Python, Octave, and the maintainer's GitHub admin rights.
+- **PR CI** sits between the two: on any PR touching `matlab/`, `testdata/` or `tests.yml`, the MATLAB job runs **R2025a with both toolboxes** (`runAllTests.m`, `runAllExamples.m`, `generate_reference.m` without committing) and the Octave job runs **snap Octave 11** with Qt offscreen; `cross-validate.yml` runs `validate_reference.m` under Octave 11 and the Python consumer. So most "needs MATLAB-proper confirmation" items are satisfied by the PR's checks without a local run.
+
+### 10.1 What was established empirically in this session (apt Octave 8.4, headless)
+
+| Check | Result under cloud Octave 8.4 | Consequence |
+|---|---|---|
+| `matlab/tests/runAllTests.m` | **374 / 380 cases pass**; the 6 failing files are exactly the plotting ones (`test_sidCompare` and `test_sidResidual` `'Plot'` cases, `test_sidMapPlot`, `test_sidModelOrder` Test 8, `test_sidPlotting`, `test_sidSpectrogramPlot`) | every non-plotting MATLAB test, including all COSMIC/uncertainty/var-len/degenerate-input tests, can be developed **and executed** in CLOUD |
+| `testdata/validate_reference.m` | **32 / 32 vectors pass** (the July S10(e′) Octave-8.4 flake does not recur now that `reference_ltv_cosmic` has its atol floor) | the Octave-side cross-validation gate can be exercised in CLOUD |
+| `matlab/examples/runAllExamples.m` | 11 / 12 fail — all plotting | examples cannot be executed in CLOUD on this image |
+| MISS_HIT `mh_lint` / `mh_style` / `mh_metric --ci` | clean (101 files) | MATLAB lint runs in CLOUD |
+| Figure rendering | `ft_text_renderer: invalid bounding box` from every `axes` call, with the gnuplot toolkit, with the Qt toolkit under `xvfb`, visible or invisible figures, DejaVu + FreeSans fonts installed — an Octave-8.4-on-this-image defect, not a sid defect | **anything that draws a figure needs PR CI (snap Octave 11, Qt offscreen) or LOCAL**; `set(0,'defaultfigurevisible','off')` does not help |
+| `generate_reference.m` | executable under Octave (rng, `jsonencode` present) but its bytes are not canonical | generator *logic* can be developed and smoke-run in CLOUD; payloads only from the canonical R2025a job (or, interim, LOCAL R2024a, flagged as churny per `testdata/README.md`) |
+
+Recommendation (environment, not code): give cloud sessions Octave 11 and a working graphics toolkit through the environment's setup script (snap is unavailable in the container; a conda-forge or self-built Octave 11 + `QT_QPA_PLATFORM=offscreen` is the route to test), so that the plotting tests, the examples and the Octave-11 floor are reachable without a PR round-trip. Until then, treat the PR's Octave job as the Octave-11 verifier.
+
+### 10.2 Classification vocabulary
+
+- **cloud** — fully developed and verified in a cloud session.
+- **cloud-dev → PR-CI** — developed and Octave/Python-verified in the cloud; MATLAB-proper (and Octave-11) confirmation comes from the PR's own CI jobs before merge; a LOCAL run is optional.
+- **local** — cannot be meaningfully done without MATLAB/toolboxes on the author's machine (toolbox functions, engine-specific tolerances, interactive MATLAB-only behaviour).
+- **ci-main** — happens only on the canonical CI job after merge (canonical vector bytes).
+- **maintainer** — admin rights, secrets, credentials, or a `[decision]`; environment-independent.
+
+### 10.3 Per-item partition
+
+| Item | Cloud session (Python + Octave) | Needs LOCAL MATLAB | Maintainer / ci-main |
+|---|---|---|---|
+| **A1** required checks | edit `rulesets/main.json`; make `cross-validate.yml` / `python-tests.yml` always-start with an in-job relevance gate; observe check-runs on a docs-only / python-only / matlab-only PR | — | accept the amended set (ADR-0005 amendment); **apply** via `branch-protection.yml` dispatch with `RULESET_TOKEN` |
+| **A2** regeneration validated; provenance; reproducibility policy | rewrite the `tests.yml` regen/commit step (bot PR or `workflow_run` + revert); numeric-diff script (exercised on Octave-regenerated vectors); provenance gate rejecting `"unknown"` + ancestry check in both consumers (`fetch-depth: 0` needed in two checkouts) | generator-side `gitField` change needs one MATLAB-proper run (PR CI suffices) | **[decision]** on the policy; GitHub-App `pull_requests: write` + bypass adjustments if the bot-PR option is chosen; end-to-end confirmation on the first push to `main` |
+| **A3** NaN-capable comparison; on-disk sentinel | NaN/Inf-aware `validate_reference.m` comparison (Octave 8.4 runs it); Python decoding; consumer tests | `writeJSON` sentinel encoding needs MATLAB `jsonencode` behaviour confirmed (PR CI MATLAB job runs the generator) | **[decision]** on the sentinel format (ADR-0002 amendment); canonical regeneration of any vector that now carries NaN/Inf (ci-main) |
+| **A4** Python structural loop; complex tolerance parity; SV truncation | all of it (Python + Octave validator both run here) | — | — |
+| **A5** atol-floor gate; default-tolerance audit | consumer-side structural tests; the audit (Octave-vs-Python residuals measurable here) | `writeJSON` pre-check needs one MATLAB-proper generator run (PR CI suffices); MATLAB-vs-Python residuals for floor values | — |
+| **A6** the three 1 % vectors | find a converging IO case (both ports run here); generator case + consumer changes; Octave-validated interim vectors | **yes** — measure the cross-engine error that sets the tolerance (MATLAB-vs-Python, MATLAB-vs-Octave); interim PR bytes from local R2024a (flagged) | **[decision]** if the EM path proves engine-sensitive (pin the cost trajectory instead); canonical bytes on merge (ci-main) |
+| **A7** payload-oracle job | all of it (numpy/scipy only, no port, no engine) | — | add the job to the required set (`RULESET_TOKEN`) |
+| **A8** missing vector = failure | all of it | — | — |
+| **A9** min-deps leg, Octave pin, `filterwarnings`, local-ci | min-deps leg (Python 3.10 resolves scipy 1.8.1); `filterwarnings = error`; `local-ci` runs the API gate; version check *authored* here | — | **[decision]** on raising dependency floors if the leg fails; Octave-11 check verified by the PR's snap job (a strict "fail below 11" would make cloud 8.4 runs red — needs an override or Octave 11 in the image); fork-PR token path needs an actual fork PR |
+| **B1** `test_sidModelOrder.m` Test 5 | author + run under Octave (Test 5/15 are non-plotting) | PR CI MATLAB confirmation | — |
+| **B2** MC calibration | scheduled-campaign workflow authored and campaign run here (`SID_MC_CAMPAIGN=1`); Python gate band re-centred from measured ratios; MATLAB Test 13 rewrite runs under Octave (`nMC = 200`, slow) | PR CI MATLAB confirmation | first scheduled firing after merge |
+| **B3** vacuous tests rewritten | all Python rewrites; MATLAB rewrites run under Octave **except** `test_sidModelOrder.m` Test 8 (`'Plot'`) and any figure-creating case | figure-creating cases: PR CI Octave-11/MATLAB jobs; seeded-statistic bounds confirmed under MATLAB (PR CI) | — |
+| **B4** deterministic tolerances | all Python; MATLAB non-plotting files under Octave | `test_compareMultiTraj.m:111` and the other four toolbox files need **System Identification Toolbox** → LOCAL (or PR CI MATLAB job with toolboxes) | — |
+| **B5** skips tally, `onCleanup`, runner isolation | author + run under Octave (the SKIP branch is exercised because toolboxes are absent) | PR CI MATLAB confirmation (`onCleanup` semantics) | — |
+| **B6** `Verified by:` corrections | spec text edits (no engine) | — | — |
+| **C1** free oracles | Python oracles; MATLAB oracles under Octave (non-plotting); the `q ≥ 2` cross-vector case authored and Octave-smoke-run | PR CI MATLAB confirmation | canonical bytes of the new vector (ci-main) |
+| **C2** warning/error identifiers | Python error-code table test; MATLAB identifier tests under Octave except figure-creating sites (`sidMapPlot`/plot errors) | figure-creating identifier tests: PR CI | Python warning identifiers depend on the **D7 [decision]** |
+| **C3** never-called options and modes | Python (plot options with matplotlib Agg); MATLAB non-plotting options under Octave; modes gated on D1/D8 land first | MATLAB plotting options (`ShowConfidence`, `Color`, `LineWidth`, `Axes`, `clim`, `channel`): PR CI | — |
+| **C4** cross-port symmetry | Python ports of the MATLAB-only suites; MATLAB ports of the Python-only cases under Octave (non-plotting) | MIMO noise-spectrum plot port: PR CI | — |
+| **C5** `util_msd*` test points; positivity | reference values at full precision (`scipy.linalg.expm`, RK4) computed here; Python tests; MATLAB tests under Octave | PR CI MATLAB confirmation | **E2** digits/tolerance change is a spec edit (cloud) |
+| **D1** Python crashes (MISO map, 3-D `L = 1`, `detrend`) | all of it | — | — |
+| **D2** SS `residual`/`compare` sizing, `u = None`, `MaxLag` | Python fully; MATLAB under Octave (non-plotting paths) | PR CI MATLAB confirmation | — |
+| **D3–D6** spec decisions (MIMO ETFE, §2.7 convention, `freq_domain_sim` DC rule, §14 multi-trajectory) | spec commit + both ports + tests authored and Octave/Python-verified; the degenerate-input cross-vector authored once A3 lands | PR CI MATLAB confirmation; interim vector bytes from LOCAL if committed before merge | **[decision]** each; canonical bytes (ci-main) |
+| **D7** Python `SidWarning` | all of it | — | **[decision]** (public API) |
+| **D8** Python parity (`show_confidence`, `map_plot` spectrogram, `model_order(plot=)`) | all of it (matplotlib Agg) | — | — |
+| **D9** `sidSpectrogram` cell input; `S₁` guards | Python fully; MATLAB logic under Octave | PR CI MATLAB confirmation | — |
+| **D10** COSMIC half | Python fully (C3 singular pivot, C2 convergence floor, C4 ÷N, C5 final-pass warning, C6 0-based alignment, C7–C16 validation) and the MATLAB twins under Octave — every COSMIC test is non-plotting; the C4 numerics change regenerates `reference_ltv_tune` (authored here, Octave-validated) | PR CI MATLAB confirmation; **C1 model-order rework** benefits from a LOCAL MATLAB run only if `sidModelOrder 'Plot'` is touched | **[decision]** on C1 (ADR-0004 revisit), C2, C3, the condition-number metric, the `p_cov` rename; canonical bytes for regenerated vectors (ci-main) |
+| **D11** minor conformance items | Python fully; MATLAB under Octave | PR CI MATLAB confirmation | `p_cov`/`complex_stft` rename **[decision]** |
+| **E1–E3** spec hygiene, `EXAMPLES.md`, header checkers | all of it (text + `check_headers.py` / `check_python_headers.py` + `mkdocs build --strict` run here) | — | **[decision]** on the `Method` string values (API change) |
+| **F1–F4** documentation site | all of it: content fixes, curated includes, MathJax fix **verified in Chromium/Playwright**, `build_matlab_api.py` / hook fixes, new pages, `mkdocs build --strict` | — | #201 (`mike`) and #200 (lychee) are CI/config changes a cloud session can author; deploy happens on merge |
+| **G1** packaging | `setuptools >= 77`, `py.typed`, sdist contents, `CITATION.cff`, trusted-publishing workflow *authored* here; `pip wheel --no-build-isolation` reproduces the setuptools failure here | — | **PyPI release**: project registration + trusted-publisher setup are maintainer actions; first publish on tag push |
+| **G2** #199–#204 | workflow/config edits authored here | — | ruleset application (`RULESET_TOKEN`), release creation (tags), #202 decision |
+| **H** publication track | all experiments (MC campaign, sandwich/bootstrap comparison, Output-COSMIC benchmarks, λ-tuning oracles) run in Python here; drafts written here | Comet Interceptor demonstration data, if any, lives with the maintainer | authorship, venue and the agent-workflow disclosure are maintainer decisions |
+
+### 10.4 Summary
+
+- **Entirely cloud-capable:** A4, A7, A8, B6, D1, D7 (after its decision), D8, E1–E3, F1–F4, and every Python-side half of every other item; plus every non-plotting MATLAB test and the Octave cross-validation gate (executed here at 374/380 and 32/32).
+- **Cloud-dev with PR-CI confirmation** (no local MATLAB strictly required): B1–B5, C1–C5, D2, D9, D10, D11 — the PR's own MATLAB R2025a + toolbox job and snap Octave 11 job are the MATLAB-proper verifiers.
+- **Genuinely local (MATLAB on the maintainer's machine):** A6's cross-engine tolerance measurement; B4's five toolbox-gated comparison files (`test_compare*.m`, System Identification Toolbox); any interim committed vector bytes before the canonical job runs; iterating on figure-producing MATLAB code faster than a PR round-trip while cloud Octave cannot render.
+- **Maintainer-only:** every `[decision]` (A2, A3, A6, A9, D3–D7, D10 C1/C2/C3, D11, E1 `Method`), ruleset application (A1, A7), GitHub-App permissions (A2), PyPI registration (G1), releases (G2), and the canonical regeneration that only `main`'s CI performs.
