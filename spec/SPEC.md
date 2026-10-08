@@ -1475,7 +1475,7 @@ J(X, C) = Σ_k ||y(k) - H x(k)||²_{R⁻¹}
         + N·λ Σ_k ||C(k) - C(k-1)||²_F
 ```
 
-Both alternating steps decrease this single `J` (the state step holds `C` — hence the smoothness term — fixed; the COSMIC step minimises the dynamics-fidelity + `N·λ`-smoothness sub-problem), so the monotone decrease claimed in §8.12.3 holds for the value reported in the `Cost` field. The user-facing knob remains `λ` (horizon-independent per §8.3.2); only its *effective* weight `N·λ` — and therefore the numeric magnitude of `Cost` — is stated here. Previously the reported `J` used weight `λ` while the step minimised the `N·λ` objective, so the documented monotone decrease was not guaranteed for the reported value.
+Both alternating steps decrease this single `J` (the state step holds `C` — hence the smoothness term — fixed; the COSMIC step minimises the dynamics-fidelity + `N·λ`-smoothness sub-problem), so the monotone decrease claimed in §8.12.3 holds for the `J` values that `CostHistory` (§8.12.9) records along a `μ = 0` alternation — the whole history when the trust region is off. On the §8.12.4 trust-region path the history also records the `μ > 0` stages, which are not a monotone descent (§8.12.4 step 2). `Cost(1)` is `J` at the returned estimate. The user-facing knob remains `λ` (horizon-independent per §8.3.2); only its *effective* weight `N·λ` — and therefore the numeric magnitude of `CostHistory` and `Cost` — is stated here. Previously the reported `J` used weight `λ` while the step minimised the `N·λ` objective, so the documented monotone decrease was not guaranteed for the reported value.
 
 **Recovery of standard COSMIC:** When `H = I` and `R → 0`, the observation fidelity forces `x(k) = y(k)` and `J` reduces to the standard COSMIC **problem** (§8.3.3) — the same minimiser, with the reported value equal to `N` times §8.3.3's scaled cost `f(C)` (the overall `N` that the `1/√N` normalisation removes from `f`; it does not change the optimiser). No additional hyperparameters are introduced in the fully-observed case.
 
@@ -1583,7 +1583,8 @@ Extends the standard `sidLTVdisc` output struct (§8.5) with:
 | `X` | `(N+1 × n × L)` | Estimated state trajectories |
 | `H` | `(p_y × n)` | Observation matrix (copy) |
 | `R` | `(p_y × p_y)` | Noise covariance used |
-| `Cost` | `(n_iter × 1)` | Cost `J` at each iteration |
+| `CostHistory` | `(n_h × 1)` | `J` (§8.12.2) at every iteration of the alternation, in order, across all §8.12.4 stages; the returned estimate's `J` is appended when it differs from the last entry, so `CostHistory(end)` is `J` at the returned estimate. `n_h` is `Iterations` or `Iterations + 1`; on the full-rank fast path (`Iterations = 0`) it is the single `J` of the returned estimate |
+| `Cost` | `(1 × 3)` | `[total, data_fidelity, regularization]` at the returned estimate, as in §8.5: `data_fidelity` is the observation + dynamics fidelity terms of §8.12.2, `regularization` is the `N·λ` smoothness term, so `Cost(1) == CostHistory(end)` |
 | `Iterations` | scalar | Number of alternating iterations |
 | `Method` | char | `'sidLTVdiscIO'` |
 | `Lambda` | scalar or vector | Regularisation used |
@@ -1614,7 +1615,7 @@ result = sidLTVdiscIO(Y, U, H, 'Lambda', 1e5, 'TrustRegion', 1);
 result = sidLTVdiscIO(Y_3d, U_3d, H, 'Lambda', 1e5);
 
 % Inspect convergence
-plot(result.Cost); xlabel('Iteration'); ylabel('J');
+plot(result.CostHistory); xlabel('Iteration'); ylabel('J');
 
 % Extract estimated states
 X_hat = result.X;
@@ -1829,7 +1830,7 @@ The following are out of scope for v1.0:
 - §8.10 online/recursive COSMIC — `deferred` (v2, per the implementation-status banner).
 - §8.11 frozen transfer function (`sidLTVdiscFrozen`) — `cross-vector` (`reference_ltv_frozen`, `H = I`; and `reference_frozen_of_io`, #145d: the **output** contract `H(e^{jω}I − A)⁻¹B` at `p_y = 2 < n = 3` piped from an `sidLTVdiscIO` result), `unit(M)` `test_sidLTVdiscFrozen.m`, `unit(Py)` `test_ltv_disc_frozen.py`, plus `unit(M/Py)` `test_frozen_of_io*` (asserts `p_y×q` shape and equality to `H·(state response)`). The `H = I` collapse keeps `reference_ltv_frozen` byte-identical.
 - §8.11 lambda tuning (`sidLTVdiscTune`) — `cross-vector` (`reference_ltv_tune`, #145d: validation-mode `BestLambda` + per-λ `AllLosses` over a fixed grid), `unit(M)` `test_sidLTVdiscTune.m`, `unit(Py)` `test_ltv_disc_tune.py`.
-- §8.12 Output-COSMIC (`sidLTVdiscIO`) — RTS state step, COSMIC step, `N·λ` reported cost (issue #137) — `cross-vector` (`reference_ltv_io`, `A`/`B`/`Cost`), `unit(M)` `test_sidLTVdiscIO.m`, `unit(Py)` `test_ltv_disc_io.py`.
+- §8.12 Output-COSMIC (`sidLTVdiscIO`) — RTS state step, COSMIC step, `N·λ` reported cost (issue #137) — `cross-vector` (`reference_ltv_io`, `A`/`B` and the history `CostHistory`, stored under the vector key `Cost`), `unit(M)` `test_sidLTVdiscIO.m`, `unit(Py)` `test_ltv_disc_io.py` (both pin the `Cost` breakdown against an independent recomputation of the §8.12.2 terms).
 - §8.12.4 two-level trust-region schedule (issue #138) — `unit(M)` `test_sidLTVdiscIO.m` (Test 11: TR markedly lowers the cost vs off on a hard partial-obs case — a revert-check against the pre-#138 fused loop, which left TR ~two decades *worse* than off; the μ-schedule advances past the initial stage and terminates within the normative `MaxIter × (⌈log₂(1/ε_μ)⌉ + 2)` budget; Test 30: `MaxIter = 0` rejected), `unit(Py)` `test_ltv_disc_io.py` (`test_trust_region_helps_on_hard_case`, `test_trust_region_mu_advances_and_terminates`, `test_max_iter_rejects_non_positive`). **`none` for `cross-vector`** — no stored vector exercises `TrustRegion` (the `reference_ltv_io` case runs `μ = 0`); the benefit is threshold-dependent so a pinned vector would be brittle. The guarded final `μ = 0` refinement and best-iterate-per-stage semantics are `manual` (SPEC §8.12.4).
 - §8.12.12 model-order selection (`sidModelOrder`) — `cross-vector` (`reference_model_order`), `unit(M)` `test_sidModelOrder.m`, `unit(Py)` `test_model_order.py`.
 - §8.12.13 batch LTV state estimation (`sidLTVStateEst`) — `cross-vector` (`reference_ltv_state_est`; and `reference_ltv_state_est_varlen`, #145d: unequal-length cell trajectories, ragged `X_hat` compared via `flatten`), `unit(M)` `test_sidLTVStateEst.m`, `unit(Py)` `test_ltv_state_est.py`.
