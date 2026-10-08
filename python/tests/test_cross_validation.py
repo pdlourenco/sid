@@ -32,13 +32,35 @@ from sid._internal.windowed_dft import windowed_dft
 TESTDATA = pathlib.Path(__file__).resolve().parent.parent.parent / "testdata"
 
 
+# Non-finite values are stored as these JSON strings (ADR-0007); jsonencode's
+# default would write NaN, Inf and -Inf all as null.
+_NONFINITE = {"NaN": float("nan"), "Inf": float("inf"), "-Inf": float("-inf")}
+
+
+def _decode_nonfinite(obj):
+    """Map the strings ``"NaN"``/``"Inf"``/``"-Inf"`` to floats, recursively.
+
+    Raises ``ValueError`` on a ``null``: with non-finite values stored as
+    strings, a ``null`` in a vector is ambiguous (ADR-0007).
+    """
+    if obj is None:
+        raise ValueError("reference vector holds a null (store NaN/Inf/-Inf as strings)")
+    if isinstance(obj, str):
+        return _NONFINITE.get(obj, obj)
+    if isinstance(obj, list):
+        return [_decode_nonfinite(v) for v in obj]
+    if isinstance(obj, dict):
+        return {k: _decode_nonfinite(v) for k, v in obj.items()}
+    return obj
+
+
 def _load(name: str) -> dict:
     """Load a JSON reference file, or skip the test if missing."""
     path = TESTDATA / name
     if not path.exists():
         pytest.skip(f"Reference file {name} not found (run MATLAB CI first)")
     with open(path) as f:
-        return json.load(f)
+        return _decode_nonfinite(json.load(f))
 
 
 def _to_array(data, key: str) -> np.ndarray:
@@ -1520,3 +1542,47 @@ class TestProvenanceMetadata:
             assert isinstance(prov, dict), f"{name}: missing provenance block (#172)"
             for key in ("generator", "git_sha", "git_date"):
                 assert prov.get(key), f"{name}: provenance.{key} missing or empty"
+
+
+class TestNonFiniteEncoding:
+    """On-disk encoding of NaN/Inf/-Inf and its comparison (ADR-0007).
+
+    The Octave validator proves the same round trip and comparison rules in its
+    own self-test (``selfTestNonFinite`` in ``testdata/validate_reference.m``).
+    """
+
+    def test_decode_maps_sentinels_in_place(self):
+        raw = json.loads(
+            '{"v": [1, "NaN", "Inf", "-Inf"], "m": [["NaN", 2], [3, "-Inf"]],'
+            ' "s": "Inf", "name": "sidFreqBT"}'
+        )
+        dec = _decode_nonfinite(raw)
+        v = np.array(dec["v"], dtype=np.float64)
+        assert np.isnan(v[1]) and v[2] == np.inf and v[3] == -np.inf and v[0] == 1.0
+        m = np.array(dec["m"], dtype=np.float64)
+        assert m.shape == (2, 2) and np.isnan(m[0, 0]) and m[1, 1] == -np.inf
+        assert dec["s"] == np.inf
+        assert dec["name"] == "sidFreqBT"
+
+    def test_decode_rejects_null(self):
+        with pytest.raises(ValueError, match="null"):
+            _decode_nonfinite(json.loads('{"v": [1, null]}'))
+
+    def test_comparison_is_exact_on_non_finite(self):
+        expected = np.array([1.0, np.nan, np.inf, -np.inf])
+        np.testing.assert_allclose(expected.copy(), expected, rtol=1e-6, atol=0)
+        for actual in (
+            [1.0, 2.0, np.inf, -np.inf],  # number where NaN is expected
+            [1.0, np.nan, -np.inf, -np.inf],  # Inf of the wrong sign
+            [1.0, np.nan, 5.0, -np.inf],  # number where Inf is expected
+            [np.nan, np.nan, np.inf, -np.inf],  # NaN where a number is expected
+        ):
+            with pytest.raises(AssertionError):
+                np.testing.assert_allclose(np.array(actual), expected, rtol=1e-6, atol=0)
+
+    @pytest.mark.parametrize(
+        "path", sorted(TESTDATA.glob("reference_*.json")), ids=lambda p: p.name
+    )
+    def test_committed_vector_has_no_null(self, path):
+        with open(path) as f:
+            _decode_nonfinite(json.load(f))

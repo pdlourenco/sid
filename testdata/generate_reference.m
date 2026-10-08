@@ -946,8 +946,10 @@ end
 
 function writeJSON(filepath, data)
 %WRITEJSON Write struct to JSON file, stamping generator provenance (#172).
+%   NaN, Inf and -Inf are stored as the strings "NaN", "Inf" and "-Inf"
+%   (ADR-0007): jsonencode's default writes all three as null.
     data.provenance = getProvenance();
-    json = jsonencode(data);
+    json = refEncodeNonFinite(jsonencode(data, 'ConvertInfAndNaN', false));
     fid = fopen(filepath, 'w');
     if fid == -1
         error('Could not open %s for writing.', filepath);
