@@ -1628,3 +1628,48 @@ class TestNonFiniteEncoding:
     def test_committed_vector_has_no_null(self, path):
         with open(path) as f:
             _decode_nonfinite(json.load(f))
+
+
+def _atol_violations(ref: dict) -> list[str]:
+    """Near-zero output fields without an absolute floor (standing rule 1).
+
+    Mirrors ``testdata/refAtolViolations.m``: a field holding an exact zero, or
+    whose smallest finite magnitude is below ``1e-12`` of its largest, must
+    carry ``<key>_atol``, where ``Response_real``/``Response_imag`` resolve to
+    ``Response`` and every other field to its own name.
+    """
+    tolerance = ref.get("tolerance", {})
+    bad = []
+    for name, value in ref["output"].items():
+        key = "Response" if name in ("Response_real", "Response_imag") else name
+        try:
+            v = np.abs(np.asarray(value, dtype=np.float64)).ravel()
+        except (TypeError, ValueError):
+            v = np.abs(np.concatenate([np.asarray(x, dtype=np.float64).ravel() for x in value]))
+        v = v[np.isfinite(v)]
+        if v.size == 0:
+            continue
+        near_zero = v.min() == 0 or v.min() < 1e-12 * v.max()
+        if near_zero and key + "_atol" not in tolerance:
+            bad.append(name)
+    return bad
+
+
+class TestToleranceFloors:
+    """Every near-zero output field carries an absolute floor (rule 1, A5)."""
+
+    def test_rule_flags_unfloored_near_zero_fields(self):
+        ref = {
+            "output": {"Response_imag": [0.0, 1.0], "W": [1e-17, 1.0], "P": [0.5, 2.0]},
+            "tolerance": {"P_rel": 1e-6},
+        }
+        assert _atol_violations(ref) == ["Response_imag", "W"]
+        ref["tolerance"].update({"Response_atol": 1e-10, "W_atol": 1e-15})
+        assert _atol_violations(ref) == []
+
+    @pytest.mark.parametrize(
+        "path", sorted(TESTDATA.glob("reference_*.json")), ids=lambda p: p.name
+    )
+    def test_committed_vector_floors_near_zero_fields(self, path):
+        ref = _load(path.name)
+        assert _atol_violations(ref) == [], f"{path.name}: add <key>_atol in generate_reference.m"

@@ -44,6 +44,18 @@ carried forward by [ADR-0007](../docs/decisions/ADR-0007-reference-regeneration-
 — the vector and its consumer land together, and payloads change only by regeneration
 — see #147, #174, and #175 for the pattern in practice.
 
+### Absolute tolerance floors
+
+Standing rule 1 is enforced, not just reviewed: an output field that holds an exact
+zero, or whose smallest finite magnitude is below `1e-12` of its largest, must carry
+`<key>_atol` in its `tolerance` block (`<key>` is `Response` for `Response_real` /
+`Response_imag`, otherwise the field's own name). `generate_reference.m` refuses to
+write such a field without one, and both consumers fail a committed vector that
+lacks one (`refAtolViolations.m`; `_atol_violations` in
+`python/tests/test_cross_validation.py`). The floors in the generator are
+`rtol × max|field|`, rounded up to one significant figure: the field's own
+relative tolerance at its largest magnitude.
+
 ### Non-finite values
 
 `NaN`, `Inf` and `-Inf` are stored as the JSON strings `"NaN"`, `"Inf"` and `"-Inf"`
