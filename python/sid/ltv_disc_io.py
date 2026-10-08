@@ -198,7 +198,8 @@ def ltv_disc_io(
     ---------
     2026-10-08 : The per-iteration history is now ``cost_history``;
         ``cost`` is the ``(3,)`` breakdown at the returned estimate
-        (SPEC.md §8.12.9). Breaking: ``cost`` changed meaning.
+        (SPEC.md §8.12.9). Breaking: ``cost`` changed meaning. By Pedro
+        Lourenco.
     2026-04-09 : First version (Python port) by Pedro Lourenco.
     """
     # ------------------------------------------------------------------

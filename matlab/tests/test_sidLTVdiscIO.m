@@ -1070,8 +1070,9 @@ fprintf('  Test 31 passed: TrustRegion out of range rejected.\n');
 % Iterations + 1 entries (one entry with Iterations = 0 on the full-rank fast
 % path). Cost(2) and Cost(3) are recomputed independently from the §8.12.2
 % terms (observation + dynamics fidelity; N*lambda smoothness), which catches
-% swapped or mis-scaled terms. Runs the EM path, the fast path and the
-% trust-region path.
+% swapped or mis-scaled terms; every case uses a non-identity R, so an
+% observation term weighted by R instead of R^-1 also fails. Runs the EM
+% path, the fast path and the trust-region path.
 rng(3200);
 n = 2; q = 1; N = 40; L = 3;
 A32 = [0.9 0.1; -0.1 0.8];
@@ -1086,10 +1087,11 @@ for l = 1:L
     end
 end
 lam32 = 1e3;
-cases32 = {'EM path', [1 0], 'off'; ...
-           'fast path', eye(2), 'off'; ...
-           'trust-region path', [1 0], 1};
+cases32 = {'EM path', [1 0], 'off', 0.25; ...
+           'fast path', eye(2), 'off', diag([0.25, 4]); ...
+           'trust-region path', [1 0], 1, 0.25};
 warnState32 = warning('off', 'sid:notConverged');
+try
 for c = 1:size(cases32, 1)
     H32 = cases32{c, 2};
     py32 = size(H32, 1);
@@ -1097,8 +1099,8 @@ for c = 1:size(cases32, 1)
     for l = 1:L
         Y32(:, :, l) = X32(:, :, l) * H32' + 0.01 * randn(N+1, py32);
     end
-    r32 = sidLTVdiscIO(Y32, U32, H32, 'Lambda', lam32, ...
-        'TrustRegion', cases32{c, 3}, 'MaxIter', 50);
+    r32 = sidLTVdiscIO(Y32, U32, H32, 'Lambda', lam32, 'R', cases32{c, 4}, ...
+        'TrustRegion', cases32{c, 3}, 'TrustRegionTol', 1e-2, 'MaxIter', 20);
     name32 = cases32{c, 1};
 
     assert(isequal(size(r32.Cost), [1, 3]), ...
@@ -1142,6 +1144,10 @@ for c = 1:size(cases32, 1)
     assert(abs(r32.Cost(3) - reg32) <= 1e-10 * max(1, abs(reg32)), ...
         '%s: regularization %.12g vs recomputed %.12g', ...
         name32, r32.Cost(3), reg32);
+end
+catch err32
+    warning(warnState32);
+    rethrow(err32);
 end
 warning(warnState32);
 runner__nPassed = runner__nPassed + 1;

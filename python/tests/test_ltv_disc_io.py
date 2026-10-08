@@ -7,7 +7,7 @@
 
 """Tests for ltv_disc_io from sid.
 
-Port of test_sidLTVdiscIO.m (8 tests).
+Port of test_sidLTVdiscIO.m.
 """
 
 from __future__ import annotations
@@ -443,7 +443,9 @@ class TestLTVDiscIOCostBreakdown:
     ``iterations == 0`` on the full-rank fast path). ``cost[1]`` and
     ``cost[2]`` are recomputed independently from the §8.12.2 terms
     (observation + dynamics fidelity; ``N * lambda`` smoothness), which
-    catches swapped or mis-scaled terms. Mirrors test_sidLTVdiscIO.m Test 32.
+    catches swapped or mis-scaled terms; every case uses a non-identity
+    ``R``, so an observation term weighted by ``R`` instead of ``R^-1``
+    also fails. Mirrors test_sidLTVdiscIO.m Test 32.
     """
 
     N = 40
@@ -467,18 +469,29 @@ class TestLTVDiscIOCostBreakdown:
         return Y, U
 
     @pytest.mark.parametrize(
-        ("label", "H", "trust_region"),
+        ("label", "H", "trust_region", "R"),
         [
-            ("em", np.array([[1.0, 0.0]]), "off"),
-            ("fast", np.eye(2), "off"),
-            ("trust_region", np.array([[1.0, 0.0]]), 1.0),
+            ("em", np.array([[1.0, 0.0]]), "off", np.array([[0.25]])),
+            ("fast", np.eye(2), "off", np.diag([0.25, 4.0])),
+            ("trust_region", np.array([[1.0, 0.0]]), 1.0, np.array([[0.25]])),
         ],
     )
-    def test_cost_breakdown(self, label: str, H: np.ndarray, trust_region) -> None:
+    def test_cost_breakdown(
+        self, label: str, H: np.ndarray, trust_region: float | str, R: np.ndarray
+    ) -> None:
         Y, U = self._data(H)
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message=".*did not converge.*")
-            res = ltv_disc_io(Y, U, H, lambda_=self.LAMBDA, trust_region=trust_region, max_iter=50)
+            res = ltv_disc_io(
+                Y,
+                U,
+                H,
+                lambda_=self.LAMBDA,
+                R=R,
+                trust_region=trust_region,
+                trust_region_tol=1e-2,
+                max_iter=20,
+            )
 
         cost = np.asarray(res.cost)
         hist = np.asarray(res.cost_history)

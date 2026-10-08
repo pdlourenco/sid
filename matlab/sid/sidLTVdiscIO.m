@@ -105,7 +105,8 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
 %   Changelog:
 %   2026-10-08: The per-iteration history is now CostHistory; Cost is the
 %               (1 x 3) breakdown at the returned estimate (SPEC.md
-%               §8.12.9). Breaking: .Cost changed meaning.
+%               §8.12.9). Breaking: .Cost changed meaning. By Pedro
+%               Lourenço.
 %   2026-04-06: Expose CovarianceMode option (was hardcoded 'diagonal').
 %   2026-04-01: First version by Pedro Lourenço.
 %

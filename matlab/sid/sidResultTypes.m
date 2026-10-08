@@ -162,8 +162,9 @@ function sidResultTypes()
 %   .Cost               (1 x 3)             [total, data_fidelity,
 %                                           regularization] at the
 %                                           returned estimate.
-%   .CostHistory        (n_h x 1)           Cost J at each iteration
-%                                           (plus the returned J).
+%   .CostHistory        (n_h x 1)           Cost J at each iteration,
+%                                           plus the returned J when it
+%                                           differs from the last entry.
 %   .Iterations         scalar               Number of alternating iters.
 %   .Lambda             (N-1 x 1)           Regularisation used.
 %   .DataLength         scalar               Number of time steps N.
@@ -235,7 +236,7 @@ function sidResultTypes()
 %
 %   Changelog:
 %   2026-10-08: LTVIOResult: CostHistory added; Cost is now the (1 x 3)
-%               breakdown (SPEC.md §8.12.9).
+%               breakdown (SPEC.md §8.12.9). By Pedro Lourenço.
 %   2026-04-09: First version by Pedro Lourenco.
 %
 %  -----------------------------------------------------------------------
