@@ -264,7 +264,15 @@ class LTVIOResult:
     """Measurement noise covariance, shape ``(py, py)`` (copy)."""
 
     cost: np.ndarray
-    """Cost history at each iteration, shape ``(n_iter,)``."""
+    """``[total, data_fidelity, regularization]`` at the returned estimate,
+    shape ``(3,)`` (SPEC.md §8.12.9); ``cost[0]`` equals
+    ``cost_history[-1]``."""
+
+    cost_history: np.ndarray
+    """Cost at each alternating iteration, plus the returned estimate's
+    cost when it differs from the last entry, shape ``(n_h,)`` with
+    ``n_h`` equal to ``iterations`` or ``iterations + 1`` (one entry on
+    the full-rank fast path)."""
 
     iterations: int
     """Number of alternating iterations."""

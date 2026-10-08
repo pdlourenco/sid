@@ -8,6 +8,20 @@ Numerical equivalence across the MATLAB/Octave and Python ports is a consequence
 of each conforming to [`spec/SPEC.md`](spec/SPEC.md); changes below apply to both
 ports unless noted.
 
+## [Unreleased]
+
+### Changed (behavioural — review before upgrading)
+
+- **Output-COSMIC cost fields renamed** (`sidLTVdiscIO` / `ltv_disc_io`): the
+  per-iteration cost history moves from `Cost` / `cost` to the new
+  `CostHistory` / `cost_history` field, with unchanged contents. `Cost` /
+  `cost` is now the `(1 × 3)` `[total, data_fidelity, regularization]`
+  breakdown at the returned estimate, as for `sidLTVdisc`: data fidelity is the
+  observation + dynamics terms, regularization the smoothness term, and
+  `Cost(1)` equals the last `CostHistory` entry. **Breaking:** code that plots
+  or indexes the IO `Cost` as a history must switch to `CostHistory`
+  (`SPEC.md` §8.12.9).
+
 ## [0.2.0] — 2026-07-26
 
 The correctness-and-verification release. It remediates every finding of the

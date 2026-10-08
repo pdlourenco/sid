@@ -7,12 +7,15 @@
 
 """Tests for ltv_disc_io from sid.
 
-Port of test_sidLTVdiscIO.m (8 tests).
+Port of test_sidLTVdiscIO.m.
 """
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
+import pytest
 
 from sid.ltv_disc import ltv_disc
 from sid.ltv_disc_io import ltv_disc_io
@@ -77,6 +80,7 @@ class TestLTVDiscIO:
             "h",
             "r",
             "cost",
+            "cost_history",
             "iterations",
             "lambda_",
             "data_length",
@@ -162,7 +166,7 @@ class TestLTVDiscIO:
 
         result = ltv_disc_io(Y, U, H_obs, lambda_=1e4)
 
-        cost = result.cost
+        cost = result.cost_history
         if hasattr(cost, "__len__") and len(cost) >= 2:
             for i in range(1, len(cost)):
                 assert cost[i] <= cost[i - 1] + 1e-8 * abs(cost[i - 1]), (
@@ -371,8 +375,8 @@ class TestLTVDiscIO:
             trust_region_tol=self._TR_MU_TOL,
         )
 
-        cost_off = float(np.min(off.cost))
-        cost_tr = float(np.min(tr.cost))
+        cost_off = float(np.min(off.cost_history))
+        cost_tr = float(np.min(tr.cost_history))
 
         assert np.all(np.isfinite(tr.a)), "TrustRegion result must be finite"
         assert not np.any(np.isnan(tr.a)), "TrustRegion result must not be NaN"
@@ -428,3 +432,90 @@ class TestLTVDiscIO:
         Y, U, H = self._make_partial_obs_data()
         with pytest.raises(SidError):
             ltv_disc_io(Y, U, H, lambda_=1e2, trust_region=2.0)
+
+
+class TestLTVDiscIOCostBreakdown:
+    """``cost`` breakdown and ``cost_history`` (SPEC.md §8.12.9, §8.12.2).
+
+    ``cost`` is ``[total, data_fidelity, regularization]`` at the returned
+    estimate with ``cost[0] == cost_history[-1]``; the history has
+    ``iterations`` or ``iterations + 1`` entries (one entry with
+    ``iterations == 0`` on the full-rank fast path). ``cost[1]`` and
+    ``cost[2]`` are recomputed independently from the §8.12.2 terms
+    (observation + dynamics fidelity; ``N * lambda`` smoothness), which
+    catches swapped or mis-scaled terms; every case uses a non-identity
+    ``R``, so an observation term weighted by ``R`` instead of ``R^-1``
+    also fails. Mirrors test_sidLTVdiscIO.m Test 32.
+    """
+
+    N = 40
+    L = 3
+    LAMBDA = 1e3
+
+    @classmethod
+    def _data(cls, H: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        rng = np.random.default_rng(3200)
+        A = np.array([[0.9, 0.1], [-0.1, 0.8]])
+        B = np.array([[0.5], [0.3]])
+        n, N, L = 2, cls.N, cls.L
+        U = rng.standard_normal((N, 1, L))
+        X = np.zeros((N + 1, n, L))
+        for ll in range(L):
+            X[0, :, ll] = rng.standard_normal(n)
+            for k in range(N):
+                X[k + 1, :, ll] = A @ X[k, :, ll] + B @ U[k, :, ll] + 0.01 * rng.standard_normal(n)
+        py = H.shape[0]
+        Y = np.einsum("tnl,pn->tpl", X, H) + 0.01 * rng.standard_normal((N + 1, py, L))
+        return Y, U
+
+    @pytest.mark.parametrize(
+        ("label", "H", "trust_region", "R"),
+        [
+            ("em", np.array([[1.0, 0.0]]), "off", np.array([[0.25]])),
+            ("fast", np.eye(2), "off", np.diag([0.25, 4.0])),
+            ("trust_region", np.array([[1.0, 0.0]]), 1.0, np.array([[0.25]])),
+        ],
+    )
+    def test_cost_breakdown(
+        self, label: str, H: np.ndarray, trust_region: float | str, R: np.ndarray
+    ) -> None:
+        Y, U = self._data(H)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message=".*did not converge.*")
+            res = ltv_disc_io(
+                Y,
+                U,
+                H,
+                lambda_=self.LAMBDA,
+                R=R,
+                trust_region=trust_region,
+                trust_region_tol=1e-2,
+                max_iter=20,
+            )
+
+        cost = np.asarray(res.cost)
+        hist = np.asarray(res.cost_history)
+        assert cost.shape == (3,), f"{label}: cost shape {cost.shape}"
+        assert abs(cost[0] - cost[1] - cost[2]) <= 1e-12 * abs(cost[0])
+        assert cost[0] == hist[-1], f"{label}: cost[0] {cost[0]!r} vs history {hist[-1]!r}"
+        if label == "fast":
+            assert res.iterations == 0 and hist.size == 1
+        else:
+            assert res.iterations > 0
+            assert hist.size in (res.iterations, res.iterations + 1)
+
+        # Independent recomputation of the §8.12.2 terms at the returned estimate.
+        N = self.N
+        X, A, B = res.x, res.a, res.b
+        Rinv = np.linalg.inv(res.r)
+        E = Y - np.einsum("tnl,pn->tpl", X, H)
+        fidelity = float(np.einsum("tpl,pq,tql->", E, Rinv, E))
+        X_next = np.einsum("ijk,kjl->kil", A, X[:N]) + np.einsum("ijk,kjl->kil", B, U)
+        fidelity += float(np.sum((X[1:] - X_next) ** 2))
+        reg = (
+            N
+            * self.LAMBDA
+            * float(np.sum(np.diff(A, axis=2) ** 2) + np.sum(np.diff(B, axis=2) ** 2))
+        )
+        np.testing.assert_allclose(cost[1], fidelity, rtol=1e-10, atol=1e-10)
+        np.testing.assert_allclose(cost[2], reg, rtol=1e-10, atol=1e-10)

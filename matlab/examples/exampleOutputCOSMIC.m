@@ -106,7 +106,7 @@ fprintf('Running Output-COSMIC identification...\n');
 result = sidLTVdiscIO(Y, U, H_use, 'Lambda', 1e5);
 
 fprintf('Converged in %d iterations.\n', result.Iterations);
-fprintf('Final cost: %.4f\n', result.Cost(end));
+fprintf('Final cost: %.4f\n', result.Cost(1));
 
 runner__nCompleted = runner__nCompleted + 1;
 fprintf('  Section %d completed: Step 4: identify the LTV model.\n', ...
@@ -114,7 +114,7 @@ fprintf('  Section %d completed: Step 4: identify the LTV model.\n', ...
 
 %% Convergence history
 figure;
-semilogy(1:length(result.Cost), result.Cost, 'b-o', 'MarkerSize', 4);
+semilogy(1:length(result.CostHistory), result.CostHistory, 'b-o', 'MarkerSize', 4);
 xlabel('Iteration');
 ylabel('Cost J');
 title('Output-COSMIC: convergence');

@@ -29,7 +29,7 @@ end
 
 result = sidLTVdiscIO(Y, U, H_obs, 'Lambda', 1e3);
 
-requiredFields = {'A', 'B', 'X', 'H', 'R', 'Cost', 'Iterations', ...
+requiredFields = {'A', 'B', 'X', 'H', 'R', 'Cost', 'CostHistory', 'Iterations', ...
     'Lambda', 'DataLength', 'StateDim', 'OutputDim', 'InputDim', ...
     'NumTrajectories', 'Algorithm', 'Method'};
 for i = 1:length(requiredFields)
@@ -219,13 +219,13 @@ for l = 1:L
 end
 res_mono = sidLTVdiscIO( ...
     Y_mono, U_mono, H_mono, 'Lambda', 1e4);
-assert(length(res_mono.Cost) >= 2, ...
+assert(length(res_mono.CostHistory) >= 2, ...
     'Need at least 2 cost evaluations');
-for i = 2:length(res_mono.Cost)
-    assert(res_mono.Cost(i) <= res_mono.Cost(i-1) + ...
-        1e-8 * abs(res_mono.Cost(i-1)), ...
+for i = 2:length(res_mono.CostHistory)
+    assert(res_mono.CostHistory(i) <= res_mono.CostHistory(i-1) + ...
+        1e-8 * abs(res_mono.CostHistory(i-1)), ...
         'Cost increased at iteration %d: %.6f > %.6f', ...
-        i, res_mono.Cost(i), res_mono.Cost(i-1));
+        i, res_mono.CostHistory(i), res_mono.CostHistory(i-1));
 end
 runner__nPassed = runner__nPassed + 1;
 fprintf('  Test 6 passed: monotone cost decrease (%d iters).\n', ...
@@ -396,8 +396,8 @@ res_off = sidLTVdiscIO(Y, U, H_obs, 'Lambda', 100, 'TrustRegion', 'off', ...
 res_tr  = sidLTVdiscIO(Y, U, H_obs, 'Lambda', 100, 'TrustRegion', 1, ...
     'MaxIter', maxIter11, 'TrustRegionTol', muTol11);
 
-cost_off = min(res_off.Cost);
-cost_tr  = min(res_tr.Cost);
+cost_off = min(res_off.CostHistory);
+cost_tr  = min(res_tr.CostHistory);
 
 assert(all(isfinite(res_tr.A(:))), 'Trust-region A must be finite');
 assert(~any(isnan(res_tr.A(:))), 'Trust-region A must not be NaN');
@@ -845,7 +845,7 @@ assert(res_vl.Iterations > 0, 'EM path should iterate');
 assert(iscell(res_vl.X), 'VarLen should return cell X');
 
 % Cost should generally decrease (small numerical increases tolerated)
-costs = res_vl.Cost;
+costs = res_vl.CostHistory;
 assert(costs(end) < costs(1), ...
     'Final cost %.4f should be less than initial %.4f', ...
     costs(end), costs(1));
@@ -928,7 +928,7 @@ assert(res_conv.Iterations >= 2, ...
     'Should take at least 2 iters, got %d', res_conv.Iterations);
 
 % Verify the stopping criterion: final relative change < tol
-costs = res_conv.Cost;
+costs = res_conv.CostHistory;
 if length(costs) >= 2
     final_rel = abs(costs(end) - costs(end-1)) / max(abs(costs(end-1)), 1);
     assert(final_rel < tol_val, ...
@@ -945,8 +945,8 @@ res_lim = sidLTVdiscIO(Y23, U23, H_23, 'Lambda', 1e4, ...
 
 assert(res_lim.Iterations == 3, ...
     'Should stop at MaxIter=3, got %d', res_lim.Iterations);
-assert(length(res_lim.Cost) == 3, ...
-    'Cost history should have 3 entries, got %d', length(res_lim.Cost));
+assert(length(res_lim.CostHistory) == 3, ...
+    'Cost history should have 3 entries, got %d', length(res_lim.CostHistory));
 runner__nPassed = runner__nPassed + 1;
 fprintf('  Test 24 passed: MaxIter limit (3 iters).\n');
 
@@ -1063,5 +1063,94 @@ end
 assert(threw31, 'TrustRegion=2 should throw an error');
 runner__nPassed = runner__nPassed + 1;
 fprintf('  Test 31 passed: TrustRegion out of range rejected.\n');
+
+%% Test 32: Cost breakdown and CostHistory (SPEC §8.12.9, §8.12.2)
+% Cost is the (1 x 3) [total, data_fidelity, regularization] at the returned
+% estimate with Cost(1) == CostHistory(end); the history has Iterations or
+% Iterations + 1 entries (one entry with Iterations = 0 on the full-rank fast
+% path). Cost(2) and Cost(3) are recomputed independently from the §8.12.2
+% terms (observation + dynamics fidelity; N*lambda smoothness), which catches
+% swapped or mis-scaled terms; every case uses a non-identity R, so an
+% observation term weighted by R instead of R^-1 also fails. Runs the EM
+% path, the fast path and the trust-region path.
+rng(3200);
+n = 2; q = 1; N = 40; L = 3;
+A32 = [0.9 0.1; -0.1 0.8];
+B32 = [0.5; 0.3];
+U32 = randn(N, q, L);
+X32 = zeros(N+1, n, L);
+for l = 1:L
+    X32(1, :, l) = randn(1, n);
+    for k = 1:N
+        X32(k+1, :, l) = (A32 * X32(k, :, l)' + B32 * U32(k, :, l)')' ...
+            + 0.01 * randn(1, n);
+    end
+end
+lam32 = 1e3;
+cases32 = {'EM path', [1 0], 'off', 0.25; ...
+           'fast path', eye(2), 'off', diag([0.25, 4]); ...
+           'trust-region path', [1 0], 1, 0.25};
+warnState32 = warning('off', 'sid:notConverged');
+try
+for c = 1:size(cases32, 1)
+    H32 = cases32{c, 2};
+    py32 = size(H32, 1);
+    Y32 = zeros(N+1, py32, L);
+    for l = 1:L
+        Y32(:, :, l) = X32(:, :, l) * H32' + 0.01 * randn(N+1, py32);
+    end
+    r32 = sidLTVdiscIO(Y32, U32, H32, 'Lambda', lam32, 'R', cases32{c, 4}, ...
+        'TrustRegion', cases32{c, 3}, 'TrustRegionTol', 1e-2, 'MaxIter', 20);
+    name32 = cases32{c, 1};
+
+    assert(isequal(size(r32.Cost), [1, 3]), ...
+        '%s: Cost should be (1 x 3)', name32);
+    assert(abs(r32.Cost(1) - r32.Cost(2) - r32.Cost(3)) ...
+        <= 1e-12 * abs(r32.Cost(1)), ...
+        '%s: Cost(1) should equal Cost(2) + Cost(3)', name32);
+    assert(r32.Cost(1) == r32.CostHistory(end), ...
+        '%s: Cost(1) %.15g should equal CostHistory(end) %.15g', ...
+        name32, r32.Cost(1), r32.CostHistory(end));
+    nh32 = numel(r32.CostHistory);
+    if strcmp(name32, 'fast path')
+        assert(r32.Iterations == 0 && nh32 == 1, ...
+            'fast path: expected Iterations 0 and 1 entry, got %d and %d', ...
+            r32.Iterations, nh32);
+    else
+        assert(r32.Iterations > 0, '%s: should iterate', name32);
+        assert(nh32 == r32.Iterations || nh32 == r32.Iterations + 1, ...
+            '%s: history length %d vs Iterations %d', ...
+            name32, nh32, r32.Iterations);
+    end
+
+    % Independent recomputation of the §8.12.2 terms at the returned estimate.
+    Rinv32 = inv(r32.R);
+    fid32 = 0;
+    for l = 1:L
+        E = Y32(:, :, l) - r32.X(:, :, l) * H32';
+        fid32 = fid32 + sum(sum((E * Rinv32) .* E));
+        for k = 1:N
+            d = r32.X(k+1, :, l)' - r32.A(:, :, k) * r32.X(k, :, l)' ...
+                - r32.B(:, :, k) * U32(k, :, l)';
+            fid32 = fid32 + d' * d;
+        end
+    end
+    dA = diff(r32.A, 1, 3);
+    dB = diff(r32.B, 1, 3);
+    reg32 = N * lam32 * (sum(dA(:) .^ 2) + sum(dB(:) .^ 2));
+    assert(abs(r32.Cost(2) - fid32) <= 1e-10 * max(1, abs(fid32)), ...
+        '%s: data fidelity %.12g vs recomputed %.12g', ...
+        name32, r32.Cost(2), fid32);
+    assert(abs(r32.Cost(3) - reg32) <= 1e-10 * max(1, abs(reg32)), ...
+        '%s: regularization %.12g vs recomputed %.12g', ...
+        name32, r32.Cost(3), reg32);
+end
+catch err32
+    warning(warnState32);
+    rethrow(err32);
+end
+warning(warnState32);
+runner__nPassed = runner__nPassed + 1;
+fprintf('  Test 32 passed: Cost breakdown and CostHistory.\n');
 
 fprintf('test_sidLTVdiscIO: %d/%d passed\n', runner__nPassed, runner__nPassed);

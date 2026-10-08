@@ -1,7 +1,7 @@
 # sid — Examples Specification
 
-**Version:** 1.0.1
-**Date:** 2026-04-12
+**Version:** 1.0.2
+**Date:** 2026-10-08
 **Reference:** Companion to [`SPEC.md`](SPEC.md). Where `SPEC.md` defines
 the binding behavior of the algorithmic functions, this document defines
 the binding structure of the example suite shipped with every language
@@ -1240,7 +1240,7 @@ the gauge-invariant **observation reconstruction error**
 | 4 | Step 2: model-order determination | Call `model_order` on the `freq_bt` result; print the estimate and note that it may overshoot the true order for short lightly-damped records. |
 | 5 | Step 3: construct observation matrix | Show `H` and print its shape. |
 | 6 | Step 4: identify the LTV model via `ltv_disc_io` | Call `ltv_disc_io(Y, U, H, lambda_=1e5)`; print iterations and final cost. |
-| 7 | Convergence history | Plot `cost` vs iteration (semilogy). |
+| 7 | Convergence history | Plot `cost_history` vs iteration (semilogy). |
 | 8 | State recovery: observed channels vs hidden channels | 2×2 grid: top row shows the two measured positions with true, estimated, and measurement curves; bottom row shows the two hidden velocities with true and estimated curves. |
 | 9 | Validation: observation reconstruction error | Compute `H · x̂` for every trajectory and compare against `Y`; print the relative Frobenius error. |
 | 10 | Frozen-time inspection of the recovered A and B | Print `A(N/2)` and `B(N/2)` as a sanity check that magnitudes are `O(1)`. |
@@ -1263,7 +1263,7 @@ the gauge-invariant **observation reconstruction error**
 | Print | 4 | `n_est` estimate with a note that it may overshoot. |
 | Print | 5 | `H` matrix. |
 | Print | 6 | Iterations and final cost. |
-| Plot (convergence) | 7 | Semilog `cost` vs iteration. |
+| Plot (convergence) | 7 | Semilog `cost_history` vs iteration. |
 | Plot (2×2 grid) | 8 | Four subplots: `x₁`, `x₂`, `v₁`, `v₂` with true/estimated/measured overlays as appropriate. |
 | Print | 9 | One line: "Observation reconstruction error: …". |
 | Print | 10 | `A(mid)` and `B(mid)` matrices. |
@@ -1532,6 +1532,14 @@ minor version when practical, but is not required to chase every
 MINOR bump immediately.
 
 ### 6.5 Changelog
+
+**v1.0.2 — 2026-10-08.** Follows the `ltv_disc_io` output rename in
+`SPEC.md` §8.12.9 (the per-iteration history is now `cost_history`;
+`cost` is the `[total, data_fidelity, regularization]` breakdown):
+
+- §3.11 `output_cosmic`: the convergence plot (section 7 and its
+  required output) plots `cost_history` instead of `cost`. The
+  example's content and pedagogy are unchanged.
 
 **v1.0.1 — 2026-04-12.** Cleanup pass motivated by spurious
 warnings in the v1.0.0 example suite:

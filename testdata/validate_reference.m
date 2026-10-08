@@ -222,6 +222,9 @@ function result = callSidFunction(funcName, input, params)
                             'regularization', reg, 'P', P);
         case 'sidLTVdiscIO'
             result = sidLTVdiscIO(input.Y, input.U, input.H, args{:});
+            % The vector key 'Cost' holds the history (SPEC.md §8.12.9
+            % CostHistory) until the vector is re-derived with the new key.
+            result.Cost = result.CostHistory;
         case 'sidLTVStateEst'
             X_hat = sidLTVStateEst(input.Y, input.U, ...
                                    input.A, input.B, input.H);

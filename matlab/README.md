@@ -142,7 +142,7 @@ the table below for a quick overview.
 | FreqMapResult | `sidFreqMap` | `.Time`, `.Response`, `.NoiseSpectrum`, `.Coherence` |
 | SpectrogramResult | `sidSpectrogram` | `.Time`, `.Frequency`, `.Power`, `.PowerDB`, `.Complex` |
 | LTVResult | `sidLTVdisc`, `sidLTVdiscTune` | `.A`, `.B`, `.Lambda`, `.Cost` (+ `.AStd`, `.BStd`, `.P` with uncertainty) |
-| LTVIOResult | `sidLTVdiscIO` | `.A`, `.B`, `.X`, `.H`, `.R`, `.Cost`, `.Iterations` |
+| LTVIOResult | `sidLTVdiscIO` | `.A`, `.B`, `.X`, `.H`, `.R`, `.Cost`, `.CostHistory`, `.Iterations` |
 | FrozenResult | `sidLTVdiscFrozen` | `.Response`, `.ResponseStd`, `.TimeSteps` |
 | CompareResult | `sidCompare` | `.Predicted`, `.Measured`, `.Fit`, `.Residual` |
 | ResidualResult | `sidResidual` | `.Residual`, `.AutoCorr`, `.CrossCorr`, `.WhitenessPass` |

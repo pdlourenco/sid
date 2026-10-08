@@ -567,7 +567,10 @@ ref14 = struct();
 ref14.function_name = 'sidLTVdiscIO';
 ref14.params = struct('Lambda', 1e5);
 ref14.input = struct('Y', Y_io, 'U', U_io, 'H', H_io);
-ref14.output = struct('A', r_io.A, 'B', r_io.B, 'Cost', r_io.Cost);
+% The vector key 'Cost' holds the per-iteration history, CostHistory
+% (SPEC.md §8.12.9); the key keeps its old name until the vector is
+% re-derived, which renames it to CostHistory and adds the (1 x 3) Cost.
+ref14.output = struct('A', r_io.A, 'B', r_io.B, 'Cost', r_io.CostHistory);
 ref14.tolerance = struct('A_rel', 1e-2, 'B_rel', 1e-2, 'Cost_rel', 1e-2);
 
 writeJSON(fullfile(thisDir, 'reference_ltv_io.json'), ref14);

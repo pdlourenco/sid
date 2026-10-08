@@ -126,7 +126,7 @@ Every public function returns a typed, frozen dataclass from `sid._results`:
 | `FreqMapResult` | `freq_map` | `response`, `noise_spectrum`, `coherence`, `time`, `frequency` |
 | `SpectrogramResult` | `spectrogram` | `power`, `power_db`, `complex_stft`, `time`, `frequency` |
 | `LTVResult` | `ltv_disc` | `a`, `b`, `a_std`, `b_std`, `lambda_`, `cost` |
-| `LTVIOResult` | `ltv_disc_io` | `a`, `b`, `x`, `cost`, `iterations` |
+| `LTVIOResult` | `ltv_disc_io` | `a`, `b`, `x`, `cost`, `cost_history`, `iterations` |
 | `FrozenResult` | `ltv_disc_frozen` | `response`, `response_std`, `time_steps`, `frequency` |
 | `ResidualResult` | `residual` | `residual`, `auto_corr`, `whiteness_pass`, `independence_pass` |
 | `CompareResult` | `compare` | `predicted`, `measured`, `fit`, `residual` |

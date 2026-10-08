@@ -156,7 +156,9 @@ Combining: $J(\mathbf{x}^{(t+1)}, \mathbf{C}^{(t+1)}) \leq J(\mathbf{x}^{(t)}, \
 > applies the $1/\sqrt{N}$ data scaling (§8.3.2), it minimises the dynamics
 > fidelity plus smoothness with effective weight $N\lambda$, not $\lambda$. The
 > single objective for which both steps are exact block minimisers — and hence
-> the one that is monotone and is reported in the `Cost` field — therefore uses
+> the one that is monotone along a $\mu = 0$ alternation and is reported in the
+> `CostHistory` field (with its breakdown at the returned estimate in `Cost`,
+> SPEC §8.12.9) — therefore uses
 > the effective weight:
 > $$ J = \sum_k \|y(k) - Hx(k)\|^2_{R^{-1}} + \sum_k \|x(k+1) - A(k)x(k) - B(k)u(k)\|^2 + N\lambda \sum_k \|C(k) - C(k-1)\|_F^2. $$
 > The $\lambda$-weighted $J$ written in §2 is the user's nominal objective (same
