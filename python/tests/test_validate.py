@@ -81,6 +81,26 @@ class TestValidateData:
             validate_data(rng.standard_normal(100), rng.standard_normal(50))
         assert exc.value.code == "size_mismatch"
 
+    @pytest.mark.parametrize(
+        ("y_shape", "u_shape"),
+        [((50, 2, 1), (50, 1, 1)), ((50, 2, 1), (50, 1)), ((50, 2), (50, 1, 1))],
+    )
+    def test_single_trajectory_3d_is_squeezed(self, y_shape, u_shape) -> None:
+        """(N, n, 1) is one trajectory: y and u come back 2-D (SPEC.md §1)."""
+        rng = np.random.default_rng(0)
+        y = rng.standard_normal(y_shape)
+        u = rng.standard_normal(u_shape)
+        y2, u2, N, ny, nu, is_ts, n_traj = validate_data(y, u)
+        assert y2.shape == (50, 2) and u2.shape == (50, 1)
+        assert (N, ny, nu, is_ts, n_traj) == (50, 2, 1, False, 1)
+        np.testing.assert_array_equal(y2, y.reshape(50, 2))
+
+    def test_single_trajectory_3d_time_series_is_squeezed(self) -> None:
+        y = np.random.default_rng(0).standard_normal((50, 1, 1))
+        y2, u2, _, ny, nu, is_ts, n_traj = validate_data(y, None)
+        assert y2.shape == (50, 1) and u2 is None
+        assert (ny, nu, is_ts, n_traj) == (1, 0, True, 1)
+
     def test_multi_output(self) -> None:
         """y(50x2), u(50x3) returns ny=2, nu=3."""
         rng = np.random.default_rng(42)

@@ -233,6 +233,8 @@ def freq_etfe(
     Changelog
     ---------
     2026-04-08 : First version (Python port) by Pedro Lourenco.
+    2026-10-08 : A single trajectory given as ``(N, n, 1)`` no longer crashes
+        and gives the 2-D result (via ``validate_data``). By Pedro Lourenco.
     """
 
     # ---- Validate data ----

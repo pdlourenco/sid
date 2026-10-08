@@ -95,6 +95,8 @@ def validate_data(
     ---------
     2026-04-08 : First version by Pedro Lourenco.
     2026-04-10 : Add ``preserve_lengths`` for SPEC.md §6.2 compliance.
+    2026-10-08 : Squeeze a single trajectory given as 3-D, ``(N, n, 1)``, to
+        2-D. By Pedro Lourenco.
     """
 
     # ---- Handle list input (variable-length trajectories) ---------------
@@ -245,6 +247,15 @@ def validate_data(
         u = np.asarray(u, dtype=np.float64)
         if u.ndim == 1:
             u = u[:, np.newaxis]
+
+    # ---- A single trajectory given as 3-D is the 2-D case ----------------
+    # (N, n, 1) is one trajectory (SPEC §1); MATLAB cannot even represent the
+    # trailing singleton. Squeeze it here, once, so no caller needs a 3-D
+    # L = 1 path of its own.
+    if y.ndim == 3 and y.shape[2] == 1:
+        y = y[:, :, 0]
+    if u is not None and u.ndim == 3 and u.shape[2] == 1:
+        u = u[:, :, 0]
 
     # ---- Detect multi-trajectory (3-D arrays) ---------------------------
     if y.ndim == 3:
