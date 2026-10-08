@@ -129,6 +129,8 @@ def detrend(
     Changelog
     ---------
     2026-04-08 : First version (Python port) by Pedro Lourenco.
+    2026-10-08 : A single trajectory given as ``(N, n_ch, 1)`` no longer
+        crashes and keeps its shape. By Pedro Lourenco.
     """
     x = np.asarray(x)
 
@@ -177,7 +179,7 @@ def detrend(
     for lt in range(n_traj):
         for ch in range(n_ch):
             # Extract column
-            if n_traj > 1:
+            if x.ndim == 3:  # includes a single trajectory (N, n_ch, 1)
                 col = x[:, ch, lt]
             else:
                 col = x[:, ch]
@@ -205,7 +207,7 @@ def detrend(
 
                 idx = seg_end
 
-            if n_traj > 1:
+            if x.ndim == 3:
                 trend[:, ch, lt] = trend_col
             else:
                 trend[:, ch] = trend_col

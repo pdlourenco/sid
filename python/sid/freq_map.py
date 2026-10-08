@@ -381,6 +381,8 @@ def freq_map(
     Changelog
     ---------
     2026-04-08 : First version (Python port) by Pedro Lourenco.
+    2026-10-08 : MISO data (one output, several inputs) no longer crashes;
+        3-D single-trajectory input works under Welch. By Pedro Lourenco.
     """
     # ---- Validate data (preserve variable-length lists for SPEC.md §6.2) ----
     y, u, N, ny, nu, is_time_series, n_traj = validate_data(y, u, preserve_lengths=True)
@@ -600,7 +602,9 @@ def freq_map(
             if Coh_all is not None:
                 Coh_all[:, idx] = rk.coherence
 
-        if ny == 1:
+        # Branch on the allocated shape, not on ny: a MISO model (ny == 1,
+        # nu > 1) is allocated in the MIMO layout (nf, K, 1, 1).
+        if NS_all.ndim == 2:
             NS_all[:, idx] = rk.noise_spectrum.ravel()
             NSStd_all[:, idx] = rk.noise_spectrum_std.ravel()
         else:
