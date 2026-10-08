@@ -1,6 +1,6 @@
 # ADR-0002: Contract artifacts are drift-hardened, not just present
 
-- **Status:** Accepted — _2026-07-24_
+- **Status:** Superseded by [ADR-0007](ADR-0007-reference-regeneration-provenance-encoding.md) — _2026-10-08_ (accepted 2026-07-24)
 - **Deciders:** Project maintainer
 - **Related:** [`CONTRIBUTING.md`](../../CONTRIBUTING.md) §"Contract artifacts and drift hardening", [ADR-0001](ADR-0001-spec-is-the-contract.md), #145, #147
 

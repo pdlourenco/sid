@@ -147,7 +147,7 @@ Before you finalize a number:
   are the sole contract; each language port derives independently; cross-language
   vectors are a check, not a proof.
 - [ADR-0002](ADR-0002-contract-artifact-hardening.md) — Contract artifacts are
-  drift-hardened, not just present — **Accepted** — `testdata/` vectors are held
+  drift-hardened, not just present — **Superseded by ADR-0007** — `testdata/` vectors are held
   to standing rules (tolerance floors, authoritative stored tolerances, no orphan
   artifacts, regeneration-only edits, structural gates) so a silent-pass vector
   can't reappear (standing-policy form of the #145 fixes).
@@ -172,3 +172,10 @@ Before you finalize a number:
   per-language material moves to the language guides, executed phase logs are
   archived under `docs/plans/`; removes the "MATLAB is ground truth" claim from
   every living document (#195).
+- [ADR-0007](ADR-0007-reference-regeneration-provenance-encoding.md) — Reference
+  vectors are regenerated on the PR, provenance-checked, and encode non-finite
+  values — **Accepted** — keeps ADR-0002's five rules and adds: no regeneration
+  commits on `main` (the PR's MATLAB job regenerates and pushes semantic changes
+  to the PR branch); a PR-time ancestry + canonical-engine provenance check; and
+  `NaN`/`Inf`/`-Inf` stored as the strings `"NaN"`/`"Inf"`/`"-Inf"`, compared
+  exactly; supersedes ADR-0002.
