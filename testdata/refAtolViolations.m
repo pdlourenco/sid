@@ -23,11 +23,12 @@ function bad = refAtolViolations(output, tolerance)
             key = name;
         end
         v = output.(name);
-        if iscell(v)
-            v = cell2mat(cellfun(@(x) x(:), v(:), 'UniformOutput', false));
+        if iscell(v) && all(cellfun(@(x) isnumeric(x) || islogical(x), v(:)))
+            v = cell2mat(cellfun(@(x) double(x(:)), v(:), 'UniformOutput', false));
         end
         if ~(isnumeric(v) || islogical(v))
-            continue;
+            error('refAtolViolations:unsupported', ...
+                'Output field %s is not numeric; the floor rule cannot check it.', name);
         end
         v = abs(double(v(:)));
         v = v(isfinite(v));

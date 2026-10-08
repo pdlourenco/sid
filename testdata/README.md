@@ -52,9 +52,10 @@ zero, or whose smallest finite magnitude is below `1e-12` of its largest, must c
 `Response_imag`, otherwise the field's own name). `generate_reference.m` refuses to
 write such a field without one, and both consumers fail a committed vector that
 lacks one (`refAtolViolations.m`; `_atol_violations` in
-`python/tests/test_cross_validation.py`). The floors in the generator are
-`rtol × max|field|`, rounded up to one significant figure: the field's own
-relative tolerance at its largest magnitude.
+`python/tests/test_cross_validation.py`). A floor binds only near zero: under
+`atol + rtol·|expected|` a floor larger than `rtol` times an entry loosens that
+entry too, so floors are set at the measured cross-engine residual scale
+(`1e-12`–`1e-14` for the spectral fields), not at `rtol × max|field|`.
 
 ### Non-finite values
 
