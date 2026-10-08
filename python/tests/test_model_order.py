@@ -76,7 +76,8 @@ class TestModelOrder:
     # Test 3: Threshold method
     # ------------------------------------------------------------------
     def test_threshold_method(self) -> None:
-        """Threshold method gives n in a reasonable range."""
+        """Threshold method returns the true order when the threshold separates
+        the structural singular values from the noise floor."""
         rng = np.random.default_rng(42)
         N = 1000
         u = rng.standard_normal(N)
@@ -90,10 +91,22 @@ class TestModelOrder:
         y = lfilter(b_poly, a_poly, u) + 0.01 * rng.standard_normal(N)
 
         G = freq_bt(y, u, window_size=60)
-        n, sv = model_order(G, threshold=0.01)
+        n, sv = model_order(G, threshold=0.1)
 
-        assert n >= 1, f"Threshold method: n should be >= 1, got {n}"
-        assert n <= 10, f"Threshold method: n should be <= 10, got {n}"
+        # The threshold method counts singular values above threshold * s[0].
+        # Here the structural values are 1 and ~0.72 and the noise floor starts
+        # at ~0.03, so 0.1 lies between them and the method must return the true
+        # order exactly. (At 0.01 the threshold sat inside the noise floor and
+        # the count was noise: 6.)
+        s = np.asarray(sv["singular_values"]) / sv["singular_values"][0]
+        assert s[1] > 0.1 > s[2], f"fixture: threshold not between {s[1]:.3g} and {s[2]:.3g}"
+        assert n == 2, f"Threshold method: expected the true order 2, got {n}"
+        # The gap method also returns 2 here, so pin the counting rule itself:
+        # at 0.01, inside the noise floor, n is the number of s > 0.01
+        # (SPEC §8.12.12) and exceeds the true order.
+        n_low, sv_low = model_order(G, threshold=0.01)
+        s_low = np.asarray(sv_low["singular_values"]) / sv_low["singular_values"][0]
+        assert n_low == int(np.sum(s_low > 0.01)) and n_low > 2, (n_low, s_low[:8])
 
     # ------------------------------------------------------------------
     # Test 4: Output fields

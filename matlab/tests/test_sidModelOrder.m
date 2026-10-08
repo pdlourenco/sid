@@ -93,15 +93,27 @@ for k = 3:N
 end
 
 G = sidFreqBT(y, u, 'WindowSize', 60);
-[n_thresh, ~] = sidModelOrder(G, 'Threshold', 0.01);
+[n_thresh, sv_thresh] = sidModelOrder(G, 'Threshold', 0.1);
 
-% Loose sanity range only. On a noisy BT estimate the singular-value tail is
-% dense around a relative threshold of 0.01, so the exact count is sensitive
-% to the BLAS/SVD engine (MATLAB ~4, Octave ~7); the bound is wide enough to
-% absorb that while still catching a broken method. The threshold method's
-% overcounting on noisy tails is part of the deferred noise-floor work (#139).
-assert(n_thresh >= 1 && n_thresh <= 12, ...
-    'Threshold method returned unreasonable n = %d', n_thresh);
+% The threshold method counts singular values above Threshold * sigma_1. On
+% this noisy BT estimate the two structural values are 1 and ~0.32 and the
+% noise floor starts at ~0.017 (MATLAB and Octave alike, although their randn
+% streams differ), so a 0.1 threshold lies between them (~3x below sigma_2,
+% ~6x above the floor) and the method must return the true order exactly.
+s_thresh = sv_thresh.SingularValues / sv_thresh.SingularValues(1);
+assert(s_thresh(2) > 0.1 && s_thresh(3) < 0.1, ...
+    'fixture: threshold not between structure and noise floor (%.3g, %.3g)', ...
+    s_thresh(2), s_thresh(3));
+assert(n_thresh == 2, ...
+    'Threshold method: expected the true order 2, got n = %d', n_thresh);
+% The gap method also returns 2 here, so pin the counting rule itself too: at
+% 0.01, inside the noise floor, the count is the number of sigma_k/sigma_1 >
+% 0.01 (SPEC §8.12.12) and exceeds the true order (4 on MATLAB, 7 on Octave).
+[n_low, sv_low] = sidModelOrder(G, 'Threshold', 0.01);
+s_low = sv_low.SingularValues / sv_low.SingularValues(1);
+assert(n_low == nnz(s_low > 0.01) && n_low > 2, ...
+    'Threshold 0.01: n = %d, expected nnz(sigma/sigma_1 > 0.01) = %d (> 2)', ...
+    n_low, nnz(s_low > 0.01));
 runner__nPassed = runner__nPassed + 1;
 fprintf('  Test 5 passed: threshold method returned n = %d.\n', n_thresh);
 
