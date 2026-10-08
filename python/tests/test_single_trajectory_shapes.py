@@ -53,6 +53,11 @@ def test_single_trajectory_3d_equals_2d(siso, call) -> None:
     r3 = call(_as3d(y), _as3d(u))
     np.testing.assert_array_equal(r3.response, r2.response)
     np.testing.assert_array_equal(r3.noise_spectrum, r2.noise_spectrum)
+    np.testing.assert_array_equal(r3.response_std, r2.response_std)
+    if r2.coherence is None:
+        assert r3.coherence is None
+    else:
+        np.testing.assert_array_equal(r3.coherence, r2.coherence)
     assert r3.response.shape == r2.response.shape
 
 
@@ -84,5 +89,5 @@ def test_freq_map_miso(algorithm: str) -> None:
     assert res.response.shape == (nf, K, 1, nu)
     assert res.noise_spectrum.shape == (nf, K, 1, 1)
     # A static MISO gain: the estimate recovers it per input channel.
-    np.testing.assert_allclose(res.response[:, :, 0, 0].real.mean(), 0.7, atol=0.05)
-    np.testing.assert_allclose(res.response[:, :, 0, 1].real.mean(), -0.4, atol=0.05)
+    np.testing.assert_allclose(res.response[:, :, 0, 0].real, 0.7, atol=0.1)
+    np.testing.assert_allclose(res.response[:, :, 0, 1].real, -0.4, atol=0.1)
