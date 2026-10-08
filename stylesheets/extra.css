@@ -1,0 +1,14 @@
+/* Slight padding tweak for inline code blocks. */
+:root {
+  --md-typeset-table-color: var(--md-default-fg-color--light);
+}
+
+.md-typeset table:not([class]) td {
+  vertical-align: top;
+}
+
+/* Tighten card grids on the landing page. */
+.md-typeset .grid.cards > :is(ul, ol) > li,
+.md-typeset .grid > .card {
+  padding: 0.8rem 1rem;
+}
