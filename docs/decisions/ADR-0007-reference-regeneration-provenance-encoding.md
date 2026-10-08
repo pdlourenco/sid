@@ -43,7 +43,9 @@ sid keeps ADR-0002's five rules unchanged, and adds three:
    vector's provenance names a non-canonical engine. That push's commit message
    never contains the skip-ci marker, and the job never pushes when the head commit
    is its own. For fork PRs the job uploads the vectors as an artifact and the
-   maintainer commits them.
+   maintainer commits them. On push to `main` the job still regenerates and diffs,
+   without committing, and fails on a semantic difference, so two individually green
+   PRs that merge into stale vectors are caught.
 2. **Provenance is checked.** The generator stamps the full commit SHA and the
    engine version. A PR-time check requires each changed vector's SHA to be an
    ancestor of the PR head and its engine to be the canonical one. Both consumers
@@ -70,11 +72,15 @@ sid keeps ADR-0002's five rules unchanged, and adds three:
 - **Negative / cost:** a PR that changes numerics gets a bot commit on its branch;
   the author must pull before pushing again and must not force-push over it.
 - **Negative / cost:** the reference bot no longer needs to push to `main`, so its
-  always-bypass in the `main` ruleset goes. That ruleset is ADR-0005's subject; the
-  ADR that supersedes ADR-0005 (the review-v2 plan's item A1) records it.
+  always-bypass in the `main` ruleset goes — but only once rule 1 is in place, since
+  until then the bot still pushes regenerated vectors to `main`. That ruleset is
+  ADR-0005's subject, and the README offers no way to supersede part of an ADR, so
+  this ADR does not change ADR-0005's status: the ADR that supersedes ADR-0005 (the
+  review-v2 plan's item A1) records the ruleset without the bypass.
 - **Not closed by this ADR:** rule 3 is implemented with this ADR (plan item A3).
   Rules 1 and 2 are implemented by plan item A2; until that lands, CI still
-  regenerates and commits on `main` as ADR-0002 described.
+  regenerates and commits on `main`, as `testdata/README.md` and `tests.yml`
+  describe.
 
 ## Alternatives considered
 
@@ -96,9 +102,10 @@ sid keeps ADR-0002's five rules unchanged, and adds three:
 - **A parallel `<field>_mask` for non-finite positions.** Rejected because it doubles
   the fields a reviewer reads, and a mask and a payload can disagree.
 - **Bare `NaN` / `Infinity` tokens** (`jsonencode` with `ConvertInfAndNaN` off).
-  Rejected because they are not JSON: strict parsers (`jq`, most non-Python
-  libraries) reject the file, so the vectors would stop being readable by standard
-  tools. sid's MATLAB and Octave consumers do use these tokens internally, as an
+  Rejected because they are not JSON (RFC 8259): JavaScript's `JSON.parse` and
+  other strict parsers reject the file, and lenient ones read it lossily (`jq` turns
+  `NaN` into `null` and `Infinity` into the largest double), so the vectors would
+  stop being reliably readable by standard tools. sid's MATLAB and Octave consumers do use these tokens internally, as an
   intermediate step when decoding.
 - **Keep `null` and treat it as `NaN`.** Rejected because it leaves the §3.3 `Inf`
   sentinel unrepresentable.

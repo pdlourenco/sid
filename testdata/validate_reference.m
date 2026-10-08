@@ -288,8 +288,12 @@ function args = structToNameValue(s)
 end
 
 
-function [ok, messages] = compareOutputs(result, expected, tolerance)
+function [ok, messages] = compareOutputs(result, expected, tolerance, quiet)
 %COMPAREOUTPUTS Check each expected output field against actual result.
+%   QUIET (optional, default false) suppresses the per-field pass lines.
+    if nargin < 4
+        quiet = false;
+    end
     ok = true;
     messages = {};
 
@@ -375,7 +379,7 @@ function [ok, messages] = compareOutputs(result, expected, tolerance)
                 '  %s: element %d |diff|=%.2e exceeds atol(%.0e)+rtol(%.0e)*|exp|(%.2e) = %.2e', ...
                 name, worstIdx, absDiff(worstIdx), atol, rtol, ...
                 abs(expVec(worstIdx)), thresh(worstIdx));
-        else
+        elseif ~quiet
             fprintf('    %s: max relative error %.2e (rtol %.0e, atol %.0e)\n', ...
                 name, relErr, rtol, atol);
         end
@@ -404,13 +408,13 @@ function selfTestNonFinite()
 
     expRef = struct('x', [1, NaN, Inf, -Inf]);
     tol = struct();
-    if ~compareOutputs(expRef, expRef, tol)
+    if ~compareOutputs(expRef, expRef, tol, true)
         error('validate_reference:selfTest', 'exact non-finite match rejected');
     end
     bad = {[1, 2, Inf, -Inf], [1, NaN, -Inf, -Inf], [1, NaN, 5, -Inf], ...
            [NaN, NaN, Inf, -Inf]};
     for k = 1:numel(bad)
-        if compareOutputs(struct('x', bad{k}), expRef, tol)
+        if compareOutputs(struct('x', bad{k}), expRef, tol, true)
             error('validate_reference:selfTest', ...
                 'non-finite mismatch %d passed the comparison', k);
         end

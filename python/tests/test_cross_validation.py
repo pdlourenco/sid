@@ -69,10 +69,44 @@ def _to_array(data, key: str) -> np.ndarray:
 
 
 def _to_complex(data, base_key: str) -> np.ndarray:
-    """Reconstruct complex array from _real and _imag JSON fields."""
+    """Reconstruct complex array from _real and _imag JSON fields.
+
+    Assigns the parts directly: ``re + 1j * im`` would turn a finite real part
+    into NaN wherever ``im`` is infinite (``0 * inf``).
+    """
     re = np.array(data[base_key + "_real"], dtype=np.float64)
     im = np.array(data[base_key + "_imag"], dtype=np.float64)
-    return re + 1j * im
+    out = np.empty(re.shape, dtype=np.complex128)
+    out.real = re
+    out.imag = im
+    return out
+
+
+def _assert_allclose(actual, desired, rtol=1e-7, atol=0.0, err_msg="", **kwargs):
+    """``np.testing.assert_allclose`` that is exact on non-finite values.
+
+    NaN matches only NaN and Inf only Inf of the same sign (ADR-0007), which
+    numpy already does for real arrays. For complex arrays numpy treats a
+    value as NaN if either part is, so ``5+nanj`` would match ``3+nanj``:
+    wherever either side has a non-finite part, the real and imaginary parts
+    are compared separately; finite entries keep the complex-modulus test.
+    """
+    a = np.asarray(actual)
+    d = np.asarray(desired)
+    if not (np.iscomplexobj(a) or np.iscomplexobj(d)):
+        np.testing.assert_allclose(a, d, rtol=rtol, atol=atol, err_msg=err_msg, **kwargs)
+        return
+    a, d = np.broadcast_arrays(a.astype(np.complex128), d.astype(np.complex128))
+    nonfin = ~(
+        np.isfinite(a.real) & np.isfinite(a.imag) & np.isfinite(d.real) & np.isfinite(d.imag)
+    )
+    for part in (np.real, np.imag):
+        np.testing.assert_allclose(
+            part(a)[nonfin], part(d)[nonfin], rtol=rtol, atol=atol, err_msg=err_msg, **kwargs
+        )
+    np.testing.assert_allclose(
+        a[~nonfin], d[~nonfin], rtol=rtol, atol=atol, err_msg=err_msg, **kwargs
+    )
 
 
 def _tol(ref: dict, field: str) -> dict:
@@ -107,7 +141,7 @@ class TestCrossValidationSISO:
         result = sid.freq_bt(y, u, window_size=ws, sample_time=ts)
 
         expected_resp = _to_complex(ref["output"], "Response")
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.response,
             expected_resp.ravel(),
             **_tol(ref, "Response"),
@@ -123,7 +157,7 @@ class TestCrossValidationSISO:
         result = sid.freq_bt(y, u, window_size=ws)
 
         expected_freq = _to_array(ref["output"], "Frequency")
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.frequency,
             expected_freq.ravel(),
             **_tol(ref, "Frequency"),
@@ -139,7 +173,7 @@ class TestCrossValidationSISO:
         result = sid.freq_bt(y, u, window_size=ws)
 
         expected_ns = _to_array(ref["output"], "NoiseSpectrum")
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.noise_spectrum,
             expected_ns.ravel(),
             **_tol(ref, "NoiseSpectrum"),
@@ -155,7 +189,7 @@ class TestCrossValidationSISO:
         result = sid.freq_bt(y, u, window_size=ws)
 
         expected_coh = _to_array(ref["output"], "Coherence")
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.coherence,
             expected_coh.ravel(),
             **_tol(ref, "Coherence"),
@@ -184,7 +218,7 @@ class TestCrossValidationSISOLargeM:
         result = sid.freq_bt(y, u, window_size=ws, sample_time=ts)
 
         expected_resp = _to_complex(ref["output"], "Response")
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.response,
             expected_resp.ravel(),
             **_tol(ref, "Response"),
@@ -200,7 +234,7 @@ class TestCrossValidationSISOLargeM:
         result = sid.freq_bt(y, u, window_size=ws)
 
         expected_freq = _to_array(ref["output"], "Frequency")
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.frequency,
             expected_freq.ravel(),
             **_tol(ref, "Frequency"),
@@ -216,7 +250,7 @@ class TestCrossValidationSISOLargeM:
         result = sid.freq_bt(y, u, window_size=ws)
 
         expected_ns = _to_array(ref["output"], "NoiseSpectrum")
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.noise_spectrum,
             expected_ns.ravel(),
             **_tol(ref, "NoiseSpectrum"),
@@ -232,7 +266,7 @@ class TestCrossValidationSISOLargeM:
         result = sid.freq_bt(y, u, window_size=ws)
 
         expected_coh = _to_array(ref["output"], "Coherence")
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.coherence,
             expected_coh.ravel(),
             **_tol(ref, "Coherence"),
@@ -259,7 +293,7 @@ class TestCrossValidationMIMO:
         nu = result.response.shape[2]
         expected_3d = expected_resp.reshape(nf, ny, nu)
 
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.response,
             expected_3d,
             **_tol(ref, "Response"),
@@ -279,7 +313,7 @@ class TestCrossValidationMIMO:
         ny = result.noise_spectrum.shape[1]
         expected_3d = expected_ns.reshape(nf, ny, ny)
 
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.noise_spectrum,
             expected_3d,
             **_tol(ref, "NoiseSpectrum"),
@@ -298,7 +332,7 @@ class TestCrossValidationTimeSeries:
         result = sid.freq_bt(y, None, window_size=ws)
 
         expected_ns = _to_array(ref["output"], "NoiseSpectrum")
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.noise_spectrum,
             expected_ns.ravel(),
             **_tol(ref, "NoiseSpectrum"),
@@ -313,7 +347,7 @@ class TestCrossValidationTimeSeries:
         result = sid.freq_bt(y, None, window_size=ws)
 
         expected_std = _to_array(ref["output"], "NoiseSpectrumStd")
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.noise_spectrum_std,
             expected_std.ravel(),
             **_tol(ref, "NoiseSpectrumStd"),
@@ -333,7 +367,7 @@ class TestCrossValidationInternals:
         R = sid_cov(x2d, x2d, M)
 
         expected = _to_array(ref["output"], "R_xx").ravel()
-        np.testing.assert_allclose(
+        _assert_allclose(
             R,
             expected,
             **_tol(ref, "R_xx"),
@@ -349,7 +383,7 @@ class TestCrossValidationInternals:
         R = sid_cov(x[:, np.newaxis], z[:, np.newaxis], M)
 
         expected = _to_array(ref["output"], "R_xz").ravel()
-        np.testing.assert_allclose(
+        _assert_allclose(
             R,
             expected,
             **_tol(ref, "R_xz"),
@@ -363,7 +397,7 @@ class TestCrossValidationInternals:
         W = hann_win(M)
 
         expected = _to_array(ref["output"], "W").ravel()
-        np.testing.assert_allclose(
+        _assert_allclose(
             W,
             expected,
             **_tol(ref, "W"),
@@ -383,7 +417,7 @@ class TestCrossValidationInternals:
         Phi = windowed_dft(R, W, freqs, True, R)
 
         expected = _to_complex(ref["output"], "Phi_xx")
-        np.testing.assert_allclose(
+        _assert_allclose(
             Phi,
             expected.ravel(),
             rtol=ref["tolerance"]["Phi_xx_real_rel"],
@@ -406,7 +440,7 @@ class TestCrossValidationInternals:
         Phi = windowed_dft(R_xz, W, freqs, True, R_zx)
 
         expected = _to_complex(ref["output"], "Phi_xz")
-        np.testing.assert_allclose(
+        _assert_allclose(
             Phi,
             expected.ravel(),
             rtol=ref["tolerance"]["Phi_xz_real_rel"],
@@ -427,7 +461,7 @@ class TestCrossValidationETFE:
         result = sid.freq_etfe(y, u, smoothing=smoothing, sample_time=ts)
 
         expected_resp = _to_complex(ref["output"], "Response")
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.response,
             expected_resp.ravel(),
             **_tol(ref, "Response"),
@@ -443,7 +477,7 @@ class TestCrossValidationETFE:
         result = sid.freq_etfe(y, u, smoothing=smoothing)
 
         expected_ns = _to_array(ref["output"], "NoiseSpectrum")
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.noise_spectrum,
             expected_ns.ravel(),
             **_tol(ref, "NoiseSpectrum"),
@@ -463,7 +497,7 @@ class TestCrossValidationBTFDR:
         result = sid.freq_btfdr(y, u, sample_time=ts)
 
         expected_resp = _to_complex(ref["output"], "Response")
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.response,
             expected_resp.ravel(),
             **_tol(ref, "Response"),
@@ -478,7 +512,7 @@ class TestCrossValidationBTFDR:
         result = sid.freq_btfdr(y, u)
 
         expected_ns = _to_array(ref["output"], "NoiseSpectrum")
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.noise_spectrum,
             expected_ns.ravel(),
             **_tol(ref, "NoiseSpectrum"),
@@ -501,7 +535,7 @@ class TestCrossValidationSpectrogram:
         result = spectrogram(x, window_length=wl, overlap=ov, sample_time=ts)
 
         expected_time = _to_array(ref["output"], "Time")
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.time,
             expected_time.ravel(),
             **_tol(ref, "Time"),
@@ -520,7 +554,7 @@ class TestCrossValidationSpectrogram:
         result = spectrogram(x, window_length=wl, overlap=ov, sample_time=ts)
 
         expected_power = _to_array(ref["output"], "Power")
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.power.ravel(),
             expected_power.ravel(),
             **_tol(ref, "Power"),
@@ -539,7 +573,7 @@ class TestCrossValidationSpectrogram:
         result = spectrogram(x, window_length=wl, overlap=ov, sample_time=ts)
 
         expected_freq = _to_array(ref["output"], "Frequency")
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.frequency,
             expected_freq.ravel(),
             **_tol(ref, "Frequency"),
@@ -563,7 +597,7 @@ class TestCrossValidationFreqMap:
         result = freq_map(y, u, segment_length=seg_len, overlap=ov, window_size=ws, algorithm="bt")
 
         expected_resp = _to_complex(ref["output"], "Response")
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.response.ravel(),
             expected_resp.ravel(),
             **_tol(ref, "Response"),
@@ -583,7 +617,7 @@ class TestCrossValidationFreqMap:
         result = freq_map(y, u, segment_length=seg_len, overlap=ov, window_size=ws, algorithm="bt")
 
         expected_ns = _to_array(ref["output"], "NoiseSpectrum")
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.noise_spectrum.ravel(),
             expected_ns.ravel(),
             **_tol(ref, "NoiseSpectrum"),
@@ -603,7 +637,7 @@ class TestCrossValidationFreqMap:
         result = freq_map(y, u, segment_length=seg_len, overlap=ov, window_size=ws, algorithm="bt")
 
         expected_coh = _to_array(ref["output"], "Coherence")
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.coherence.ravel(),
             expected_coh.ravel(),
             **_tol(ref, "Coherence"),
@@ -623,7 +657,7 @@ class TestCrossValidationFreqMap:
         result = freq_map(y, u, segment_length=seg_len, overlap=ov, window_size=ws, algorithm="bt")
 
         expected_time = _to_array(ref["output"], "Time")
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.time,
             expected_time.ravel(),
             **_tol(ref, "Time"),
@@ -645,7 +679,7 @@ class TestCrossValidationLTVCosmic:
         result = ltv_disc(X, U, lambda_=lam)
 
         expected_A = _to_array(ref["output"], "A")
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.a.ravel(),
             expected_A.ravel(),
             **_tol(ref, "A"),
@@ -663,7 +697,7 @@ class TestCrossValidationLTVCosmic:
         result = ltv_disc(X, U, lambda_=lam)
 
         expected_B = _to_array(ref["output"], "B")
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.b.ravel(),
             expected_B.ravel(),
             **_tol(ref, "B"),
@@ -681,7 +715,7 @@ class TestCrossValidationLTVCosmic:
         result = ltv_disc(X, U, lambda_=lam)
 
         expected_cost = _to_array(ref["output"], "Cost")
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.cost,
             expected_cost.ravel(),
             **_tol(ref, "Cost"),
@@ -714,12 +748,8 @@ class TestCrossValidationTestMSD:
 
         expected_Ad = _to_array(ref["output"], "Ad")
         expected_Bd = _to_array(ref["output"], "Bd")
-        np.testing.assert_allclose(
-            Ad, expected_Ad, err_msg="MSD Ad mismatch vs MATLAB", **_tol(ref, "Ad")
-        )
-        np.testing.assert_allclose(
-            Bd, expected_Bd, err_msg="MSD Bd mismatch vs MATLAB", **_tol(ref, "Bd")
-        )
+        _assert_allclose(Ad, expected_Ad, err_msg="MSD Ad mismatch vs MATLAB", **_tol(ref, "Ad"))
+        _assert_allclose(Bd, expected_Bd, err_msg="MSD Bd mismatch vs MATLAB", **_tol(ref, "Bd"))
 
 
 class TestCrossValidationCosmicInternals:
@@ -777,7 +807,7 @@ class TestCrossValidationCosmicInternals:
             ("P", P),
         ]:
             expected = _to_array(ref["output"], name)
-            np.testing.assert_allclose(
+            _assert_allclose(
                 actual.ravel(),
                 expected.ravel(),
                 err_msg=f"COSMIC {name} mismatch vs MATLAB reference",
@@ -788,13 +818,11 @@ class TestCrossValidationCosmicInternals:
         expected_fid = float(ref["output"]["fidelity"])
         expected_reg = float(ref["output"]["regularization"])
 
-        np.testing.assert_allclose(
-            cost, expected_cost, err_msg="COSMIC cost mismatch", **_tol(ref, "cost")
-        )
-        np.testing.assert_allclose(
+        _assert_allclose(cost, expected_cost, err_msg="COSMIC cost mismatch", **_tol(ref, "cost"))
+        _assert_allclose(
             fid, expected_fid, err_msg="COSMIC fidelity mismatch", **_tol(ref, "fidelity")
         )
-        np.testing.assert_allclose(
+        _assert_allclose(
             reg,
             expected_reg,
             err_msg="COSMIC regularization mismatch",
@@ -823,7 +851,7 @@ class TestCrossValidationLTVFrozen:
         frz = ltv_disc_frozen(ltv, time_steps=time_steps)
 
         expected_resp = _to_complex(ref["output"], "Response")
-        np.testing.assert_allclose(
+        _assert_allclose(
             frz.response.ravel(),
             expected_resp.ravel(),
             **_tol(ref, "Response"),
@@ -865,7 +893,7 @@ class TestCrossValidationModelOrder:
             f"model order n mismatch vs MATLAB: got {n_est}, expected {int(ref['output']['n'])}"
         )
         expected_sv = _to_array(ref["output"], "SingularValues").ravel()
-        np.testing.assert_allclose(
+        _assert_allclose(
             sv["singular_values"][: len(expected_sv)],
             expected_sv,
             **_tol(ref, "SingularValues"),
@@ -893,7 +921,7 @@ class TestCrossValidationLTVStateEst:
             X_hat = X_hat[:, :, 0]
 
         expected = _to_array(ref["output"], "X_hat")
-        np.testing.assert_allclose(
+        _assert_allclose(
             X_hat,
             expected,
             **_tol(ref, "X_hat"),
@@ -921,13 +949,13 @@ class TestCrossValidationLTIFreqIO:
         if expected_B0.ndim == 1:
             expected_B0 = expected_B0[:, np.newaxis]
 
-        np.testing.assert_allclose(
+        _assert_allclose(
             A0,
             expected_A0,
             **_tol(ref, "A0"),
             err_msg="LTI A0 mismatch vs MATLAB reference",
         )
-        np.testing.assert_allclose(
+        _assert_allclose(
             B0,
             expected_B0,
             **_tol(ref, "B0"),
@@ -957,19 +985,19 @@ class TestCrossValidationResidual:
         expected_ac = _to_array(ref["output"], "AutoCorr")
         expected_cc = _to_array(ref["output"], "CrossCorr")
 
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.residual.ravel(),
             expected_resid.ravel(),
             **_tol(ref, "Residual"),
             err_msg="Residual mismatch vs MATLAB",
         )
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.auto_corr.ravel(),
             expected_ac.ravel(),
             **_tol(ref, "AutoCorr"),
             err_msg="AutoCorr mismatch vs MATLAB",
         )
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.cross_corr.ravel(),
             expected_cc.ravel(),
             **_tol(ref, "CrossCorr"),
@@ -997,13 +1025,13 @@ class TestCrossValidationCompare:
         expected_pred = _to_array(ref["output"], "Predicted")
         expected_fit = _to_array(ref["output"], "Fit")
 
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.predicted.ravel(),
             expected_pred.ravel(),
             **_tol(ref, "Predicted"),
             err_msg="Compare predicted mismatch vs MATLAB",
         )
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.fit.ravel(),
             expected_fit.ravel(),
             **_tol(ref, "Fit"),
@@ -1035,13 +1063,13 @@ class TestCrossValidationDetrend:
 
         x_det, trend = detrend(x, order=order)
 
-        np.testing.assert_allclose(
+        _assert_allclose(
             x_det.ravel(),
             _to_array(ref["output"], "x_detrended").ravel(),
             err_msg="Detrend x_detrended mismatch vs MATLAB",
             **_tol(ref, "x_detrended"),
         )
-        np.testing.assert_allclose(
+        _assert_allclose(
             trend.ravel(),
             _to_array(ref["output"], "trend").ravel(),
             err_msg="Detrend trend mismatch vs MATLAB",
@@ -1070,7 +1098,7 @@ class TestCrossValidationFreqDomainSim:
         r_bt = freq_bt(y_noiseless, u, window_size=bt_ws)
         y_pred = freq_domain_sim(r_bt.response, r_bt.frequency, u, u.shape[0])
 
-        np.testing.assert_allclose(
+        _assert_allclose(
             y_pred.ravel(),
             _to_array(ref["output"], "Y_pred").ravel(),
             err_msg="FreqDomainSim Y_pred mismatch vs MATLAB",
@@ -1103,13 +1131,13 @@ class TestCrossValidationUncertainty:
             r_bt.response, r_bt.noise_spectrum, r_bt.coherence, y.shape[0], W, 1
         )
 
-        np.testing.assert_allclose(
+        _assert_allclose(
             g_std.ravel(),
             _to_array(ref["output"], "GStd").ravel(),
             err_msg="Uncertainty GStd mismatch vs MATLAB",
             **_tol(ref, "GStd"),
         )
-        np.testing.assert_allclose(
+        _assert_allclose(
             phi_v_std.ravel(),
             _to_array(ref["output"], "PhiVStd").ravel(),
             err_msg="Uncertainty PhiVStd mismatch vs MATLAB",
@@ -1133,19 +1161,19 @@ class TestCrossValidationLTVdiscIO:
 
         result = ltv_disc_io(Y, U, H, lambda_=lam)
 
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.a.ravel(),
             _to_array(ref["output"], "A").ravel(),
             err_msg="LTV-IO A mismatch vs MATLAB",
             **_tol(ref, "A"),
         )
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.b.ravel(),
             _to_array(ref["output"], "B").ravel(),
             err_msg="LTV-IO B mismatch vs MATLAB",
             **_tol(ref, "B"),
         )
-        np.testing.assert_allclose(
+        _assert_allclose(
             np.asarray(result.cost).ravel(),
             _to_array(ref["output"], "Cost").ravel(),
             err_msg="LTV-IO cost history mismatch vs MATLAB",
@@ -1165,7 +1193,7 @@ class TestCrossValidationMultiTrajBT:
     def test_multitraj_response(self):
         ref, y3, u3 = self._data()
         result = sid.freq_bt(y3, u3, window_size=ref["params"]["WindowSize"])
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.response.ravel(),
             _to_complex(ref["output"], "Response").ravel(),
             **_tol(ref, "Response"),
@@ -1175,7 +1203,7 @@ class TestCrossValidationMultiTrajBT:
     def test_multitraj_response_std(self):
         ref, y3, u3 = self._data()
         result = sid.freq_bt(y3, u3, window_size=ref["params"]["WindowSize"])
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.response_std.ravel(),
             _to_array(ref["output"], "ResponseStd").ravel(),
             **_tol(ref, "ResponseStd"),
@@ -1185,7 +1213,7 @@ class TestCrossValidationMultiTrajBT:
     def test_multitraj_noise_spectrum(self):
         ref, y3, u3 = self._data()
         result = sid.freq_bt(y3, u3, window_size=ref["params"]["WindowSize"])
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.noise_spectrum.ravel(),
             _to_array(ref["output"], "NoiseSpectrum").ravel(),
             **_tol(ref, "NoiseSpectrum"),
@@ -1202,7 +1230,7 @@ class TestCrossValidationTimeSeriesETFE:
         if y.ndim == 1:
             y = y[:, np.newaxis]
         result = sid.freq_etfe(y, None)
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.noise_spectrum.ravel(),
             _to_array(ref["output"], "NoiseSpectrum").ravel(),
             **_tol(ref, "NoiseSpectrum"),
@@ -1215,7 +1243,7 @@ class TestCrossValidationTimeSeriesETFE:
         if y.ndim == 1:
             y = y[:, np.newaxis]
         result = sid.freq_etfe(y, None)
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.frequency.ravel(),
             _to_array(ref["output"], "Frequency").ravel(),
             **_tol(ref, "Frequency"),
@@ -1241,7 +1269,7 @@ class TestCrossValidationFreqMapWelch:
 
     def test_freqmap_welch_response(self):
         ref, result = self._run()
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.response.ravel(),
             _to_complex(ref["output"], "Response").ravel(),
             **_tol(ref, "Response"),
@@ -1250,7 +1278,7 @@ class TestCrossValidationFreqMapWelch:
 
     def test_freqmap_welch_noise_spectrum(self):
         ref, result = self._run()
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.noise_spectrum.ravel(),
             _to_array(ref["output"], "NoiseSpectrum").ravel(),
             **_tol(ref, "NoiseSpectrum"),
@@ -1259,7 +1287,7 @@ class TestCrossValidationFreqMapWelch:
 
     def test_freqmap_welch_coherence(self):
         ref, result = self._run()
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.coherence.ravel(),
             _to_array(ref["output"], "Coherence").ravel(),
             **_tol(ref, "Coherence"),
@@ -1280,7 +1308,7 @@ class TestCrossValidationBTFDRVecRes:
 
     def test_btfdr_vecres_response(self):
         ref, result = self._run()
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.response.ravel(),
             _to_complex(ref["output"], "Response").ravel(),
             **_tol(ref, "Response"),
@@ -1289,7 +1317,7 @@ class TestCrossValidationBTFDRVecRes:
 
     def test_btfdr_vecres_window_size(self):
         ref, result = self._run()
-        np.testing.assert_allclose(
+        _assert_allclose(
             np.asarray(result.window_size).ravel(),
             _to_array(ref["output"], "WindowSize").ravel(),
             **_tol(ref, "WindowSize"),
@@ -1298,7 +1326,7 @@ class TestCrossValidationBTFDRVecRes:
 
     def test_btfdr_vecres_noise_spectrum(self):
         ref, result = self._run()
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.noise_spectrum.ravel(),
             _to_array(ref["output"], "NoiseSpectrum").ravel(),
             **_tol(ref, "NoiseSpectrum"),
@@ -1322,7 +1350,7 @@ class TestCrossValidationCosmicUncertainty:
 
     def test_cosmic_a_std(self):
         ref, result = self._run()
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.a_std.ravel(),
             _to_array(ref["output"], "AStd").ravel(),
             **_tol(ref, "AStd"),
@@ -1331,7 +1359,7 @@ class TestCrossValidationCosmicUncertainty:
 
     def test_cosmic_b_std(self):
         ref, result = self._run()
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.b_std.ravel(),
             _to_array(ref["output"], "BStd").ravel(),
             **_tol(ref, "BStd"),
@@ -1340,7 +1368,7 @@ class TestCrossValidationCosmicUncertainty:
 
     def test_cosmic_noise_cov(self):
         ref, result = self._run()
-        np.testing.assert_allclose(
+        _assert_allclose(
             np.asarray(result.noise_cov).ravel(),
             _to_array(ref["output"], "NoiseCov").ravel(),
             **_tol(ref, "NoiseCov"),
@@ -1349,13 +1377,13 @@ class TestCrossValidationCosmicUncertainty:
 
     def test_cosmic_dof_and_variance(self):
         ref, result = self._run()
-        np.testing.assert_allclose(
+        _assert_allclose(
             float(result.degrees_of_freedom),
             float(_to_array(ref["output"], "DegreesOfFreedom")),
             **_tol(ref, "DegreesOfFreedom"),
             err_msg="COSMIC DegreesOfFreedom mismatch vs MATLAB",
         )
-        np.testing.assert_allclose(
+        _assert_allclose(
             float(result.noise_variance),
             float(_to_array(ref["output"], "NoiseVariance")),
             **_tol(ref, "NoiseVariance"),
@@ -1378,7 +1406,7 @@ class TestCrossValidationLTVCosmicVarLen:
 
     def test_varlen_a(self):
         ref, result = self._run()
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.a.ravel(),
             _to_array(ref["output"], "A").ravel(),
             **_tol(ref, "A"),
@@ -1387,7 +1415,7 @@ class TestCrossValidationLTVCosmicVarLen:
 
     def test_varlen_b(self):
         ref, result = self._run()
-        np.testing.assert_allclose(
+        _assert_allclose(
             result.b.ravel(),
             _to_array(ref["output"], "B").ravel(),
             **_tol(ref, "B"),
@@ -1396,7 +1424,7 @@ class TestCrossValidationLTVCosmicVarLen:
 
     def test_varlen_cost(self):
         ref, result = self._run()
-        np.testing.assert_allclose(
+        _assert_allclose(
             np.asarray(result.cost).ravel(),
             _to_array(ref["output"], "Cost").ravel(),
             **_tol(ref, "Cost"),
@@ -1423,7 +1451,7 @@ class TestCrossValidationLTIFreqIOPartial:
 
     def test_partial_a0(self):
         ref, a0, _ = self._run()
-        np.testing.assert_allclose(
+        _assert_allclose(
             a0.ravel(),
             _to_array(ref["output"], "A0").ravel(),
             **_tol(ref, "A0"),
@@ -1432,7 +1460,7 @@ class TestCrossValidationLTIFreqIOPartial:
 
     def test_partial_b0(self):
         ref, _, b0 = self._run()
-        np.testing.assert_allclose(
+        _assert_allclose(
             b0.ravel(),
             _to_array(ref["output"], "B0").ravel(),
             **_tol(ref, "B0"),
@@ -1457,7 +1485,7 @@ class TestCrossValidationLTVStateEstVarLen:
         # MATLAB flatten(cell) concatenates each trajectory column-major.
         actual = np.concatenate([np.asarray(x).flatten(order="F") for x in x_hat])
         expected = np.concatenate([np.array(t).flatten(order="F") for t in ref["output"]["X_hat"]])
-        np.testing.assert_allclose(
+        _assert_allclose(
             actual,
             expected,
             **_tol(ref, "X_hat"),
@@ -1485,7 +1513,7 @@ class TestCrossValidationLTVTune:
 
     def test_tune_best_lambda(self):
         ref, best_lambda, _ = self._run()
-        np.testing.assert_allclose(
+        _assert_allclose(
             float(best_lambda),
             float(_to_array(ref["output"], "BestLambda")),
             **_tol(ref, "BestLambda"),
@@ -1494,7 +1522,7 @@ class TestCrossValidationLTVTune:
 
     def test_tune_all_losses(self):
         ref, _, all_losses = self._run()
-        np.testing.assert_allclose(
+        _assert_allclose(
             np.asarray(all_losses).ravel(),
             _to_array(ref["output"], "AllLosses").ravel(),
             **_tol(ref, "AllLosses"),
@@ -1517,7 +1545,7 @@ class TestCrossValidationFrozenOfIO:
         res = ltv_disc_io(Y, U, H, lambda_=float(ref["params"]["Lambda"]))
         ts = np.array([int(ref["params"]["frozen_TimeSteps"])]) - 1  # 1-based -> 0-based
         frz = ltv_disc_frozen(res, time_steps=ts)
-        np.testing.assert_allclose(
+        _assert_allclose(
             frz.response.ravel(),
             _to_complex(ref["output"], "Response").ravel(),
             **_tol(ref, "Response"),
@@ -1551,6 +1579,10 @@ class TestNonFiniteEncoding:
     own self-test (``selfTestNonFinite`` in ``testdata/validate_reference.m``).
     """
 
+    def test_to_complex_keeps_real_part_next_to_infinite_imag(self):
+        z = _to_complex({"R_real": [1.0, 2.0], "R_imag": [float("inf"), 0.5]}, "R")
+        assert z[0].real == 1.0 and z[0].imag == np.inf and z[1] == 2.0 + 0.5j
+
     def test_decode_maps_sentinels_in_place(self):
         raw = json.loads(
             '{"v": [1, "NaN", "Inf", "-Inf"], "m": [["NaN", 2], [3, "-Inf"]],'
@@ -1570,7 +1602,17 @@ class TestNonFiniteEncoding:
 
     def test_comparison_is_exact_on_non_finite(self):
         expected = np.array([1.0, np.nan, np.inf, -np.inf])
-        np.testing.assert_allclose(expected.copy(), expected, rtol=1e-6, atol=0)
+        _assert_allclose(expected.copy(), expected, rtol=1e-6, atol=0)
+        z = np.array([1 + 2j, complex(5.0, np.nan), complex(np.nan, 1.0), complex(2.0, np.inf)])
+        _assert_allclose(z.copy(), z, rtol=1e-6, atol=0)
+        for actual in (
+            [1 + 2j, complex(3.0, np.nan), complex(np.nan, 1.0), complex(2.0, np.inf)],
+            [1 + 2j, complex(5.0, np.nan), complex(np.nan, 7.0), complex(2.0, np.inf)],
+            [1 + 2j, complex(5.0, np.nan), complex(np.nan, 1.0), complex(2.0, -np.inf)],
+        ):
+            # a wrong finite part next to a non-finite one must not pass
+            with pytest.raises(AssertionError):
+                _assert_allclose(np.array(actual), z, rtol=1e-6, atol=0)
         for actual in (
             [1.0, 2.0, np.inf, -np.inf],  # number where NaN is expected
             [1.0, np.nan, -np.inf, -np.inf],  # Inf of the wrong sign
@@ -1578,7 +1620,7 @@ class TestNonFiniteEncoding:
             [np.nan, np.nan, np.inf, -np.inf],  # NaN where a number is expected
         ):
             with pytest.raises(AssertionError):
-                np.testing.assert_allclose(np.array(actual), expected, rtol=1e-6, atol=0)
+                _assert_allclose(np.array(actual), expected, rtol=1e-6, atol=0)
 
     @pytest.mark.parametrize(
         "path", sorted(TESTDATA.glob("reference_*.json")), ids=lambda p: p.name
