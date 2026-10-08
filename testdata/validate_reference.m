@@ -17,6 +17,7 @@ thisDir = fileparts(mfilename('fullpath'));
 rootDir = fileparts(thisDir);
 sidDir = fullfile(rootDir, 'matlab', 'sid');
 addpath(sidDir);
+addpath(thisDir);  % refEncodeNonFinite / refDecodeNonFinite (ADR-0007)
 % MATLAB ignores addpath on directories named 'private'. Copy to a
 % temporary non-private-named directory so private helpers are accessible.
 privateDir = fullfile(sidDir, 'private');
@@ -32,6 +33,10 @@ cleanupObj = onCleanup(@() cleanupShim(shimDir));
 % Example-suite helpers (util_msd and friends) live in matlab/examples/
 % and are used by the MSD reference validation case below.
 addpath(fullfile(rootDir, 'matlab', 'examples'));
+
+% The non-finite encoding and the comparison rules must hold before any
+% vector is trusted to them (ADR-0007): fail loudly if they do not.
+selfTestNonFinite();
 
 files = dir(fullfile(thisDir, 'reference_*.json'));
 if isempty(files)
@@ -50,7 +55,16 @@ for i = 1:numel(files)
     filepath = fullfile(thisDir, name);
     fprintf('  %s\n', name);
 
-    ref = jsondecode(fileread(filepath));
+    txt = fileread(filepath);
+    % Structural: no null anywhere -- NaN, Inf and -Inf are stored as
+    % strings, so a null is an ambiguous non-finite value (ADR-0007).
+    if ~isempty(regexp(txt, '[\[,:]\s*null\s*[,\]\}]', 'once'))
+        nFail = nFail + 1;
+        fprintf('    FAIL\n    holds a null (store NaN/Inf/-Inf as strings)\n');
+        failures{end+1} = name;  %#ok<AGROW>
+        continue;
+    end
+    ref = jsondecode(refDecodeNonFinite(txt));
 
     % Structural: every vector must carry a well-formed provenance block
     % (#172 / ADR-0002) so a stale or hand-edited payload is catchable.
@@ -274,8 +288,12 @@ function args = structToNameValue(s)
 end
 
 
-function [ok, messages] = compareOutputs(result, expected, tolerance)
+function [ok, messages] = compareOutputs(result, expected, tolerance, quiet)
 %COMPAREOUTPUTS Check each expected output field against actual result.
+%   QUIET (optional, default false) suppresses the per-field pass lines.
+    if nargin < 4
+        quiet = false;
+    end
     ok = true;
     messages = {};
 
@@ -327,9 +345,27 @@ function [ok, messages] = compareOutputs(result, expected, tolerance)
             atol = 0;
         end
 
-        % allclose check: |actual - expected| <= atol + rtol * |expected|
+        % Non-finite values compare exactly (ADR-0007): NaN only with NaN,
+        % Inf only with Inf of the same sign. Without this, NaN > x is false
+        % and a NaN on either side would pass the allclose test below.
+        nonFin = ~isfinite(expVec) | ~isfinite(actVec);
+        nonFinOk = (isnan(expVec) & isnan(actVec)) ...
+            | (isinf(expVec) & actVec == expVec);
+        badIdx = find(nonFin & ~nonFinOk, 1);
+        if ~isempty(badIdx)
+            ok = false;
+            messages{end+1} = sprintf( ...
+                '  %s: element %d is %g, expected %g (non-finite values must match exactly)', ...
+                name, badIdx, actVec(badIdx), expVec(badIdx));
+            continue;
+        end
+
+        % allclose check on the finite entries:
+        % |actual - expected| <= atol + rtol * |expected|
         absDiff = abs(actVec - expVec);
         thresh  = atol + rtol * abs(expVec);
+        absDiff(nonFin) = 0;
+        thresh(nonFin)  = 0;
         worstIdx = find(absDiff - thresh == max(absDiff - thresh), 1);
 
         % Report the effective relative error for logging (using the
@@ -343,9 +379,44 @@ function [ok, messages] = compareOutputs(result, expected, tolerance)
                 '  %s: element %d |diff|=%.2e exceeds atol(%.0e)+rtol(%.0e)*|exp|(%.2e) = %.2e', ...
                 name, worstIdx, absDiff(worstIdx), atol, rtol, ...
                 abs(expVec(worstIdx)), thresh(worstIdx));
-        else
+        elseif ~quiet
             fprintf('    %s: max relative error %.2e (rtol %.0e, atol %.0e)\n', ...
                 name, relErr, rtol, atol);
+        end
+    end
+end
+
+
+function selfTestNonFinite()
+%SELFTESTNONFINITE Prove the non-finite encoding and comparison (ADR-0007).
+%   Round-trips NaN/Inf/-Inf through the generator's encoder and this
+%   validator's decoder, then checks that the comparison passes exact
+%   matches and fails every non-finite mismatch, including the NaN-vs-number
+%   case the old allclose test let through.
+    % Column vectors: jsondecode returns 1-D arrays as columns.
+    data = struct('v', [1; NaN; Inf; -Inf], 'm', [NaN, 2; 3, -Inf], ...
+                  's', Inf, 'f', [0.5; 2]);
+    txt = refEncodeNonFinite(jsonencode(data, 'ConvertInfAndNaN', false));
+    if ~isempty(regexp(txt, '[\[,:](null|NaN|-?Infinity)[,\]\}]', 'once'))
+        error('validate_reference:selfTest', 'encoder left a bare token');
+    end
+    back = jsondecode(refDecodeNonFinite(txt));
+    if ~isequaln(back, data)
+        error('validate_reference:selfTest', ...
+            'NaN/Inf round-trip through the reference encoding failed');
+    end
+
+    expRef = struct('x', [1, NaN, Inf, -Inf]);
+    tol = struct();
+    if ~compareOutputs(expRef, expRef, tol, true)
+        error('validate_reference:selfTest', 'exact non-finite match rejected');
+    end
+    bad = {[1, 2, Inf, -Inf], [1, NaN, -Inf, -Inf], [1, NaN, 5, -Inf], ...
+           [NaN, NaN, Inf, -Inf]};
+    for k = 1:numel(bad)
+        if compareOutputs(struct('x', bad{k}), expRef, tol, true)
+            error('validate_reference:selfTest', ...
+                'non-finite mismatch %d passed the comparison', k);
         end
     end
 end

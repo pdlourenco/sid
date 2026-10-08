@@ -122,7 +122,8 @@ failure mode is silent — a wrong vector that both ports happen to match keeps
 cross-validation green while every port is wrong (core rule 5). The machinery
 that produces and consumes them is therefore held to standing rules, hardened
 after the #145 cross-validation remediation (see
-[ADR-0002](docs/decisions/ADR-0002-contract-artifact-hardening.md)):
+[ADR-0002](docs/decisions/ADR-0002-contract-artifact-hardening.md), carried
+forward by [ADR-0007](docs/decisions/ADR-0007-reference-regeneration-provenance-encoding.md)):
 
 1. **Absolute tolerance floors.** Every reference field's tolerance carries an
    absolute floor (`<field>_atol`) alongside the relative one (`<field>_rel`),
@@ -151,6 +152,10 @@ after the #145 cross-validation remediation (see
    *mechanism* — every stored field is read and compared, every tolerance
    honored — over one that asserts only a specific numeric outcome. Outcome
    tests pass right up until the generator drifts; structural gates catch it.
+
+Non-finite values (`NaN`, `Inf`, `-Inf`) are stored as the JSON strings `"NaN"`,
+`"Inf"` and `"-Inf"` and compared exactly; a `null` in a vector is an error
+(ADR-0007, [`testdata/README.md`](testdata/README.md)).
 
 These make the vectors trustworthy enough to *adjudicate* a numerical change —
 the role they play in every algorithmic PR — rather than merely accompany it.

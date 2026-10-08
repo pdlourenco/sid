@@ -39,9 +39,29 @@ file. So a local regen under any engine other than the pinned R2025a churns most
 A PR that *changes* reference semantics or *adds* a vector is different: commit
 exactly the files the change affects (flag them in the PR, and note the canonical
 R2025a round-trip CI will apply post-merge), and leave the rest untouched. This is
-[ADR-0002](../docs/decisions/ADR-0002-contract-artifact-hardening.md) rules 3–4 —
-the vector and its consumer land together, and payloads change only by regeneration
+[ADR-0002](../docs/decisions/ADR-0002-contract-artifact-hardening.md) rules 3–4,
+carried forward by [ADR-0007](../docs/decisions/ADR-0007-reference-regeneration-provenance-encoding.md)
+— the vector and its consumer land together, and payloads change only by regeneration
 — see #147, #174, and #175 for the pattern in practice.
+
+### Non-finite values
+
+`NaN`, `Inf` and `-Inf` are stored as the JSON strings `"NaN"`, `"Inf"` and `"-Inf"`
+([ADR-0007](../docs/decisions/ADR-0007-reference-regeneration-provenance-encoding.md)).
+`jsonencode`'s default would write all three as `null`, which makes `NaN` and the
+`Inf` sentinel indistinguishable, so:
+
+- the generator writes them through `refEncodeNonFinite.m`, which errors if a `null`
+  or a bare `NaN`/`Infinity` token would reach the file;
+- every consumer maps the three strings back to numbers before comparing
+  (`refDecodeNonFinite.m` for MATLAB/Octave, `_decode_nonfinite` in
+  `python/tests/test_cross_validation.py`), and fails a vector that holds a `null`;
+- comparisons are exact on non-finite values: `NaN` matches only `NaN`, and `Inf`
+  only `Inf` of the same sign; finite entries use the stored tolerances.
+
+The three strings are therefore reserved: a field can no longer hold one of them as
+text. The validator's self-test (`selfTestNonFinite` in `validate_reference.m`)
+round-trips the encoding and checks the comparison rules on every run.
 
 ## Validating against reference data
 
