@@ -114,7 +114,13 @@ def ltv_disc_io(
         - **x** (*ndarray or list*) -- Estimated state trajectories.
         - **h** (*ndarray, shape (py, n)*) -- Observation matrix (copy).
         - **r** (*ndarray, shape (py, py)*) -- Noise covariance used.
-        - **cost** (*ndarray, shape (n_iter,)*) -- Cost at each iteration.
+        - **cost** (*ndarray, shape (3,)*) -- ``[total, data_fidelity,
+          regularization]`` at the returned estimate; ``cost[0]`` equals
+          ``cost_history[-1]``.
+        - **cost_history** (*ndarray, shape (n_h,)*) -- Cost at each
+          iteration, plus the returned estimate's cost when it differs
+          from the last entry; ``n_h`` is ``iterations`` or
+          ``iterations + 1``.
         - **iterations** (*int*) -- Number of alternating iterations.
         - **lambda_** (*ndarray, shape (N-1,)*) -- Lambda vector used.
         - **data_length** (*int*) -- *N*.
@@ -190,6 +196,9 @@ def ltv_disc_io(
 
     Changelog
     ---------
+    2026-10-08 : The per-iteration history is now ``cost_history``;
+        ``cost`` is the ``(3,)`` breakdown at the returned estimate
+        (SPEC.md §8.12.9). Breaking: ``cost`` changed meaning.
     2026-04-09 : First version (Python port) by Pedro Lourenco.
     """
     # ------------------------------------------------------------------
@@ -245,7 +254,7 @@ def ltv_disc_io(
             X_hat, U_parsed, lambda_vec, N, n, q, L, is_var_len, horizons
         )
 
-        J = _evaluate_full_cost(
+        J, J_parts = _evaluate_full_cost(
             X_hat,
             A,
             B,
@@ -273,7 +282,8 @@ def ltv_disc_io(
             x=X_hat,
             h=H.copy(),
             r=R_mat.copy(),
-            cost=np.array([J]),
+            cost=J_parts,
+            cost_history=np.array([J]),
             iterations=0,
             lambda_=lambda_vec,
             data_length=N,
@@ -320,7 +330,7 @@ def ltv_disc_io(
         """
         a_k = a_start.copy()
         b_k = b_start.copy()
-        best: tuple | None = None  # (J, X, A, B, S_c, D_c, Xl_c, C_c)
+        best: tuple | None = None  # (J, X, A, B, S_c, D_c, Xl_c, C_c, J_parts)
         j_prev: float | None = None
         iters = 0
         converged = False
@@ -330,7 +340,7 @@ def ltv_disc_io(
             a_k, b_k, s_c, d_c, xl_c, c_c = _cosmic_step(
                 x_hat, U_parsed, lambda_vec, N, n, q, L, is_var_len, horizons
             )
-            j = _evaluate_full_cost(
+            j, j_parts = _evaluate_full_cost(
                 x_hat,
                 a_k,
                 b_k,
@@ -349,7 +359,7 @@ def ltv_disc_io(
             cost_history.append(j)
             iters += 1
             if best is None or j <= best[0]:
-                best = (j, x_hat, a_k.copy(), b_k.copy(), s_c, d_c, xl_c, c_c)
+                best = (j, x_hat, a_k.copy(), b_k.copy(), s_c, d_c, xl_c, c_c, j_parts)
             if j_prev is not None:
                 # SPEC S8.12.3 convergence, with the small-cost floor that keeps
                 # the test from demanding ~machine-precision absolute steps once
@@ -394,7 +404,7 @@ def ltv_disc_io(
         n_iter += iters_z
         best = best_zero if best_zero[0] < accepted[0] else accepted
 
-    J, X_hat, A, B, S_c, D_c, Xl_c, C_c = best
+    J, X_hat, A, B, S_c, D_c, Xl_c, C_c, J_parts = best
     # Report the achieved cost as the final history entry (best iterate may not
     # be the last one evaluated when mu > 0 stages ran).
     if not cost_history or cost_history[-1] != J:
@@ -413,7 +423,8 @@ def ltv_disc_io(
         x=X_hat,
         h=H.copy(),
         r=R_mat.copy(),
-        cost=np.array(cost_history),
+        cost=J_parts,
+        cost_history=np.array(cost_history),
         iterations=n_iter,
         lambda_=lambda_vec,
         data_length=N,
@@ -688,10 +699,14 @@ def _evaluate_full_cost(
     L: int,
     is_var_len: bool,
     horizons: np.ndarray | None,
-) -> float:
+) -> tuple[float, np.ndarray]:
     """Compute full Output-COSMIC objective.
 
     J = obs_fidelity + dyn_fidelity + smoothness
+
+    Returns ``(J, J_parts)`` with ``J_parts = [J, obs_fidelity + dyn_fidelity,
+    smoothness]``, the SPEC §8.12.9 ``Cost`` breakdown (data fidelity,
+    regularization).
     """
     obs_fidelity = 0.0
     dyn_fidelity = 0.0
@@ -727,7 +742,9 @@ def _evaluate_full_cost(
         Ck1 = np.vstack([A[:, :, k + 1].T, B[:, :, k + 1].T])
         smoothness += N * lambda_vec[k] * np.sum((Ck1 - Ck) ** 2)
 
-    return obs_fidelity + dyn_fidelity + smoothness
+    fidelity = obs_fidelity + dyn_fidelity
+    J = fidelity + smoothness
+    return J, np.array([J, fidelity, smoothness])
 
 
 def _add_uncertainty(

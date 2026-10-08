@@ -1124,7 +1124,9 @@ class TestCrossValidationLTVdiscIO:
             **_tol(ref, "B"),
         )
         np.testing.assert_allclose(
-            np.asarray(result.cost).ravel(),
+            # The vector key "Cost" holds the history (SPEC.md §8.12.9
+            # CostHistory) until the vector is re-derived with the new key.
+            np.asarray(result.cost_history).ravel(),
             _to_array(ref["output"], "Cost").ravel(),
             err_msg="LTV-IO cost history mismatch vs MATLAB",
             **_tol(ref, "Cost"),

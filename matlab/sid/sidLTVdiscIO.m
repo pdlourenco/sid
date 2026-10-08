@@ -53,7 +53,12 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
 %       .X               - (N+1 x n x L) or cell {L x 1} estimated states
 %       .H               - (py x n) observation matrix (copy)
 %       .R               - (py x py) noise covariance used
-%       .Cost            - (n_iter x 1) cost J at each iteration
+%       .Cost            - (1 x 3) [total, data_fidelity, regularization]
+%                          at the returned estimate (SPEC.md §8.12.9);
+%                          Cost(1) == CostHistory(end)
+%       .CostHistory     - (n_h x 1) cost J at each iteration, plus the
+%                          returned estimate's J when it differs from the
+%                          last entry; n_h is Iterations or Iterations+1
 %       .Iterations      - scalar, number of alternating iterations
 %       .Lambda          - (N-1 x 1) regularisation used
 %       .DataLength      - N
@@ -98,6 +103,9 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
 %   See also: sidLTIfreqIO, sidLTVdisc, sidLTVStateEst, sidLTVdiscFrozen
 %
 %   Changelog:
+%   2026-10-08: The per-iteration history is now CostHistory; Cost is the
+%               (1 x 3) breakdown at the returned estimate (SPEC.md
+%               §8.12.9). Breaking: .Cost changed meaning.
 %   2026-04-06: Expose CovarianceMode option (was hardcoded 'diagonal').
 %   2026-04-01: First version by Pedro Lourenço.
 %
@@ -139,11 +147,11 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
         [A, B, S_c, D_c, Xl_c, C_c] = cosmicStep( ...
             X_hat, U, lambda, N, n, q, L, isVarLen, horizons);
 
-        J = evaluateFullCost( ...
+        [J, Jparts] = evaluateFullCost( ...
             X_hat, A, B, Y, U, H, Rinv, ...
             lambda, N, n, q, L, isVarLen, horizons);
         result = packResult( ...
-            A, B, X_hat, H, R, J, 0, lambda, ...
+            A, B, X_hat, H, R, J, Jparts, 0, lambda, ...
             N, n, py, q, L, isVarLen, horizons);
         result = addUncertainty( ...
             result, S_c, D_c, Xl_c, C_c, lambda, N, n, q, covMode, ...
@@ -221,7 +229,7 @@ function result = sidLTVdiscIO(Y, U, H, varargin)
 
     % ---- Pack result struct ----
     result = packResult( ...
-        A, B, X_hat, H, R, costHistory(:), nIter, lambda, ...
+        A, B, X_hat, H, R, costHistory(:), best.Jparts, nIter, lambda, ...
         N, n, py, q, L, isVarLen, horizons);
 
     % ---- Bayesian uncertainty from final COSMIC step (SPEC.md §8.12.9) ----
@@ -268,7 +276,7 @@ function [best, iters, converged, costVec] = innerLoop( ...
             X_hat, U, lambda, N, n, q, L, isVarLen, horizons);
 
         % -- Evaluate cost --
-        J = evaluateFullCost( ...
+        [J, Jparts] = evaluateFullCost( ...
             X_hat, A_k, B_k, Y, U, H, Rinv, ...
             lambda, N, n, q, L, isVarLen, horizons);
         iters = iters + 1;
@@ -280,6 +288,7 @@ function [best, iters, converged, costVec] = innerLoop( ...
         %    its A/B/... fields (matching Python's `best is None or ...`). --
         if it == 1 || J <= best.J
             best.J = J;   best.X = X_hat;   best.A = A_k;   best.B = B_k;
+            best.Jparts = Jparts;
             best.S = S_c;  best.D = D_c;  best.Xl = Xl_c;  best.C = C_c;
         end
 
@@ -300,16 +309,19 @@ function [best, iters, converged, costVec] = innerLoop( ...
 end
 
 function result = packResult( ...
-    A, B, X, H, R, cost, nIter, lambda, ...
+    A, B, X, H, R, costHistory, costParts, nIter, lambda, ...
     N, n, py, q, L, isVarLen, horizons)
 % PACKRESULT Build the output struct (shared by both code paths).
+%   COSTPARTS is the (1 x 3) [total, data_fidelity, regularization] of the
+%   returned estimate, so COSTPARTS(1) == COSTHISTORY(end).
 
     result.A               = A;
     result.B               = B;
     result.X               = X;
     result.H               = H;
     result.R               = R;
-    result.Cost            = cost;
+    result.Cost            = costParts;
+    result.CostHistory     = costHistory;
     result.Iterations      = nIter;
     result.Lambda          = lambda;
     result.DataLength      = N;
@@ -515,11 +527,13 @@ function [A, B, S, D, Xl, C] = cosmicStep( ...
     B = permute(C(n+1:end, :, :), [2 1 3]);   % (n x q x N)
 end
 
-function J = evaluateFullCost( ...
+function [J, Jparts] = evaluateFullCost( ...
     X_hat, A, B, Y, U, H, Rinv, lambda, N, n, q, L, isVarLen, horizons)
 % EVALUATEFULLCOST Compute full Output-COSMIC objective.
 %
 %   J = obs_fidelity + dyn_fidelity + smoothness
+%   JPARTS = [J, obs_fidelity + dyn_fidelity, smoothness], the SPEC §8.12.9
+%   Cost breakdown (data fidelity, regularization).
 
     obs_fidelity = 0;
     dyn_fidelity = 0;
@@ -563,5 +577,7 @@ function J = evaluateFullCost( ...
         smoothness = smoothness + N * lambda(k) * norm(Ck1 - Ck, 'fro')^2;
     end
 
-    J = obs_fidelity + dyn_fidelity + smoothness;
+    fidelity = obs_fidelity + dyn_fidelity;
+    J = fidelity + smoothness;
+    Jparts = [J, fidelity, smoothness];
 end
