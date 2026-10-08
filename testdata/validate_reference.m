@@ -66,6 +66,17 @@ for i = 1:numel(files)
     end
     ref = jsondecode(refDecodeNonFinite(txt));
 
+    % Structural: every near-zero output field carries an absolute floor
+    % (standing rule 1; the generator refuses to write one that does not).
+    badAtol = refAtolViolations(ref.output, ref.tolerance);
+    if ~isempty(badAtol)
+        nFail = nFail + 1;
+        fprintf('    FAIL\n    near-zero field(s) without <key>_atol: %s\n', ...
+            strjoin(badAtol, ', '));
+        failures{end+1} = name;  %#ok<AGROW>
+        continue;
+    end
+
     % Structural: every vector must carry a well-formed provenance block
     % (#172 / ADR-0002) so a stale or hand-edited payload is catchable.
     if ~isfield(ref, 'provenance') || ~isstruct(ref.provenance) ...
